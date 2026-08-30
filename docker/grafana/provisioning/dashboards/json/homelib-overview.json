@@ -1,0 +1,215 @@
+{
+  "uid": "homelib-overview",
+  "title": "homelib \u2014 retrieval and answers",
+  "tags": [
+    "homelib"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Queries per hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "Request volume. Flat-lining here is the first sign the API stopped serving.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', ts) AS time, count(*) AS queries\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latency p50 / p95",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "p95 separately from p50: a mean would hide the reranked tail.",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('minute', ts) AS time,\n  percentile_cont(0.5)  WITHIN GROUP (ORDER BY latency_ms) AS p50,\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Retrieval arm distribution",
+      "type": "piechart",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "Which arm actually served traffic \u2014 including fallbacks after degradation.",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT arm AS metric, count(*) AS value\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY arm ORDER BY value DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Feedback ratio",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "Only rated answers. Unrated requests are absent rather than counted as neutral.",
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', ts) AS time,\n  count(*) FILTER (WHERE feedback = 'up')   AS thumbs_up,\n  count(*) FILTER (WHERE feedback = 'down') AS thumbs_down\nFROM query_log WHERE $__timeFilter(ts) AND feedback IS NOT NULL\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Token usage",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "Prompt and completion split \u2014 cost is dominated by whichever grows.",
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', ts) AS time,\n  sum(tokens_prompt)     AS prompt_tokens,\n  sum(tokens_completion) AS completion_tokens\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Degraded-answer rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "homelib-postgres"
+      },
+      "description": "Share of answers served from a fallback path. The API returns 200 when a backend is down, so this \u2014 not the HTTP status \u2014 is how degradation is visible.",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "homelib-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', ts) AS time,\n  100.0 * count(*) FILTER (WHERE degraded) / NULLIF(count(*), 0) AS degraded_pct\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
