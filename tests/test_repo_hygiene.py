@@ -191,3 +191,25 @@ def test_the_full_suite_does_not_run_on_the_quick_lane() -> None:
                 f"job {name!r} runs the full corpus-scale suite on the quick lane "
                 f"({labels}), whose daemon will cancel it at 25 minutes"
             )
+
+
+def test_compose_pins_the_ollama_context_window() -> None:
+    """An unpinned context window fails silently, which is the worst kind.
+
+    Ollama TRUNCATES an over-long prompt rather than erroring, so the model
+    answers a question it was only shown part of and nothing in the response
+    says so. `_MAX_CONTEXT_HITS` allows 20 passages, which reaches ~7,600
+    tokens; the image default is far smaller.
+
+    This was invisible during development because the dev machine has
+    OLLAMA_CONTEXT_LENGTH set globally to 32768 — a local setting no reviewer
+    inherits. Exactly the class of defect this repo keeps finding: something
+    that works only because of state on one machine.
+    """
+    compose = yaml.safe_load((REPO_ROOT / "docker/docker-compose.yml").read_text())
+    env = compose["services"]["ollama"].get("environment") or {}
+
+    assert "OLLAMA_CONTEXT_LENGTH" in env, (
+        "the ollama service does not pin OLLAMA_CONTEXT_LENGTH, so a reviewer "
+        "gets the image default and silent prompt truncation"
+    )

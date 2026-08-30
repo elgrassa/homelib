@@ -38,6 +38,19 @@ services:
 
   ollama:
     image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+    environment:
+      # Pinned, because leaving it to the image default is a "works on my
+      # machine" trap of the worst kind: it fails SILENTLY. Ollama truncates an
+      # over-long prompt rather than erroring, so the model simply answers a
+      # question it was only shown part of.
+      #
+      # Measured on the dev box: an /v1/ask prompt at k=5 is ~1,900 tokens, and
+      # `_MAX_CONTEXT_HITS` allows up to 20 passages, which reaches ~7,600. The
+      # dev machine happens to have OLLAMA_CONTEXT_LENGTH=32768 set globally, so
+      # none of that was ever visible here — a reviewer running the default
+      # would get a fraction of that window and truncation we would never see.
+      # 16384 covers the 20-passage ceiling with room left to generate into.
+      OLLAMA_CONTEXT_LENGTH: "${OLLAMA_CONTEXT_LENGTH:-16384}"
     volumes:
       - ollama:/root/.ollama
     ports: ["127.0.0.1:${OLLAMA_PORT:-11434}:11434"]
