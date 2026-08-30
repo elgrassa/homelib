@@ -14,7 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 # OCR fallback for scanned PDFs. Optional: import-guarded, fails loudly at the
 # use site rather than at import time (see formats/pdf.py).
-ocr = ["pymupdf"]
+ocr = ["pymupdf==1.28.2"]
 
 [build-system]
 requires = ["hatchling"]
