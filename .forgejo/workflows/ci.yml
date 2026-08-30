@@ -33,7 +33,18 @@ jobs:
   gate:
     name: ruff + mypy + pytest
     runs-on: [macos-arm64, quick]
-    timeout-minutes: 10
+    # Measured, not guessed: the run that landed WP-09 took 9m34s — 26 seconds
+    # inside the old 10-minute cap. The dlt integration tests alone are ~7m50s
+    # because they load and re-load the whole 9,168-chunk corpus against a real
+    # Postgres, which is the point of them. One more test would have turned a
+    # green build into a timeout that reads like a hang.
+    #
+    # Raised rather than split into a second job: the steps already run
+    # fast-first (ruff, gitleaks, mypy), so a lint or type error still fails
+    # this job in about two minutes. A parallel job would buy nothing on that
+    # front and would put two runs on one host, which is how the shared-resource
+    # collisions in this repo's history started.
+    timeout-minutes: 25
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache

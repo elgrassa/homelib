@@ -19,9 +19,9 @@ Last updated: 2026-08-30.
 | 1 | **Problem description** | 2 | ✅ done | README states the problem in user terms: unsearchable shelf, unplanned reading order |
 | 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Postgres FTS + pgvector + grounded answer with validated citations (WP-14) |
 | 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | 🟡 partial | 235-pair ground truth ✅, hit-rate/MRR ✅ (hand-computed tests); 4-arm comparison + ADR-001 pending |
-| 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ⬜ todo | ≥3 prompt variants + judge with bias control. **Budget: ~30–50 questions** (measured ~13s/answer) |
+| 4 | **LLM evaluation** — multiple approaches, best one used | 2 | 🟡 partial | Harness ✅ (3 variants, judge with bias control, prompt-hash drift). Live bake-off still to run — it already found the answer-path defect |
 | 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
-| 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | 🟡 partial | dlt pipeline in flight; corpus snapshot + catalog fetchers ✅ |
+| 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
 | 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 partial | Exact pins ✅, snapshot committed ✅, digests ✅; full cold-clone drill blocked on the API |
@@ -80,14 +80,16 @@ Last updated: 2026-08-30.
 1. ~~No Forgejo remote~~ **Resolved 2026-08-30.** `elgrassa/homelib` is live;
    36 commits pushed, CI green first try (run 12254), `main` seeded from that
    verified commit and set as default. PR #1 open.
-2. **dlt pipeline is red.** Its tests fail on foreign-key violations. Likely
-   cause: dlt owns its destination schema and does not naturally load into
-   hand-written tables carrying a `GENERATED ALWAYS AS` tsvector column and a
-   pgvector type. The clean shape is ELT — dlt loads its own schema, then an
-   explicit step populates the typed canonical tables.
+2. ~~dlt pipeline is red~~ **Resolved 2026-08-30** via exactly that ELT
+   shape. 37 tests, 0 skipped, against a live Postgres.
 3. **Open Library has no `description` field** on `search.json` (0% coverage).
    Harmless: the roadmap always generates its own rationale.
 4. ~~The local model invents authors~~ **Closed structurally 2026-08-30.** The
    schema the model fills has no `book_title`/`book_id` field, so an invented
    attribution has no path into a response; titles come from Postgres.
 5. **LLM eval must stay bounded** — ~13s per grounded answer warm.
+6. **The local 7B model is the current ceiling on answer quality.** After the
+   citation fixes, 7/12 sampled questions answer without degrading; the rest
+   are the model returning a bare `{}` or quoting text that appears in no
+   passage. Both are correctly rejected rather than passed off as grounded.
+   This is what the prompt-variant bake-off exists to move.
