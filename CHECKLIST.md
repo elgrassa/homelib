@@ -51,13 +51,14 @@ Last updated: 2026-08-30.
 ## C. Engineering quality (the "maintainable, extendable" half)
 
 - [x] **Spec-first**: 18 one-page specs written before their code
-- [x] `just ci` = ruff + mypy --strict + pytest, **90% coverage floor enforced**
+- [x] `just ci` = ruff + mypy --strict + gitleaks + pytest, **90% coverage floor enforced**
+- [x] Gates split by cost: pre-push is fast (11.7s measured, 355 tests); the PR runs the 13 integration/slow/llm tests and the coverage floor
 - [x] Exact pins everywhere; `uv.lock` authoritative; CI uses `--frozen` so drift fails
 - [x] Forgejo CI with the pinned checkout SHA (hostexecutor runners never auto-clone) — **verified green on the real runner**, not just written
 - [x] Every new module ships behavioural tests in the same commit
 - [x] Degradation is contractual, not incidental — rerank returns `None`, rewrite falls back, hybrid reports the arm it actually used
 - [x] Privacy by default: queries logged as a 16-char sha256 prefix, plaintext opt-in
-- [x] Secrets never staged; `.gitleaks.toml`; `.env.example` committed
+- [x] Secrets never staged; `.gitleaks.toml` **enforced** in CI and pre-push (it was wired into nothing until 2026-08-30); `.env.example` committed
 - [x] `docs/evidence.md` records every verification — including a diagnosis I got wrong and retracted
 - [ ] Eval regression gate wired into CI as a blocking step
 - [x] `specs/openapi.snapshot.json` drift guard green
