@@ -1,0 +1,52 @@
+name: ci
+
+# Forgejo Actions CI. This instance's runners are hostexecutor: no job gets an
+# automatic clone, so EVERY job must start with actions/checkout.
+on:
+  push:
+    branches-ignore: ['wip/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: ruff + mypy + pytest
+    runs-on: [macos-arm64, quick]
+    timeout-minutes: 10
+    env:
+      RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
+      AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
+      UV_PYTHON: "3.13"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # uv is installed on the Mac runners at ~/.local/bin/uv. `uv sync
+      # --frozen` refuses to update uv.lock, so a lock that drifted from
+      # pyproject.toml fails CI instead of being silently repaired.
+      - name: Sync environment (frozen lock)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv --version
+          uv sync --frozen --all-extras
+
+      - name: Lint (ruff)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check (mypy --strict)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run mypy
+
+      - name: Test (pytest + coverage floor)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run pytest -q --cov --cov-report=term-missing

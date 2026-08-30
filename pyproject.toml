@@ -1,0 +1,105 @@
+# homelib — workspace root (virtual: not itself a distributable package).
+#
+# Layout (see docs/architecture.md):
+#   packages/homelib-core  installable: models, format handlers, chunking
+#   packages/homelib-rag   installable: indexing, hybrid, rerank, agent
+#   apps/, evals/, scripts/  plain importable trees (pythonpath below)
+#
+# Exact pins only. uv.lock is the source of truth; bumps go via PR.
+[project]
+name = "homelib"
+version = "0.1.0"
+description = "Personal library: ingest any book format, ask it questions with block-level citations, get a reading roadmap"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Pavlo Korodziievskyi" }]
+
+dependencies = [
+    "homelib-core",
+    "homelib-rag",
+    # api / ui
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.4",
+    "streamlit==1.62.0",
+    # data
+    "psycopg[binary]==3.3.4",
+    "pgvector==0.5.0",
+    "dlt[postgres]==1.30.0",
+    # llm + embeddings
+    "openai==3.6.0",
+    "sentence-transformers==6.0.0",
+    # misc
+    "httpx==0.28.1",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "python-dotenv==1.2.3",
+    "pyyaml==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "hypothesis==6.167.0",
+    "respx==0.23.1",
+    "ruff==0.16.5",
+    "mypy==2.3.1",
+    "types-pyyaml==6.0.12.20260815",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+homelib-core = { workspace = true }
+homelib-rag = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["packages", "apps", "evals"]
+pythonpath = ["."]
+filterwarnings = ["error", "ignore::DeprecationWarning"]
+markers = [
+    "integration: needs a live Postgres (compose test profile)",
+    "llm: needs a reachable LLM endpoint",
+    "slow: takes more than a few seconds",
+]
+
+[tool.coverage.run]
+source = ["packages/homelib-core/src", "packages/homelib-rag/src", "apps", "evals"]
+branch = true
+omit = ["*/tests/*", "apps/ui/*"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "S", "UP", "RUF", "SIM", "C4", "PTH", "RET", "TID"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["S"]
+"scripts/**/*.py" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_any_explicit = false
+files = ["packages/homelib-core/src", "packages/homelib-rag/src", "apps", "evals", "scripts"]
+exclude = "(^|/)tests/"
+
+[[tool.mypy.overrides]]
+module = ["ebooklib.*", "fitz.*", "dlt.*", "pgvector.*", "sentence_transformers.*", "streamlit.*"]
+ignore_missing_imports = true

@@ -1,0 +1,29 @@
+# secrets
+.env
+.env.local
+*.pem
+*.key
+credentials.json
+secrets/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# personal library — purchased ebooks never leave this machine
+data/books/
+data/private/
+
+# working dirs
+.dlt/
+evals/results/*.json
+!evals/results/.gitkeep

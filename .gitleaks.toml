@@ -1,0 +1,16 @@
+title = "homelib gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local-development placeholders committed on purpose"
+paths = [
+  '''\.env\.example$''',
+  '''docker/docker-compose\.yml$''',
+  '''README\.md$''',
+]
+regexes = [
+  '''homelib_local_dev''',
+  '''LLM_API_KEY=ollama''',
+]
