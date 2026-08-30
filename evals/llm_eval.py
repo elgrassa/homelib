@@ -36,6 +36,7 @@ import json
 import logging
 import sys
 import time
+import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,7 @@ from homelib_rag.answer import (
     Citation,
     LLMResponse,
     LLMUnreachableError,
+    OpenAIClient,
     OpenAICompatibleClient,
     answer,
     default_llm_client,
@@ -570,7 +572,33 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--report", type=Path, default=REPORT_PATH, help="report path (default: %(default)s)"
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=180.0,
+        help="per-LLM-call timeout in seconds. Deliberately far above "
+        "production's 30s: this box is shared, and a short ceiling turns "
+        "contention into recorded model failures (default: %(default)s)",
+    )
     return parser.parse_args(argv)
+
+
+def _machine_snapshot() -> str:
+    """Which models Ollama is holding, for the report's contention caveat.
+
+    Recorded at BOTH ends of a run. Checking only at the start is what let two
+    contaminated runs look clean until the numbers were already in hand: a
+    third-party CI job can load a 15GB model halfway through and push the box
+    into swap without either end of this script noticing.
+    """
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/ps", timeout=5) as fh:
+            models = json.load(fh).get("models", [])
+    except Exception:
+        return "unavailable"
+    total = sum(int(m.get("size", 0)) for m in models)
+    names = ", ".join(sorted(str(m.get("name", "?")) for m in models))
+    return f"{len(models)} model(s), {total / 1e9:.1f}GB resident [{names}]"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -582,12 +610,28 @@ def main(argv: list[str] | None = None) -> int:
     questions = load_questions(budget=args.questions)
     print(f"{len(questions)} questions x {len(variants)} variants (+ one judge call each)")
 
+    # A generous timeout, deliberately unlike production's 30s. This box is
+    # shared — another project's CI loads its own models into the same Ollama
+    # without asking either of us — and under memory pressure a 30s ceiling
+    # turns queueing into `LLMUnreachableError`, which this harness records as
+    # a degraded case. That is indistinguishable in the report from the model
+    # failing its JSON contract, so a contended run does not read as noisy, it
+    # reads as a worse model. Two runs were discarded to learn that.
+    #
+    # Waiting for a quiet machine is not something this script can enforce.
+    # Not manufacturing failures out of slowness is.
+    llm_client = OpenAIClient(timeout=args.timeout)
+
+    before = _machine_snapshot()
     cases_by_variant: dict[str, list[AnsweredCase]] = {}
     for variant in variants:
-        cases_by_variant[variant] = run_variant(variant, questions, k=args.k)
+        cases_by_variant[variant] = run_variant(variant, questions, k=args.k, client=llm_client)
         print(f"  answered {variant}: {len(cases_by_variant[variant])} cases")
 
-    scores = score_variants(cases_by_variant)
+    scores = score_variants(cases_by_variant, client=llm_client)
+    after = _machine_snapshot()
+    if before != after:
+        print(f"⚠ machine state changed during the run:\n    before {before}\n    after  {after}")
     write_report(scores, args.report)
     print(f"wrote {args.report} in {time.monotonic() - started:.1f}s")
     print(json.dumps([score.model_dump() for score in scores], indent=2))
