@@ -22,6 +22,7 @@ from evals.ground_truth import (
     GroundTruthRow,
     _clean_questions,
     _client,
+    _is_self_referential,
     _is_substantial,
     _model_name,
     build_ground_truth,
@@ -30,7 +31,6 @@ from evals.ground_truth import (
     main,
     sample_chunks,
     write_ground_truth,
-    _is_self_referential,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
