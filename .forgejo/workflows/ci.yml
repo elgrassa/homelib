@@ -33,18 +33,13 @@ jobs:
   gate:
     name: ruff + mypy + pytest
     runs-on: [macos-arm64, quick]
-    # Measured, not guessed: the run that landed WP-09 took 9m34s — 26 seconds
-    # inside the old 10-minute cap. The dlt integration tests alone are ~7m50s
-    # because they load and re-load the whole 9,168-chunk corpus against a real
-    # Postgres, which is the point of them. One more test would have turned a
-    # green build into a timeout that reads like a hang.
-    #
-    # Raised rather than split into a second job: the steps already run
-    # fast-first (ruff, gitleaks, mypy), so a lint or type error still fails
-    # this job in about two minutes. A parallel job would buy nothing on that
-    # front and would put two runs on one host, which is how the shared-resource
-    # collisions in this repo's history started.
-    timeout-minutes: 25
+    # The quick lane's runner daemon enforces `timeout: 25m` and its own config
+    # says "any single quick job > 12 min is wrong". A `timeout-minutes:` larger
+    # than the daemon's cap is not honoured — the daemon kills the job and
+    # reports it CANCELLED, not failed, which is how run 12292 died looking
+    # like a hang. So the corpus-scale work moves to the heavy lane below
+    # rather than the cap being raised again.
+    timeout-minutes: 12
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
@@ -83,7 +78,38 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv run mypy
 
-      - name: Test (pytest + coverage floor)
+      # Fast tests only. The corpus-scale integration tests run in `full-suite`
+      # below, on the lane sized for them. This job exists to say "the code is
+      # wrong" in a couple of minutes, not to be exhaustive.
+      - name: Test (fast subset)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run pytest -q --no-cov -m "not integration and not slow and not llm"
+
+  # Everything expensive, on the heavy lane (daemon cap 2h). This is the
+  # authoritative run: the whole suite, integration tests included, with the
+  # coverage floor enforced over all of it. Separate job so a lint error does
+  # not wait behind a 20-minute corpus load, and a separate LANE so the two do
+  # not contend for one host — which is the failure mode this repo keeps
+  # rediscovering.
+  full-suite:
+    name: full suite + coverage floor
+    runs-on: [macos-arm64, e2e]
+    timeout-minutes: 45
+    env:
+      RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
+      AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
+      UV_PYTHON: "3.13"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Sync environment (frozen lock)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv --version
+          uv sync --frozen --all-extras
+
+      - name: Test (full suite + coverage floor)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           uv run pytest -q --cov --cov-report=term-missing

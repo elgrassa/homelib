@@ -146,15 +146,48 @@ def test_pre_push_hook_stays_fast_by_excluding_the_slow_markers() -> None:
     assert "--no-cov" in body, "pre-push hook runs the coverage floor; that belongs on the PR"
 
 
-def test_ci_runs_the_full_suite_the_hook_skips() -> None:
+def _all_job_commands() -> dict[str, str]:
+    """Every `run:` command in the workflow, keyed by job name."""
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    return {
+        name: " ".join(str(step.get("run", "")) for step in job["steps"])
+        for name, job in workflow["jobs"].items()
+    }
+
+
+def test_some_ci_job_runs_the_full_suite_the_hook_skips() -> None:
     """Whatever the hook defers must actually be enforced somewhere.
 
-    A fast local gate is only safe because the PR runs everything. If CI ever
-    picks up the hook's marker exclusions too, the slow tests would run
-    nowhere and both gates would be green on a suite nobody executed.
+    The fast local gate and the fast CI job are only safe because ONE job runs
+    everything with the coverage floor. If every job picked up the marker
+    exclusions, the integration tests would run nowhere at all and three
+    separate gates would be green on a suite nobody executed.
     """
-    commands = " ".join(str(step.get("run", "")) for step in _gate_steps())
+    jobs = _all_job_commands()
+    full = {
+        name: cmd
+        for name, cmd in jobs.items()
+        if "pytest" in cmd and "--cov" in cmd and "not integration" not in cmd
+    }
 
-    assert "pytest" in commands, "CI runs no tests at all"
-    assert "not integration" not in commands, "CI excludes the tests the hook already defers"
-    assert "--cov" in commands, "CI does not enforce the coverage floor"
+    assert full, f"no CI job runs the full suite with the coverage floor; jobs are {sorted(jobs)}"
+
+
+def test_the_full_suite_does_not_run_on_the_quick_lane() -> None:
+    """The quick runner's daemon caps jobs at 25m and considers >12m wrong.
+
+    A `timeout-minutes:` above the daemon's own cap is not honoured: the
+    daemon kills the job and reports it CANCELLED rather than failed, which
+    reads as a hang rather than a limit. Run 12292 died exactly that way. The
+    corpus-scale suite therefore belongs on the heavy lane.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+
+    for name, job in workflow["jobs"].items():
+        commands = " ".join(str(step.get("run", "")) for step in job["steps"])
+        if "--cov" in commands and "not integration" not in commands:
+            labels = job["runs-on"]
+            assert "quick" not in labels, (
+                f"job {name!r} runs the full corpus-scale suite on the quick lane "
+                f"({labels}), whose daemon will cancel it at 25 minutes"
+            )
