@@ -138,21 +138,53 @@ def _drop_staging_schemas(database_url: str) -> None:
         conn.execute(f"DROP SCHEMA IF EXISTS {STAGING_DATASET}_staging CASCADE")
 
 
+def _table_counts(database_url: str) -> dict[str, int]:
+    """Row counts for every canonical table."""
+    with psycopg.connect(database_url) as conn:
+        return {
+            table: conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]  # type: ignore[index]
+            for table in _CANONICAL_TABLES
+        }
+
+
+def _reset_corpus_tables(database_url: str) -> None:
+    """Empty the canonical tables and drop dlt's staging schemas."""
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        conn.execute("TRUNCATE TABLE chunk_embeddings, chunks, blocks, books, catalog CASCADE")
+    _drop_staging_schemas(database_url)
+
+
+@pytest.fixture(scope="session")
+def seeded_corpus(_throwaway_database: str) -> Iterator[str]:
+    """The full corpus, loaded ONCE for the whole session.
+
+    Every integration test below used to call `run_pipeline()` itself, and
+    each call embeds all 9,168 chunks. Seven tests therefore paid for seven
+    full embedding passes — about 14 minutes, which was enough on its own to
+    blow through CI's job timeout twice.
+
+    Sharing one load is not a shortcut: these tests assert on the STATE a load
+    produces, and they assert different things about it, so one load answers
+    all of them. The two idempotency tests deliberately run a second pass on
+    top; that is safe for the tests that follow precisely because being
+    idempotent means the second pass changes nothing — if it ever does, the
+    idempotency test fails first and says so directly.
+    """
+    _reset_corpus_tables(_throwaway_database)
+    run_pipeline(database_url=_throwaway_database)
+    yield _throwaway_database
+    _reset_corpus_tables(_throwaway_database)
+
+
 @pytest.fixture
 def clean_corpus_tables(live_database_url: str) -> Iterator[str]:
-    """Truncate the canonical tables and drop dlt's staging schema before and
-    after the test, so pipeline runs in this test module start from a
-    known-empty state and don't leak rows into other tests or a real dev seed.
+    """An EMPTY canonical schema, for tests that need to observe a load
+    happening rather than its result. Function-scoped and expensive — prefer
+    `seeded_corpus` unless the test genuinely needs to start from empty.
     """
-
-    def _reset() -> None:
-        with psycopg.connect(live_database_url, autocommit=True) as conn:
-            conn.execute("TRUNCATE TABLE chunk_embeddings, chunks, blocks, books, catalog CASCADE")
-        _drop_staging_schemas(live_database_url)
-
-    _reset()
+    _reset_corpus_tables(live_database_url)
     yield live_database_url
-    _reset()
+    _reset_corpus_tables(live_database_url)
 
 
 # ── unit tests: pure helpers, no DB, no model, no network ──────────────────
@@ -238,11 +270,9 @@ def test_catalog_resource_skips_provenance_header_and_malformed_line(tmp_path: P
 
 
 @pytest.mark.integration
-def test_chunks_and_embeddings_counts_match(clean_corpus_tables: str) -> None:
+def test_chunks_and_embeddings_counts_match(seeded_corpus: str) -> None:
     """Every loaded chunk has exactly one embedding row."""
-    run_pipeline(database_url=clean_corpus_tables)
-
-    with psycopg.connect(clean_corpus_tables) as conn:
+    with psycopg.connect(seeded_corpus) as conn:
         chunk_count = conn.execute("SELECT count(*) FROM chunks").fetchone()
         embedding_count = conn.execute("SELECT count(*) FROM chunk_embeddings").fetchone()
         unmatched = conn.execute(
@@ -260,7 +290,7 @@ def test_chunks_and_embeddings_counts_match(clean_corpus_tables: str) -> None:
 
 
 @pytest.mark.integration
-def test_chunk_embeddings_chunk_id_always_has_matching_chunk(clean_corpus_tables: str) -> None:
+def test_chunk_embeddings_chunk_id_always_has_matching_chunk(seeded_corpus: str) -> None:
     """Regression test for the exact defect this pipeline's design guards
     against: dlt has no knowledge of `chunk_embeddings.chunk_id`'s FK to
     `chunks.chunk_id`, so a naive single dlt load into `public` can commit
@@ -270,9 +300,7 @@ def test_chunk_embeddings_chunk_id_always_has_matching_chunk(clean_corpus_tables
     counts_match`'s row-count comparison, which a coincidental count match
     would not catch.
     """
-    run_pipeline(database_url=clean_corpus_tables)
-
-    with psycopg.connect(clean_corpus_tables) as conn:
+    with psycopg.connect(seeded_corpus) as conn:
         orphans = conn.execute(
             "SELECT e.chunk_id FROM chunk_embeddings e "
             "LEFT JOIN chunks c ON c.chunk_id = e.chunk_id "
@@ -283,7 +311,7 @@ def test_chunk_embeddings_chunk_id_always_has_matching_chunk(clean_corpus_tables
 
 
 @pytest.mark.integration
-def test_ingest_does_not_reshape_canonical_schema(clean_corpus_tables: str) -> None:
+def test_ingest_does_not_reshape_canonical_schema(seeded_corpus: str) -> None:
     """dlt must never own or reshape `public`: this pins the invariant that
     makes the ELT split (dlt -> `homelib_staging`, then an explicit transform
     -> `public`) safe. `chunks.tsv` is a `GENERATED ALWAYS` column dlt never
@@ -291,9 +319,7 @@ def test_ingest_does_not_reshape_canonical_schema(clean_corpus_tables: str) -> N
     a real pgvector `vector(384)`, not whatever type dlt would have invented
     for it (dlt's own type system has no vector type at all).
     """
-    run_pipeline(database_url=clean_corpus_tables)
-
-    with psycopg.connect(clean_corpus_tables) as conn:
+    with psycopg.connect(seeded_corpus) as conn:
         tsv_column = conn.execute(
             "SELECT data_type FROM information_schema.columns "
             "WHERE table_schema='public' AND table_name='chunks' AND column_name='tsv'"
@@ -326,55 +352,43 @@ def test_ingest_does_not_reshape_canonical_schema(clean_corpus_tables: str) -> N
 
 
 @pytest.mark.integration
-def test_second_run_adds_no_duplicates(clean_corpus_tables: str) -> None:
-    """Idempotency proof: run twice, row counts are identical."""
-    run_pipeline(database_url=clean_corpus_tables)
+def test_second_run_adds_no_duplicates(seeded_corpus: str) -> None:
+    """Idempotency proof: load again over an existing load, counts identical.
 
-    def _counts() -> dict[str, int]:
-        with psycopg.connect(clean_corpus_tables) as conn:
-            return {
-                table: conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]  # type: ignore[index]
-                for table in _CANONICAL_TABLES
-            }
-
-    first_counts = _counts()
+    Builds on the session's load rather than doing its own first pass — the
+    claim is "a second run changes nothing", and the session fixture already
+    provides the first run. That halves the embedding work for this test.
+    """
+    first_counts = _table_counts(seeded_corpus)
     assert first_counts["books"] > 0
 
-    run_pipeline(database_url=clean_corpus_tables)
-    second_counts = _counts()
+    run_pipeline(database_url=seeded_corpus)
 
-    assert second_counts == first_counts
+    assert _table_counts(seeded_corpus) == first_counts
 
 
 @pytest.mark.integration
-def test_sync_staging_to_public_alone_is_idempotent(clean_corpus_tables: str) -> None:
-    """`_sync_staging_to_public` (the ELT transform) is idempotent on its
-    own, independent of dlt's own merge: re-running it against the same
-    already-staged rows must not duplicate `public` rows.
+def test_sync_staging_to_public_alone_is_idempotent(seeded_corpus: str) -> None:
+    """The ELT transform is idempotent on its own, independent of dlt's merge.
+
+    Re-running it against the same already-staged rows must not duplicate
+    anything in `public`. Deliberately calls the transform rather than the
+    whole pipeline: dlt's merge disposition would mask a non-idempotent
+    transform by never presenting it with a duplicate in the first place.
+    Staging is already populated by the session's load, so this costs no
+    embedding work at all.
     """
-    run_pipeline(database_url=clean_corpus_tables)
-
-    def _counts() -> dict[str, int]:
-        with psycopg.connect(clean_corpus_tables) as conn:
-            return {
-                table: conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]  # type: ignore[index]
-                for table in _CANONICAL_TABLES
-            }
-
-    first_counts = _counts()
+    first_counts = _table_counts(seeded_corpus)
     assert first_counts["chunks"] > 0
 
-    _sync_staging_to_public(clean_corpus_tables)
-    second_counts = _counts()
+    _sync_staging_to_public(seeded_corpus)
 
-    assert second_counts == first_counts
+    assert _table_counts(seeded_corpus) == first_counts
 
 
 @pytest.mark.integration
-def test_embeddings_are_384_dim(clean_corpus_tables: str) -> None:
-    run_pipeline(database_url=clean_corpus_tables)
-
-    with psycopg.connect(clean_corpus_tables) as conn:
+def test_embeddings_are_384_dim(seeded_corpus: str) -> None:
+    with psycopg.connect(seeded_corpus) as conn:
         dims = conn.execute(
             "SELECT DISTINCT vector_dims(embedding) FROM chunk_embeddings"
         ).fetchall()
