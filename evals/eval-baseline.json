@@ -1,19 +1,19 @@
 {
   "metrics": {
-    "hybrid_rerank.hit_rate_at_5": 0.70,
-    "hybrid_rerank.mrr_at_5": 0.55,
+    "hybrid_rerank.hit_rate_at_5": 0.1744,
+    "hybrid_rerank.mrr_at_5": 0.1673,
     "judge.mean_faithfulness": 3.8
   },
   "specs": {
     "hybrid_rerank.hit_rate_at_5": {
       "key": "hybrid_rerank.hit_rate_at_5",
       "direction": "higher_is_better",
-      "margin": 0.03
+      "margin": 0.01
     },
     "hybrid_rerank.mrr_at_5": {
       "key": "hybrid_rerank.mrr_at_5",
       "direction": "higher_is_better",
-      "margin": 0.03
+      "margin": 0.01
     },
     "judge.mean_faithfulness": {
       "key": "judge.mean_faithfulness",
@@ -22,8 +22,8 @@
     }
   },
   "notes": {
-    "hybrid_rerank.hit_rate_at_5": "PLACEHOLDER floor, not yet measured — evals/ground_truth.jsonl and evals/retrieval_eval.py (WP-12/13) do not exist yet. 0.70 is a conservative guess for the RRF+cross-encoder arm, based on typical hit-rate@5 figures reported for hybrid retrieval over a few-hundred-question set on a 15-25 book shelf. Margin 0.03 is set to absorb LLM ground-truth generation noise between reruns (question phrasing varies run to run), not real regressions. REPLACE both the number and this note with the measured value plus its real justification once the WP-12/13 retrieval eval runs for the first time.",
-    "hybrid_rerank.mrr_at_5": "PLACEHOLDER floor, same caveat as hybrid_rerank.hit_rate_at_5 above — no real retrieval eval run exists yet. 0.55 assumes that once cross-encoder rerank is applied, most hits land within the first 1-2 ranks rather than deep in the top-5. Margin 0.03 mirrors hit_rate_at_5's tolerance for ground-truth-generation noise between runs. REPLACE with the measured value once WP-12/13 land.",
-    "judge.mean_faithfulness": "PLACEHOLDER floor for the WP-15 LLM-judge faithfulness score (1-5 scale) pending a real evals/results run — no judge pipeline has executed yet. 3.8 is a deliberately unambitious guess so the gate is not immediately red on the very first real measurement. Margin 0.15 anticipates judge-model variance and mirrors the illustrative example in specs/eval-gate.md; RE-DERIVE it properly by rerunning the same prompt/model variant 3x and observing the spread, once the judge pipeline exists."
+    "hybrid_rerank.hit_rate_at_5": "MEASURED 2026-08-30 over all 235 ground-truth rows, k=5, zero degraded queries (evals/results/retrieval.md, ADR-001). This floor is LOW and deliberately not dressed up: the metric is single-positive and chunk-exact, so a neighbouring chunk carrying equally relevant prose scores as a total miss, and at 9168 chunks over 18 books near-misses are the common case. A diagnostic over 60 questions puts correct-book-in-top-5 at 0.650 and correct-section at 0.400, so retrieval has real signal that this number does not show. It is still the right metric to gate on, because every arm is penalised identically. Margin 0.01, not the usual noise-absorbing width, because this eval is DETERMINISTIC: no LLM in the measurement path and a fixed index, verified by two runs returning byte-identical metrics. There is no sampling noise to absorb, so anything beyond rounding is a real change. RE-MEASURE, do not hand-edit, if the corpus, the chunker, or evals/ground_truth.jsonl changes \u2014 all three move this number legitimately.",
+    "hybrid_rerank.mrr_at_5": "MEASURED 2026-08-30, same run and same caveats as hybrid_rerank.hit_rate_at_5. Worth reading alongside it: rerank lifts MRR (0.152 -> 0.167) while leaving hit-rate unchanged, which is the signature of a component that reorders a fixed candidate set and cannot surface a chunk fusion missed. If a future change moves hit-rate and MRR together, something other than the reranker did it. Margin 0.01 for the determinism reason above.",
+    "judge.mean_faithfulness": "PLACEHOLDER floor for the WP-15 LLM-judge faithfulness score (1-5 scale) pending a real evals/results run \u2014 no judge pipeline has executed yet. 3.8 is a deliberately unambitious guess so the gate is not immediately red on the very first real measurement. Margin 0.15 anticipates judge-model variance and mirrors the illustrative example in specs/eval-gate.md; RE-DERIVE it properly by rerunning the same prompt/model variant 3x and observing the spread, once the judge pipeline exists."
   }
 }

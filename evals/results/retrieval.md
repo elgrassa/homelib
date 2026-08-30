@@ -1,16 +1,16 @@
 # Retrieval arm eval
 
-Generated: 2026-08-30T15:33:14+00:00
+Generated: 2026-08-30T15:56:31+00:00
 Ground truth: `evals/ground_truth.jsonl` — 235 row(s) loaded, 235 scored, 0 skipped because the labelled `chunk_id` is not in the current index (corpus drift; excluded rather than counted as a miss).
 Coverage: k=5, question budget = all rows (`--questions`), query rewrite = off (`--rewrite`).
 Arms compared: `lexical`, `vector`, `hybrid`, `hybrid_rerank`.
 
 | arm | rewrite | n | hit-rate@5 | MRR@5 | degraded | mean latency (ms) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `lexical` | off | 235 | 0.072 | 0.066 | 0 | 77 |
-| `vector` | off | 235 | 0.106 | 0.092 | 0 | 137 |
-| `hybrid` | off | 235 | 0.174 | 0.152 | 0 | 164 |
-| `hybrid_rerank` **(winner)** | off | 235 | 0.174 | 0.167 | 0 | 276 |
+| `lexical` | off | 235 | 0.072 | 0.066 | 0 | 173 |
+| `vector` | off | 235 | 0.106 | 0.092 | 0 | 233 |
+| `hybrid` | off | 235 | 0.174 | 0.152 | 0 | 252 |
+| `hybrid_rerank` **(winner)** | off | 235 | 0.174 | 0.167 | 0 | 338 |
 
 **Winner: `hybrid_rerank`** — highest hit-rate@5 (0.174), MRR@5 (0.167) breaking ties.
 
