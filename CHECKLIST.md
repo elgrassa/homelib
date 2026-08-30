@@ -17,10 +17,10 @@ Last updated: 2026-08-30.
 | # | Criterion | Max | Status | Evidence / what remains |
 |---|---|---|---|---|
 | 1 | **Problem description** | 2 | ✅ done | README states the problem in user terms: unsearchable shelf, unplanned reading order |
-| 2 | **Retrieval flow** — KB **and** LLM both used | 2 | 🟡 partial | Postgres FTS + pgvector done; answer path is in flight (WP-14) |
+| 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Postgres FTS + pgvector + grounded answer with validated citations (WP-14) |
 | 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | 🟡 partial | 235-pair ground truth ✅, hit-rate/MRR ✅ (hand-computed tests); 4-arm comparison + ADR-001 pending |
 | 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ⬜ todo | ≥3 prompt variants + judge with bias control. **Budget: ~30–50 questions** (measured ~13s/answer) |
-| 5 | **Interface** — UI or API | 2 | 🟡 partial | Streamlit UI ✅ done (3 tabs, 100% covered logic); FastAPI + Swagger in flight (WP-14) |
+| 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | 🟡 partial | dlt pipeline in flight; corpus snapshot + catalog fetchers ✅ |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
@@ -60,7 +60,7 @@ Last updated: 2026-08-30.
 - [x] Secrets never staged; `.gitleaks.toml`; `.env.example` committed
 - [x] `docs/evidence.md` records every verification — including a diagnosis I got wrong and retracted
 - [ ] Eval regression gate wired into CI as a blocking step
-- [ ] `specs/openapi.snapshot.json` drift guard green
+- [x] `specs/openapi.snapshot.json` drift guard green
 - [x] ADR-002 (catalog source) written — records the Kaggle/Google Books/Goodreads rejections, enforced by a grep test
 - [ ] ADR-001 (retrieval arm) — blocked on the 4-arm eval table
 - [ ] Fresh-eyes pass: no dead code, no stale docstrings
@@ -86,7 +86,7 @@ Last updated: 2026-08-30.
    explicit step populates the typed canonical tables.
 3. **Open Library has no `description` field** on `search.json` (0% coverage).
    Harmless: the roadmap always generates its own rationale.
-4. **The local model invents authors** — it attributed Ford's *My Life and Work*
-   to Theodore Roosevelt when given title-only context. Authors are now passed
-   explicitly and citation validation must check attribution.
+4. ~~The local model invents authors~~ **Closed structurally 2026-08-30.** The
+   schema the model fills has no `book_title`/`book_id` field, so an invented
+   attribution has no path into a response; titles come from Postgres.
 5. **LLM eval must stay bounded** — ~13s per grounded answer warm.
