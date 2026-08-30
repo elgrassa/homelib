@@ -8,13 +8,14 @@ all until a coverage sweep caught it.
 
 import gzip
 import json
+import re
 from pathlib import Path
 
 import pytest
+from homelib_core.models import BookDoc
 
 from apps.ingest.build_snapshot import build_book, build_snapshot, main
 from apps.ingest.fetch_corpus import ManifestEntry
-from homelib_core.models import BookDoc
 
 _ENTRY = ManifestEntry(
     book_id="test-book",
@@ -72,7 +73,7 @@ def test_build_book_preserves_parsed_structure(tmp_path: Path) -> None:
 
 def test_build_book_missing_file_names_the_fix(tmp_path: Path) -> None:
     """A missing download must say how to get it, not raise a bare OSError."""
-    with pytest.raises(FileNotFoundError, match="fetch_corpus.py --fetch"):
+    with pytest.raises(FileNotFoundError, match=re.escape("fetch_corpus.py --fetch")):
         build_book(_ENTRY, books_dir=tmp_path)
 
 
