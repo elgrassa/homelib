@@ -25,10 +25,14 @@ an optional override, never a requirement.
 
 ```bash
 cp .env.example .env
-docker compose -f docker/docker-compose.yml up -d --build
-docker compose -f docker/docker-compose.yml --profile seed run --rm ingest
+docker compose --env-file .env -f docker/docker-compose.yml up -d --build
+docker compose --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
 open http://localhost:8501
 ```
+
+`--env-file` is not optional: the compose file lives in `docker/`, so Compose
+looks for `docker/.env` and would otherwise start Postgres with a blank
+password. `just up && just seed` does the same thing and checks for you.
 
 ## Development
 

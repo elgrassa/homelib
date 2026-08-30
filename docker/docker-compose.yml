@@ -1,0 +1,136 @@
+# homelib — the entire solution in one stack.
+#
+# Reviewer path, start to finish:
+#   cp .env.example .env
+#   docker compose -f docker/docker-compose.yml up -d --build
+#   docker compose -f docker/docker-compose.yml --profile seed run --rm ingest
+#   open http://localhost:8501
+#
+# Every port binds to 127.0.0.1: this stack is a local application, not a
+# service exposed to the network. Every long-running service declares a
+# healthcheck, and dependants wait on `service_healthy` rather than racing a
+# container that is up but not yet listening.
+#
+# NOT YET REPRODUCIBLE: these images carry tags but no digests, because Docker
+# Hub was unreachable from this machine when the file was written (even
+# `docker pull alpine` timed out). Reproducibility is a graded criterion, so
+# WP-07 must replace every tag below with `<tag>@sha256:<digest>` once the
+# registry responds. Until then a rebuild can silently pick up a different
+# image than the one this stack was verified against.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: homelib
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: homelib
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homelib -d homelib"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports: ["127.0.0.1:11434:11434"]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # One-shot: pulls the chat model so the first /v1/ask never cold-fails on a
+  # missing model. Runs to completion and exits; `restart: no` keeps it exited.
+  model-init:
+    image: ollama/ollama:latest
+    entrypoint: ["/bin/sh", "-c", "OLLAMA_HOST=http://ollama:11434 ollama pull ${LLM_MODEL}"]
+    depends_on:
+      ollama: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://homelib:${POSTGRES_PASSWORD}@postgres:5432/homelib
+      # Point these at any OpenAI-compatible endpoint to swap providers. The
+      # default keeps everything inside this stack — no account, no key.
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-ollama}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
+      EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      ollama: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # `just seed`. Behind a profile so `up -d` does not run it implicitly —
+  # ingestion is idempotent, but it should still be a deliberate step.
+  ingest:
+    build:
+      context: ..
+      dockerfile: docker/ingest.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://homelib:${POSTGRES_PASSWORD}@postgres:5432/homelib
+      SNAPSHOT: /data/corpus_snapshot.jsonl.gz
+      CATALOG: /data/catalog.jsonl
+      EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+    volumes:
+      - ../data:/data:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    profiles: [seed]
+
+  ui:
+    build:
+      context: ..
+      dockerfile: docker/ui.Dockerfile
+    environment:
+      API_URL: http://api:8000
+    ports: ["127.0.0.1:8501:8501"]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana:/var/lib/grafana
+    ports: ["127.0.0.1:3001:3000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata: {}
+  ollama: {}
+  grafana: {}

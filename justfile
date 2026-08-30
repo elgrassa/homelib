@@ -29,18 +29,31 @@ fmt:
 
 # ── stack ───────────────────────────────────────────────────────────────────
 
-up:
-    docker compose -f docker/docker-compose.yml up -d --build
+# Compose lives in docker/, so Compose treats THAT as the project directory and
+# looks for docker/.env — it does not pick up the repo-root .env on its own.
+# Without --env-file the stack boots with a blank POSTGRES_PASSWORD and an empty
+# LLM_MODEL, warning but not failing. Every compose call therefore passes it.
+compose := "docker compose --env-file .env -f docker/docker-compose.yml"
 
-down:
-    docker compose -f docker/docker-compose.yml down
+# Refuse to run against a missing .env rather than silently using blank values.
+_require-env:
+    @test -f .env || { echo "✗ no .env — run: cp .env.example .env"; exit 1; }
 
-logs SERVICE="":
-    docker compose -f docker/docker-compose.yml logs -f {{SERVICE}}
+up: _require-env
+    {{compose}} up -d --build
+
+down: _require-env
+    {{compose}} down
+
+logs SERVICE="": _require-env
+    {{compose}} logs -f {{SERVICE}}
 
 # One-shot dlt ingestion: corpus snapshot + catalog -> Postgres.
-seed:
-    docker compose -f docker/docker-compose.yml --profile seed run --rm ingest
+seed: _require-env
+    {{compose}} --profile seed run --rm ingest
+
+ps: _require-env
+    {{compose}} ps --format '{{{{.Name}} {{{{.Status}}'
 
 # ── evaluation ──────────────────────────────────────────────────────────────
 

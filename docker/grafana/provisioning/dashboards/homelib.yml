@@ -1,0 +1,15 @@
+# Dashboards are committed JSON, provisioned at boot. Nothing is created by
+# hand in the UI, so a fresh clone shows the same panels as this machine.
+apiVersion: 1
+
+providers:
+  - name: homelib
+    orgId: 1
+    folder: homelib
+    type: file
+    disableDeletion: true
+    # Provisioned dashboards are read-only in the UI: an edit that only lives
+    # in one person's browser is not evidence of anything.
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

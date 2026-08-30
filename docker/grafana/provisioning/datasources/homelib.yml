@@ -1,0 +1,21 @@
+# Grafana reads the same Postgres the app writes to — no metrics sidecar, no
+# exporter. It connects as grafana_ro (docker/initdb/02-grafana-user.sql), which
+# holds SELECT and nothing else.
+apiVersion: 1
+
+datasources:
+  - name: homelib
+    type: postgres
+    uid: homelib-postgres
+    access: proxy
+    url: postgres:5432
+    database: homelib
+    user: grafana_ro
+    secureJsonData:
+      password: grafana_ro
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1700
+      timescaledb: false
+    isDefault: true
+    editable: false
