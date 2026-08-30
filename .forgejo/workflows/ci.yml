@@ -33,13 +33,17 @@ jobs:
   gate:
     name: ruff + mypy + pytest
     runs-on: [macos-arm64, quick]
-    # The quick lane's runner daemon enforces `timeout: 25m` and its own config
-    # says "any single quick job > 12 min is wrong". A `timeout-minutes:` larger
-    # than the daemon's cap is not honoured — the daemon kills the job and
-    # reports it CANCELLED, not failed, which is how run 12292 died looking
-    # like a hang. So the corpus-scale work moves to the heavy lane below
-    # rather than the cap being raised again.
-    timeout-minutes: 12
+    # The quick lane's daemon enforces `timeout: 25m`. A `timeout-minutes:`
+    # ABOVE that is not honoured — the daemon kills the job and reports it
+    # CANCELLED rather than failed, which reads as a hang (run 12292). 20 keeps
+    # this under the daemon's cap so a real overrun still reports as a failure.
+    #
+    # 12 was too tight, and not because of the tests. Measured on run 12298:
+    # checkout took 2 seconds and `uv sync --frozen --all-extras` took 11.5
+    # minutes. The runner wipes its workdir every job, so the venv — torch,
+    # sentence-transformers, the lot — is rebuilt from scratch each time. The
+    # fast test suite itself is about 8 seconds.
+    timeout-minutes: 20
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
