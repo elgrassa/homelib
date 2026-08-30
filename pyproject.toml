@@ -29,6 +29,11 @@ dependencies = [
     # llm + embeddings
     "openai==3.6.0",
     "sentence-transformers==6.0.0",
+    # Declared explicitly only so the CPU-only index below applies to it.
+    # sentence-transformers would otherwise pull it transitively, and on
+    # linux/amd64 that means the CUDA build: 2.9 GB of nvidia-* wheels plus
+    # 652 MB of triton, in an image that never sees a GPU.
+    "torch==2.10.0",
     # misc
     "httpx==0.28.1",
     "pydantic==2.13.5",
@@ -55,12 +60,23 @@ dev = [
 [tool.uv]
 package = false
 
+# PyTorch publishes CPU-only wheels on a separate index. Without this, the
+# linux resolution drags in the full CUDA stack and the API image balloons
+# past 18 GB — measured, not guessed. `explicit = true` keeps this index
+# scoped to torch alone rather than shadowing PyPI for everything.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+homelib-core = { workspace = true }
+homelib-rag = { workspace = true }
+
 [tool.uv.workspace]
 members = ["packages/*"]
 
-[tool.uv.sources]
-homelib-core = { workspace = true }
-homelib-rag = { workspace = true }
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
