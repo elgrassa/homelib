@@ -18,14 +18,14 @@ Last updated: 2026-08-30.
 |---|---|---|---|---|
 | 1 | **Problem description** | 2 | ✅ done | README states the problem in user terms: unsearchable shelf, unplanned reading order |
 | 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Postgres FTS + pgvector + grounded answer with validated citations (WP-14) |
-| 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | 🟡 partial | 235-pair ground truth ✅, hit-rate/MRR ✅ (hand-computed tests); 4-arm comparison + ADR-001 pending |
+| 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms × 235 questions, 0 degraded; ADR-001 records the choice and the evidence |
 | 4 | **LLM evaluation** — multiple approaches, best one used | 2 | 🟡 partial | Harness ✅ (3 variants, judge with bias control, prompt-hash drift). Live bake-off still to run — it already found the answer-path defect |
 | 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
 | 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 partial | Exact pins ✅, snapshot committed ✅, digests ✅; full cold-clone drill blocked on the API |
-| 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | 🟡 partial | All three implemented ✅; the point needs the eval table showing they were compared |
+| 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | ✅ done | All three implemented **and measured**. Rewrite compared on a matched sample and rejected on evidence — a recorded negative result |
 | 11 | **Bonus: cloud deployment** | 2 | ⬜ optional | Buffer-day only. Never at the cost of 1–10 |
 | 12 | **Bonus: extras** | 3 | 🟡 partial | Eval regression gate ✅ built; audiobook + Obsidian BookShelf are buffer-day |
 | — | **Peer reviews (×3)** | +9 | ⬜ todo | **Required, and time-boxed — schedule ≥2h after submitting** |
@@ -60,10 +60,11 @@ Last updated: 2026-08-30.
 - [x] Privacy by default: queries logged as a 16-char sha256 prefix, plaintext opt-in
 - [x] Secrets never staged; `.gitleaks.toml` **enforced** in CI and pre-push (it was wired into nothing until 2026-08-30); `.env.example` committed
 - [x] `docs/evidence.md` records every verification — including a diagnosis I got wrong and retracted
+- [x] Eval baselines replaced with measured values + honest notes; gate exits 0
 - [ ] Eval regression gate wired into CI as a blocking step
 - [x] `specs/openapi.snapshot.json` drift guard green
 - [x] ADR-002 (catalog source) written — records the Kaggle/Google Books/Goodreads rejections, enforced by a grep test
-- [ ] ADR-001 (retrieval arm) — blocked on the 4-arm eval table
+- [x] ADR-001 (retrieval arm) — hybrid+rerank on measured evidence; rewrite rejected
 - [ ] Fresh-eyes pass: no dead code, no stale docstrings
 
 ## D. Nice to have — extendability
