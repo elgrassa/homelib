@@ -62,6 +62,7 @@ Last updated: 2026-08-30.
 - [x] `docs/evidence.md` records every verification — including a diagnosis I got wrong and retracted
 - [x] Eval baselines replaced with measured values + honest notes; gate exits 0
 - [ ] Eval regression gate wired into CI as a blocking step
+- [x] CI split by cost across lanes: quick gate (ruff/gitleaks/mypy/fast tests) + heavy full suite with the coverage floor
 - [x] `specs/openapi.snapshot.json` drift guard green
 - [x] ADR-002 (catalog source) written — records the Kaggle/Google Books/Goodreads rejections, enforced by a grep test
 - [x] ADR-001 (retrieval arm) — hybrid+rerank on measured evidence; rewrite rejected
@@ -89,6 +90,16 @@ Last updated: 2026-08-30.
    schema the model fills has no `book_title`/`book_id` field, so an invented
    attribution has no path into a response; titles come from Postgres.
 5. **LLM eval must stay bounded** — ~13s per grounded answer warm.
+7. **Two latent LLM-config hazards, recorded not fixed.** `_TIMEOUT_SECONDS = 30`
+   in `OpenAIClient` is a production ceiling a cold model load can blow through,
+   and `_MAX_CONTEXT_HITS = 20` would put prompts near ~7,600 tokens — fine on
+   the current 32k-context model, not fine on a 4k or 8k one, and silent from
+   the client side either way.
+8. **A zero-citation answer currently counts as a success.** `degraded=False`
+   with `citations=[]` is the legitimate "the passages do not answer this"
+   reply, but it means a prompt variant can win the bake-off by declining more
+   often. No winner is published without the per-arm count of ungrounded
+   successes.
 6. **The local 7B model is the current ceiling on answer quality.** After the
    citation fixes, 7/12 sampled questions answer without degrading; the rest
    are the model returning a bare `{}` or quoting text that appears in no
