@@ -13,12 +13,14 @@ run still passes with no database running.
 
 import gzip
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import psycopg
 import pytest
 from homelib_core.models import Block, BookDoc, Provenance
+from psycopg import sql
 
 from apps.ingest.pipeline import (
     DEFAULT_DATABASE_URL,
@@ -32,7 +34,21 @@ from apps.ingest.pipeline import (
     run_pipeline,
 )
 
-TEST_DATABASE_URL = DEFAULT_DATABASE_URL
+# NEVER the application's own database. These tests drop dlt's staging schemas
+# and reload `public` wholesale, so pointing them at `homelib` means running
+# the suite silently wipes and rebuilds whatever the operator had seeded —
+# which is exactly what happened here, and left `public` empty while the data
+# sat in a stale staging schema.
+#
+# The name is unique per process for the reason established twice already in
+# this repo: two runs on one host (a push and its PR, or a developer alongside
+# CI) otherwise DROP and CREATE the same database and delete each other's
+# mid-test.
+_ADMIN_DSN = DEFAULT_DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
+_TEST_DB_NAME = f"homelib_test_ingest_{os.environ.get('GITHUB_RUN_ID', 'local')}_{os.getpid()}"
+TEST_DATABASE_URL = DEFAULT_DATABASE_URL.rsplit("/", 1)[0] + "/" + _TEST_DB_NAME
+
+_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "docker" / "initdb" / "01-schema.sql"
 
 _CANONICAL_TABLES = ("books", "blocks", "chunks", "chunk_embeddings", "catalog")
 
@@ -68,21 +84,47 @@ def _write_snapshot(path: Path, docs: list[BookDoc], *, extra_malformed_line: st
             fh.write(extra_malformed_line + "\n")
 
 
-@pytest.fixture
-def live_database_url() -> str:
-    """The live-Postgres DATABASE_URL, or a skip if it isn't reachable.
+@pytest.fixture(scope="session")
+def _throwaway_database() -> Iterator[str]:
+    """Create a throwaway database for this process, and drop it afterwards.
 
-    Keeps `@pytest.mark.integration` tests self-guarding: `uv run pytest`
-    with no marker filter still passes with no database running, per
-    the binding rule in specs/ingestion.md's verify commands.
+    Skips (rather than fails) when no Postgres server is reachable, so a plain
+    `uv run pytest` still passes with nothing running, per specs/ingestion.md.
+    Note that a skip reads as green in pytest's summary line — an earlier CI
+    run reported "1 skipped" purely because Docker had restarted, so treat
+    "0 skipped" as part of what a real verification shows.
     """
-    url = TEST_DATABASE_URL
     try:
-        with psycopg.connect(url, connect_timeout=2) as conn:
-            conn.execute("SELECT 1")
-    except psycopg.OperationalError:
-        pytest.skip("no live Postgres reachable at DATABASE_URL")
-    return url
+        admin = psycopg.connect(_ADMIN_DSN, autocommit=True, connect_timeout=3)
+    except psycopg.OperationalError as exc:
+        pytest.skip(f"no reachable Postgres server for integration tests: {exc}")
+
+    with admin, admin.cursor() as cur:
+        cur.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(_TEST_DB_NAME)))
+        cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(_TEST_DB_NAME)))
+
+    with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+        cur.execute(_SCHEMA_PATH.read_text())
+        conn.commit()
+
+    try:
+        yield TEST_DATABASE_URL
+    finally:
+        with (
+            psycopg.connect(_ADMIN_DSN, autocommit=True) as teardown,
+            teardown.cursor() as cur,
+        ):
+            cur.execute(
+                sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(
+                    sql.Identifier(_TEST_DB_NAME)
+                )
+            )
+
+
+@pytest.fixture
+def live_database_url(_throwaway_database: str) -> str:
+    """This process's throwaway database — never the application's."""
+    return _throwaway_database
 
 
 def _drop_staging_schemas(database_url: str) -> None:

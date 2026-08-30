@@ -107,6 +107,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT_PATH = REPO_ROOT / "data" / "corpus_snapshot.jsonl.gz"
 CATALOG_PATH = REPO_ROOT / "data" / "catalog.jsonl"
 
+
+def _run_scope() -> str:
+    """A token unique to this process, for namespacing shared-host resources.
+
+    The CI run id separates two runners; the pid separates two processes on
+    one host, including a developer's local run racing a CI job. Both halves
+    have been needed in this repo.
+    """
+    return f"{os.environ.get('GITHUB_RUN_ID', 'local')}_{os.getpid()}"
+
+
 DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/homelib"
 DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 EMBED_DIM = 384
@@ -371,7 +382,15 @@ def _make_pipeline(database_url: str) -> dlt.Pipeline:
         # A one-shot batch pipeline has no reason to want durable local state
         # anyway (dlt's own docs call this exact shape out: "CI runners
         # without persistent volumes" is a supported, expected deployment).
-        pipelines_dir=str(Path(tempfile.gettempdir()) / "homelib_dlt_pipelines"),
+        # Per-process working directory. dlt keeps its load packages here, and
+        # a constant path is shared state: two runs on one host (a push and its
+        # PR, or a developer alongside CI) delete each other's packages
+        # mid-load. Observed as `NormalizeJobFailed: Package with load_id=...
+        # could not be found` on run 12269 — not a dlt bug, two processes in
+        # one directory. Costs nothing here because this pipeline reloads the
+        # whole snapshot every time and gets its idempotency from
+        # merge + primary_key, not from dlt's incremental state.
+        pipelines_dir=str(Path(tempfile.gettempdir()) / f"homelib_dlt_{_run_scope()}"),
     )
 
 
