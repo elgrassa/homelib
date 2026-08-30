@@ -7,7 +7,10 @@
 #   open http://localhost:8501
 #
 # Every port binds to 127.0.0.1: this stack is a local application, not a
-# service exposed to the network. Every long-running service declares a
+# service exposed to the network. Each host port is overridable from .env
+# (API_PORT, UI_PORT, GRAFANA_PORT, POSTGRES_PORT, OLLAMA_PORT) — the defaults
+# are what the README documents, but a machine already running Postgres or
+# Ollama should not have to edit this file to try the project. Every long-running service declares a
 # healthcheck, and dependants wait on `service_healthy` rather than racing a
 # container that is up but not yet listening.
 #
@@ -26,7 +29,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U homelib -d homelib"]
       interval: 5s
@@ -37,7 +40,7 @@ services:
     image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
     volumes:
       - ollama:/root/.ollama
-    ports: ["127.0.0.1:11434:11434"]
+    ports: ["127.0.0.1:${OLLAMA_PORT:-11434}:11434"]
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -66,7 +69,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-ollama}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
       EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
-    ports: ["127.0.0.1:8000:8000"]
+    ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     depends_on:
       postgres: {condition: service_healthy}
       ollama: {condition: service_healthy}
@@ -100,7 +103,7 @@ services:
       dockerfile: docker/ui.Dockerfile
     environment:
       API_URL: http://api:8000
-    ports: ["127.0.0.1:8501:8501"]
+    ports: ["127.0.0.1:${UI_PORT:-8501}:8501"]
     depends_on:
       api: {condition: service_healthy}
     healthcheck:
@@ -119,7 +122,7 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana:/var/lib/grafana
-    ports: ["127.0.0.1:3001:3000"]
+    ports: ["127.0.0.1:${GRAFANA_PORT:-3001}:3000"]
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
