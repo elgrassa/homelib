@@ -92,7 +92,11 @@ markers = [
 [tool.coverage.run]
 source = ["packages/homelib-core/src", "packages/homelib-rag/src", "apps", "evals"]
 branch = true
-omit = ["*/tests/*", "apps/ui/*"]
+# Only the Streamlit rendering shell is exempt — it cannot run without a live
+# Streamlit runtime, so any test of it would assert nothing. Every decision the
+# UI makes lives in apps/ui/view_model.py, which the floor DOES cover. Widening
+# this back to `apps/ui/*` would silently un-guard that logic.
+omit = ["*/tests/*", "apps/ui/app.py"]
 
 [tool.coverage.report]
 fail_under = 90

@@ -1,0 +1,320 @@
+"""Behavioural tests for apps/ui/view_model.py.
+
+These drive the pure helper functions directly — no Streamlit runtime, no
+running API, no database, no browser — per specs/ui.md's named red tests and
+the architectural invariant that the UI never touches the database or any
+internal package directly.
+"""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+from apps.ui.api_client import (
+    ApiClientError,
+    ApiUnavailableError,
+    AskResponse,
+    BookSummary,
+    Citation,
+    RoadmapStep,
+    TokenUsage,
+)
+from apps.ui.view_model import (
+    DEFAULT_API_URL,
+    block_id_for_citation,
+    format_api_error_message,
+    format_citation_label,
+    format_degraded_banner,
+    get_api_url,
+    has_voted,
+    library_summary,
+    normalize_level,
+    parse_interests,
+    record_vote,
+    resolve_prerequisite_titles,
+    steps_in_order,
+)
+
+FORBIDDEN_MODULES = ("psycopg", "homelib_core", "homelib_rag", "sqlalchemy", "dlt")
+
+
+# --------------------------------------------------------------------------
+# Test data builders.
+# --------------------------------------------------------------------------
+
+
+def _make_citation(
+    *,
+    chunk_id: str = "chunk-1",
+    book_title: str = "Walden",
+    section_path: list[str] | None = None,
+    page: int | None = 12,
+) -> Citation:
+    return Citation(
+        chunk_id=chunk_id,
+        book_id="book-1",
+        book_title=book_title,
+        section_path=["Economy"] if section_path is None else section_path,
+        page=page,
+        quote="a quote",
+    )
+
+
+def _make_ask_response(*, degraded: bool, arm_used: str = "hybrid_rerank") -> AskResponse:
+    return AskResponse(
+        request_id="req-1",
+        answer="an answer",
+        citations=[_make_citation()],
+        arm_used=arm_used,
+        degraded=degraded,
+        latency_ms=100,
+        tokens=TokenUsage(prompt=10, completion=20),
+    )
+
+
+def _make_step(
+    *,
+    order: int,
+    title: str,
+    prerequisites: list[int] | None = None,
+) -> RoadmapStep:
+    return RoadmapStep(
+        order=order,
+        ol_key=None,
+        book_id="book-1",
+        title=title,
+        authors=["An Author"],
+        why="because",
+        prerequisites=[] if prerequisites is None else prerequisites,
+        est_effort="light",
+    )
+
+
+def _make_book(*, blocks: int, chunks: int) -> BookSummary:
+    return BookSummary(
+        book_id=f"book-{blocks}-{chunks}",
+        title="A Book",
+        authors=["An Author"],
+        blocks=blocks,
+        chunks=chunks,
+        format="epub",
+    )
+
+
+# --------------------------------------------------------------------------
+# Architectural invariant: no DB / internal-package imports anywhere in
+# apps/ui, enforced statically over the actual source tree.
+# --------------------------------------------------------------------------
+
+
+def _imported_root_modules(tree: ast.AST) -> set[str]:
+    roots: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                roots.add(alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
+def test_ui_never_imports_database_or_internal_packages() -> None:
+    ui_dir = Path(__file__).resolve().parent.parent
+    offending: dict[str, set[str]] = {}
+    for path in sorted(ui_dir.rglob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        hits = _imported_root_modules(tree) & set(FORBIDDEN_MODULES)
+        if hits:
+            offending[str(path)] = hits
+    assert not offending, f"forbidden imports found under apps/ui: {offending}"
+
+
+# --------------------------------------------------------------------------
+# Degraded-answer banner.
+# --------------------------------------------------------------------------
+
+
+def test_degraded_response_renders_banner() -> None:
+    degraded = _make_ask_response(degraded=True, arm_used="lexical")
+
+    banner = format_degraded_banner(degraded)
+
+    assert banner == "Answered with a degraded backend: lexical"
+
+
+def test_healthy_response_has_no_banner() -> None:
+    healthy = _make_ask_response(degraded=False)
+
+    assert format_degraded_banner(healthy) is None
+
+
+# --------------------------------------------------------------------------
+# Double-vote prevention.
+# --------------------------------------------------------------------------
+
+
+def test_double_vote_is_prevented() -> None:
+    feedback_sent: set[str] = set()
+    assert has_voted(feedback_sent, "req-1") is False
+
+    feedback_sent = record_vote(feedback_sent, "req-1")
+    assert has_voted(feedback_sent, "req-1") is True
+
+    # A second attempt to record the same vote must not create a duplicate
+    # or otherwise change the outcome — the UI disables the button once
+    # has_voted is True, so this models "what if it were called anyway".
+    feedback_sent = record_vote(feedback_sent, "req-1")
+    assert feedback_sent == {"req-1"}
+
+
+def test_vote_on_one_request_id_does_not_affect_another() -> None:
+    feedback_sent = record_vote(set(), "req-1")
+
+    assert has_voted(feedback_sent, "req-2") is False
+
+
+# --------------------------------------------------------------------------
+# Roadmap ordering + prerequisite title resolution.
+# --------------------------------------------------------------------------
+
+
+def test_roadmap_steps_render_in_order() -> None:
+    steps = [
+        _make_step(order=3, title="C"),
+        _make_step(order=1, title="A"),
+        _make_step(order=2, title="B"),
+    ]
+
+    ordered = steps_in_order(steps)
+
+    assert [step.order for step in ordered] == [1, 2, 3]
+    assert [step.title for step in ordered] == ["A", "B", "C"]
+
+
+def test_resolve_prerequisite_titles_uses_titles_not_integers() -> None:
+    steps = [
+        _make_step(order=1, title="Basics", prerequisites=[]),
+        _make_step(order=2, title="Intermediate", prerequisites=[1]),
+        _make_step(order=3, title="Advanced", prerequisites=[1, 2]),
+    ]
+
+    titles = resolve_prerequisite_titles(steps)
+
+    assert titles[1] == []
+    assert titles[2] == ["Basics"]
+    assert titles[3] == ["Basics", "Intermediate"]
+
+
+# --------------------------------------------------------------------------
+# Library tab summary.
+# --------------------------------------------------------------------------
+
+
+def test_library_tab_summary_matches_book_list() -> None:
+    books = [
+        _make_book(blocks=10, chunks=4),
+        _make_book(blocks=20, chunks=8),
+        _make_book(blocks=5, chunks=1),
+    ]
+
+    summary = library_summary(books)
+
+    assert summary.book_count == 3
+    assert summary.total_blocks == sum(book.blocks for book in books) == 35
+    assert summary.total_chunks == sum(book.chunks for book in books) == 13
+
+
+def test_library_tab_summary_of_empty_list_is_zeroed() -> None:
+    summary = library_summary([])
+
+    assert summary == library_summary([])
+    assert summary.book_count == 0
+    assert summary.total_blocks == 0
+    assert summary.total_chunks == 0
+
+
+# --------------------------------------------------------------------------
+# Error message formatting — readable, never a stack trace.
+# --------------------------------------------------------------------------
+
+
+def test_format_api_error_message_for_unreachable_backend() -> None:
+    exc = ApiUnavailableError("connection refused")
+
+    message = format_api_error_message(exc)
+
+    assert "unreachable" in message
+    assert "connection refused" in message
+
+
+def test_format_api_error_message_for_4xx_response() -> None:
+    exc = ApiClientError("block not found", status_code=404)
+
+    message = format_api_error_message(exc)
+
+    assert "404" in message
+    assert "block not found" in message
+
+
+# --------------------------------------------------------------------------
+# Small remaining helpers.
+# --------------------------------------------------------------------------
+
+
+def test_parse_interests_splits_and_strips_and_drops_empties() -> None:
+    assert parse_interests(" stoicism, discipline ,, business ") == [
+        "stoicism",
+        "discipline",
+        "business",
+    ]
+
+
+def test_parse_interests_on_empty_string_is_empty_list() -> None:
+    assert parse_interests("") == []
+
+
+def test_format_citation_label_includes_book_section_and_page() -> None:
+    citation = _make_citation(book_title="Walden", section_path=["Economy"], page=12)
+
+    assert format_citation_label(citation) == "Walden · Economy · page 12"
+
+
+def test_format_citation_label_handles_missing_page_and_section() -> None:
+    citation = _make_citation(book_title="Walden", section_path=[], page=None)
+
+    assert format_citation_label(citation) == "Walden · — · page —"
+
+
+def test_block_id_for_citation_derives_from_chunk_id() -> None:
+    citation = _make_citation(chunk_id="chunk-42")
+
+    assert block_id_for_citation(citation) == "chunk-42"
+
+
+def test_normalize_level_accepts_every_known_level() -> None:
+    for level in ("beginner", "intermediate", "advanced"):
+        assert normalize_level(level) == level
+
+
+def test_normalize_level_rejects_an_unknown_value() -> None:
+    # st.selectbox hands back a plain str, so a typo or a widget key collision
+    # would otherwise flow straight into the API request body unchecked.
+    try:
+        normalize_level("expert")
+    except ValueError as exc:
+        assert "expert" in str(exc)
+    else:  # pragma: no cover - the assert below is the real failure message
+        raise AssertionError("normalize_level accepted an unknown level")
+
+
+def test_get_api_url_defaults_to_localhost(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.delenv("API_URL", raising=False)
+
+    assert get_api_url() == DEFAULT_API_URL
+
+
+def test_get_api_url_honours_the_environment(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("API_URL", "http://api:8000")
+
+    assert get_api_url() == "http://api:8000"
