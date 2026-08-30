@@ -87,7 +87,7 @@ def test_citations_resolve() -> None:
     """Every Citation.chunk_id in a non-degraded response corresponds to one
     of the input hits' chunk_id values (specs/answer.md)."""
     hits = [_hit()]
-    client = _ScriptedClient([_llm_json("It jumps.", [{"chunk_id": "c1", "quote": "fox jumps"}])])
+    client = _ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
 
     result = answer("does it jump?", hits, client=client, arm_used="hybrid")
 
@@ -102,7 +102,7 @@ def test_answer_rejects_quote_not_in_chunk() -> None:
     degraded fallback instead of being passed through unchecked."""
     hits = [_hit(text="The fox jumps high.")]
     client = _ScriptedClient(
-        [_llm_json("It flies.", [{"chunk_id": "c1", "quote": "the fox flies away"}])]
+        [_llm_json("It flies.", [{"passage": 1, "quote": "the fox flies away"}])]
     )
 
     result = answer("does it fly?", hits, client=client, arm_used="hybrid")
@@ -116,7 +116,7 @@ def test_citation_quote_present_verbatim_in_chunk() -> None:
     of the matching hit's text."""
     hits = [_hit(text="Four score and seven years ago.")]
     client = _ScriptedClient(
-        [_llm_json("A famous opening.", [{"chunk_id": "c1", "quote": "seven years ago"}])]
+        [_llm_json("A famous opening.", [{"passage": 1, "quote": "seven years ago"}])]
     )
 
     result = answer("what's the opening line?", hits, client=client, arm_used="lexical")
@@ -142,12 +142,16 @@ def test_llm_unreachable_returns_degraded_200() -> None:
 
 
 def test_hallucinated_citation_triggers_degradation() -> None:
-    """A citation to a chunk_id absent from `hits` never reaches the caller
-    as trustworthy."""
+    """A citation to a source absent from `hits` never reaches the caller as
+    trustworthy.
+
+    The model no longer names a chunk_id — it names a passage number — so the
+    fabrication this guards against is a number that was never offered. The
+    old form of this test (an invented chunk_id string) is now unreachable by
+    construction, which is the stronger outcome.
+    """
     hits = [_hit(chunk_id="c1")]
-    client = _ScriptedClient(
-        [_llm_json("Made up.", [{"chunk_id": "chunk-that-does-not-exist", "quote": "anything"}])]
-    )
+    client = _ScriptedClient([_llm_json("Made up.", [{"passage": 7, "quote": "anything"}])])
 
     result = answer("what happened?", hits, client=client, arm_used="hybrid")
 
@@ -197,7 +201,7 @@ def test_citation_book_title_never_taken_from_model_output() -> None:
                         "answer": "ok",
                         "citations": [
                             {
-                                "chunk_id": "c1",
+                                "passage": 1,
                                 "quote": "fox jumps",
                                 "book_title": "A Title The Model Made Up",
                             }
@@ -343,3 +347,188 @@ def test_openai_client_raises_on_empty_choices(monkeypatch: pytest.MonkeyPatch) 
 
 def test_default_llm_client_is_a_singleton() -> None:
     assert default_llm_client() is default_llm_client()
+
+
+# ── Live-run regressions: measured against qwen2.5:7b-instruct, 2026-08-30 ──
+#
+# Every one of these was found by running the real answer path against the
+# real corpus. Before the fix, 3 of 3 sampled questions degraded to the
+# "I couldn't produce a verified answer" fallback — the headline feature was
+# returning nothing usable, while the unit suite was fully green because
+# every fake obligingly produced a perfect chunk_id and a byte-exact quote.
+
+
+def test_citation_is_made_by_passage_number_not_by_chunk_id() -> None:
+    """The model picks a passage; the code supplies the id.
+
+    Asking a 7B model to echo a 16-hex chunk_id is asking it to do the one
+    thing it is worst at. Observed live: it returned
+    `chunk_id='10028766648516879691'` — a plausible-looking id that exists
+    nowhere. A small ordinal it can copy reliably, and the mapping back to a
+    real chunk_id happens in code, so an invented id has no path in at all.
+    """
+    hits = [_hit(chunk_id="1bdc21dad28df706", text="The fox jumps high.")]
+    client = _ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is False
+    assert [c.chunk_id for c in response.citations] == ["1bdc21dad28df706"]
+
+
+def test_passage_number_outside_the_context_with_an_unfindable_quote_is_rejected() -> None:
+    """A number nobody offered, quoting text nobody showed, is a fabrication."""
+    hits = [_hit()]
+    client = _ScriptedClient([_llm_json("It jumps.", [{"passage": 99, "quote": "a badger sings"}])])
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is True
+    assert response.citations == []
+
+
+def test_a_quote_from_a_different_passage_is_reattributed_not_discarded() -> None:
+    """The model is good at copying text and bad at bookkeeping.
+
+    Observed live: asked about clear writing, it returned a real, verbatim
+    sentence from Taylor on scientific management while citing the passage
+    number of an entirely different extract. The words were genuine; the
+    label was wrong.
+
+    Binding a citation to the passage the text demonstrably came from is
+    stronger attribution than trusting the number the model typed, not
+    weaker — it is the same principle that already keeps `book_title` and
+    `chunk_id` out of the model's hands. Only a quote found in NO passage is
+    a fabrication.
+    """
+    hits = [
+        _hit(chunk_id="c1", text="The fox jumps high."),
+        _hit(chunk_id="c2", text="Scientific management must inevitably prevail."),
+    ]
+    client = _ScriptedClient(
+        [_llm_json("It prevails.", [{"passage": 1, "quote": "must inevitably prevail"}])]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is False
+    assert [c.chunk_id for c in response.citations] == ["c2"]
+
+
+def test_a_quote_found_in_no_passage_at_all_still_degrades() -> None:
+    """Reattribution must not become "accept anything".
+
+    If the words appear in none of the passages the model was shown, there is
+    nothing to bind the citation to and the answer is not grounded.
+    """
+    hits = [_hit(chunk_id="c1", text="The fox jumps high.")]
+    client = _ScriptedClient(
+        [_llm_json("A badger.", [{"passage": 1, "quote": "the badger sings at dawn"}])]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is True
+    assert response.citations == []
+
+
+def test_quote_matching_ignores_only_whitespace_differences() -> None:
+    """Book text is hard-wrapped; the model re-flows it.
+
+    The chunk holds "division of labour\\nin this factory"; the model returns
+    "division of labour in this factory". Character-for-character that is not
+    a substring, but nothing was invented — the difference is a line break
+    the typesetter chose. Failing this rejected essentially every real quote.
+    """
+    hits = [_hit(text="The division of labour\nin this factory system\nis very marked.")]
+    client = _ScriptedClient(
+        [_llm_json("Marked.", [{"passage": 1, "quote": "division of labour in this factory"}])]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is False
+    assert len(response.citations) == 1
+
+
+def test_a_paraphrase_is_still_rejected_after_whitespace_normalisation() -> None:
+    """The guard rail must not have been loosened into uselessness.
+
+    Whitespace-insensitivity is the smallest change that admits real quotes.
+    Anything that alters a word is still a fabricated quote and must degrade.
+    """
+    hits = [_hit(text="The division of labour in this factory system is very marked.")]
+    client = _ScriptedClient(
+        [_llm_json("Marked.", [{"passage": 1, "quote": "the splitting up of work is notable"}])]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is True
+
+
+def test_passage_ordinal_is_not_accepted_as_a_chunk_id() -> None:
+    """An ordinal typed into a `chunk_id` field is never accepted as one.
+
+    This is the shape of the original live defect, reproduced exactly: the
+    model, shown `[1] chunk_id='b4e8f2cb74bee0e8' ...`, answered with
+    `chunk_id: "1"` — it copied the most salient token on the line, the
+    ordinal, not the opaque hex id it was asked for. `_validate_citations`
+    rejected it (`citation cites chunk_id '3', which is not in the retrieved
+    hits`), so the answer degraded, and /v1/ask returned the honest-but-
+    useless fallback for the majority of real questions.
+
+    Two properties are pinned here, and they are the two halves of the fix:
+
+    - the ordinal never becomes a `chunk_id` — no citation carrying `"1"`
+      may ever reach a caller, degraded or not. `_validate_citations` stays
+      exactly as strict as specs/answer.md requires.
+    - a citation made the way the prompt now asks for one — by passage
+      number — resolves to the real hex id. That half is what was failing:
+      the guard rail was right and the thing it was guarding was
+      unanswerable, so every answer degraded.
+    """
+    hex_id = "b4e8f2cb74bee0e8"
+    hits = [_hit(chunk_id=hex_id, text="The fox jumps high.")]
+
+    # The old, defective model output: the ordinal in the chunk_id field.
+    ordinal_client = _ScriptedClient(
+        [_llm_json("It jumps.", [{"chunk_id": "1", "quote": "fox jumps"}])]
+    )
+    ordinal_result = answer("does it jump?", hits, client=ordinal_client, arm_used="hybrid")
+
+    assert "1" not in [c.chunk_id for c in ordinal_result.citations]
+    assert ordinal_result.citations == []
+    assert ordinal_result.degraded is True
+
+    # The output the prompt now asks for, on the same hits: a real citation.
+    passage_client = _ScriptedClient(
+        [_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]
+    )
+    passage_result = answer("does it jump?", hits, client=passage_client, arm_used="hybrid")
+
+    assert passage_result.degraded is False
+    assert [c.chunk_id for c in passage_result.citations] == [hex_id]
+
+
+def test_context_prompt_never_shows_a_chunk_id() -> None:
+    """The prompt must not put an identifier in front of the model that it is
+    forbidden to use.
+
+    `[1] chunk_id='b4e8f2cb74bee0e8' book=...` showed the model two competing
+    identifiers and asked it to cite by neither name reliably. The id is dead
+    weight in the context — nothing downstream reads it back, because
+    `answer()` maps the passage number to the real chunk itself — and while it
+    is on the line it is bait for exactly the defect
+    `test_passage_ordinal_is_not_accepted_as_a_chunk_id` covers. Keeping it
+    out is cheaper than out-instructing it.
+    """
+    hits = [_hit(chunk_id="b4e8f2cb74bee0e8")]
+    client = _ScriptedClient([_llm_json("ok", [])])
+
+    answer("q", hits, client=client, arm_used="hybrid")
+
+    sent_prompt = client.calls[0]["messages"][1].content
+    assert "chunk_id" not in sent_prompt
+    assert "b4e8f2cb74bee0e8" not in sent_prompt
+    assert "[1]" in sent_prompt

@@ -154,7 +154,7 @@ def test_ask_degrades_to_200_when_vector_backend_down(monkeypatch: pytest.Monkey
         # backend raised — see homelib_rag.hybrid's own degrade contract.
         return ([hit], "lexical", True)
 
-    fake_llm = _ScriptedClient([_llm_json("It jumps.", [{"chunk_id": "c1", "quote": "fox jumps"}])])
+    fake_llm = _ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(retrieve=_retrieve, llm_client=fake_llm)
     app.dependency_overrides[get_deps] = lambda: deps
 
@@ -172,7 +172,7 @@ def test_ask_writes_query_log_row(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     hit = _hit()
     logged: list[QueryLogRow] = []
-    fake_llm = _ScriptedClient([_llm_json("It jumps.", [{"chunk_id": "c1", "quote": "fox jumps"}])])
+    fake_llm = _ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(
         retrieve=lambda query, k, arm: ([hit], "hybrid", False),
         llm_client=fake_llm,

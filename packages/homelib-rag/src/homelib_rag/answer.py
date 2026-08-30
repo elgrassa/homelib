@@ -74,19 +74,28 @@ _TIMEOUT_SECONDS = 30.0
 # window silently.
 _MAX_CONTEXT_HITS = 20
 
+# Citations are made by PASSAGE NUMBER, not by chunk_id. Measured against
+# qwen2.5:7b-instruct on the real corpus: asked for a 16-hex chunk_id, the
+# model returned `10028766648516879691` — a confident-looking id belonging to
+# nothing. Copying a long opaque identifier is precisely what a small model is
+# worst at, and there is no reason to ask: the passages are already numbered
+# for the reader, and mapping an ordinal back to a real chunk_id is one line
+# of code. Same principle as `book_title` — never ask the model for a value
+# the system already knows, because then a wrong one has no way in.
 _SYSTEM_PROMPT = (
     "You answer a question using ONLY the numbered passages given below — "
-    "never outside knowledge. Each passage lists its chunk_id, the book's "
-    "title, its authors, the section, and the page. The author names given "
-    "are authoritative: never attribute a passage to an author not listed "
-    "for it, and never guess an author who is not shown. For every claim you "
-    "make, add an entry to `citations` whose `quote` is copied VERBATIM "
-    "(an exact substring, not a paraphrase) from the passage text you are "
-    "citing, and whose `chunk_id` is exactly one of the chunk_ids listed "
-    "below — never a chunk_id you were not given. If the passages do not "
-    "answer the question, say so plainly and return an empty `citations` "
-    "list rather than guessing. Respond with ONLY a JSON object of the form "
-    '{"answer": "...", "citations": [{"chunk_id": "...", "quote": "..."}]} '
+    "never outside knowledge. Each passage begins with its number in square "
+    "brackets, then the book's title, its authors, the section, and the page. "
+    "The author names given are authoritative: never attribute a passage to "
+    "an author not listed for it, and never guess an author who is not shown. "
+    "For every claim you make, add an entry to `citations` whose `passage` is "
+    "the number in square brackets of the passage you are citing — one of the "
+    "numbers shown below and nothing else — and whose `quote` is copied "
+    "VERBATIM from that passage's text: an exact run of words from it, not a "
+    "paraphrase and not a summary. If the passages do not answer the "
+    "question, say so plainly and return an empty `citations` list rather "
+    "than guessing. Respond with ONLY a JSON object of the form "
+    '{"answer": "...", "citations": [{"passage": 1, "quote": "..."}]} '
     "and no other text."
 )
 
@@ -261,14 +270,19 @@ class CitationValidationError(Exception):
 
 
 class _RawCitation(BaseModel):
-    """The shape the LLM is asked to produce for one citation. Deliberately
-    has NO `book_title`/`book_id` field — the model is never asked for those,
-    so it cannot supply an invented one; `answer()` fills them in from
-    `_book_metadata` instead."""
+    """The shape the LLM is asked to produce for one citation.
+
+    Deliberately has NO `book_title`, `book_id` or `chunk_id` field. The model
+    is never asked for any of them, so it cannot supply an invented one:
+    `answer()` fills them in from the hit at `passage` and from
+    `_book_metadata`. `passage` is the 1-based number shown in the prompt,
+    which is small enough for a 7B model to copy reliably — a 16-hex chunk_id
+    demonstrably was not.
+    """
 
     model_config = ConfigDict(extra="allow")
 
-    chunk_id: str
+    passage: int
     quote: str
 
 
@@ -323,6 +337,68 @@ def _build_context_prompt(
     return "\n".join(lines)
 
 
+def _collapse_whitespace(text: str) -> str:
+    """Whitespace-insensitive form for quote comparison.
+
+    Book text is hard-wrapped, so a chunk holds "division of labour\nin this
+    factory" while the model returns it re-flowed onto one line. Byte-for-byte
+    that is not a substring, yet nothing was fabricated — the difference is a
+    line break a typesetter chose a century ago. Measured live before this
+    change: 3 of 3 sampled questions degraded on exactly that.
+
+    This is the smallest loosening that admits real quotes, and deliberately
+    the only one. Word order, wording and punctuation still have to match
+    exactly, so a paraphrase is rejected as firmly as before — which is the
+    whole point of the check.
+    """
+    return " ".join(text.split())
+
+
+def _resolve_quote(raw_citation: _RawCitation, context_hits: list[Hit]) -> Hit | None:
+    """The passage a quote actually came from, or `None` if it came from none.
+
+    The model's `passage` number is treated as a hint, not as truth. It is
+    checked first — it is usually right, and preferring it keeps attribution
+    stable when the same sentence appears twice — but if the quote is not in
+    that passage, every other shown passage is searched before giving up.
+
+    This is not leniency. Observed live: asked what makes writing clear, the
+    model returned a real, verbatim sentence of Taylor on scientific
+    management while citing the number of a completely different extract. The
+    words were genuine; only the label was wrong. Binding the citation to the
+    passage the text demonstrably occupies is *stronger* attribution than
+    trusting a number the model typed — the same reason `book_title` and
+    `chunk_id` are never taken from its output either. The model is reliable
+    at copying text and unreliable at bookkeeping, so it does the copying and
+    this function does the bookkeeping.
+
+    A quote present in no shown passage still returns `None`, and the caller
+    degrades: there is nothing to bind it to, and the answer is not grounded.
+    """
+    needle = _collapse_whitespace(raw_citation.quote)
+    if not needle:
+        return None
+
+    hinted = raw_citation.passage - 1
+    if 0 <= hinted < len(context_hits):
+        candidate = context_hits[hinted]
+        if needle in _collapse_whitespace(candidate.text):
+            return candidate
+
+    for index, candidate in enumerate(context_hits):
+        if index == hinted:
+            continue
+        if needle in _collapse_whitespace(candidate.text):
+            logger.info(
+                "citation named passage %d but its quote is in passage %d; "
+                "reattributing to where the text actually is",
+                raw_citation.passage,
+                index + 1,
+            )
+            return candidate
+    return None
+
+
 def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
     """Raise `CitationValidationError` unless every citation is genuine.
 
@@ -339,7 +415,7 @@ def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
             raise CitationValidationError(
                 f"citation cites chunk_id {citation.chunk_id!r}, which is not in the retrieved hits"
             )
-        if citation.quote not in hit.text:
+        if _collapse_whitespace(citation.quote) not in _collapse_whitespace(hit.text):
             raise CitationValidationError(
                 f"citation quote for chunk_id {citation.chunk_id!r} is not a verbatim "
                 "substring of that chunk's text"
@@ -399,31 +475,26 @@ def answer(
     except ValidationError as exc:
         return _degraded_response(arm_used, f"malformed LLM output: {exc}")
 
+    # Only the passages actually shown to the model are citable. Slicing the
+    # same way `_build_context_prompt` does keeps the two in step.
+    context_hits = hits[:_MAX_CONTEXT_HITS]
     citations: list[Citation] = []
     for raw_citation in parsed.citations:
-        matching_hit = _find_hit(hits, raw_citation.chunk_id)
-        if matching_hit is None:
-            # Not a real hit — build a citation `_validate_citations` below
-            # is guaranteed to reject, rather than special-casing it here.
-            citations.append(
-                Citation(
-                    chunk_id=raw_citation.chunk_id,
-                    book_id="",
-                    book_title="(unknown title)",
-                    section_path=[],
-                    page=None,
-                    quote=raw_citation.quote,
-                )
+        source = _resolve_quote(raw_citation, context_hits)
+        if source is None:
+            return _degraded_response(
+                arm_used,
+                f"citation quote {raw_citation.quote[:60]!r} does not appear in any "
+                "of the passages provided",
             )
-            continue
-        title, _authors = book_meta.get(matching_hit.book_id, ("(unknown title)", []))
+        title, _authors = book_meta.get(source.book_id, ("(unknown title)", []))
         citations.append(
             Citation(
-                chunk_id=raw_citation.chunk_id,
-                book_id=matching_hit.book_id,
+                chunk_id=source.chunk_id,
+                book_id=source.book_id,
                 book_title=title,
-                section_path=matching_hit.section_path,
-                page=matching_hit.page,
+                section_path=source.section_path,
+                page=source.page,
                 quote=raw_citation.quote,
             )
         )
@@ -445,13 +516,6 @@ def answer(
             prompt=response.usage.prompt_tokens, completion=response.usage.completion_tokens
         ),
     )
-
-
-def _find_hit(hits: list[Hit], chunk_id: str) -> Hit | None:
-    for hit in hits:
-        if hit.chunk_id == chunk_id:
-            return hit
-    return None
 
 
 _default_client_lock = threading.Lock()
