@@ -179,3 +179,38 @@ def test_parse_file_unknown_extension_raises_value_error(tmp_path: Path) -> None
 
     with pytest.raises(ValueError, match="unsupported"):
         parse_file(path)
+
+
+def test_crlf_file_still_detects_headings(tmp_path: Path) -> None:
+    """Real-world regression: Project Gutenberg ships CRLF, and every book
+    collapsed into a single block because the blank-line check compared the
+    next line against "" while it actually held "\\r".
+
+    Found by running the parser over the real 18-book shelf, where all 18 books
+    produced exactly one block each — synthetic LF fixtures had never exercised
+    this path.
+    """
+    content = "CHAPTER I.\r\n\r\nCall me Ishmael.\r\n\r\nCHAPTER II.\r\n\r\nSome years ago.\r\n"
+    path = tmp_path / "crlf.txt"
+    path.write_bytes(content.encode("utf-8"))
+
+    doc, _extraction = parse_txt(path, book_id="crlf")
+
+    assert len(doc.blocks) == 2, f"expected one block per chapter, got {len(doc.blocks)}"
+    assert doc.blocks[0].section_path == ["CHAPTER I."]
+    assert doc.blocks[1].section_path == ["CHAPTER II."]
+    # No stray carriage returns should survive into the canonical text.
+    assert "\r" not in doc.canonical_text
+    for block in doc.blocks:
+        assert doc.canonical_text[block.char_start : block.char_end] == block.text
+
+
+def test_lone_cr_line_endings_are_normalised(tmp_path: Path) -> None:
+    """Classic-Mac CR-only files must not silently become one giant block either."""
+    path = tmp_path / "cr.txt"
+    path.write_bytes(b"HEADING ONE\r\rBody text.\r\rHEADING TWO\r\rMore body.\r")
+
+    doc, _extraction = parse_txt(path, book_id="cr")
+
+    assert len(doc.blocks) == 2
+    assert "\r" not in doc.canonical_text

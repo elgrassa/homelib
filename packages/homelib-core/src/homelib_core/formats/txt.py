@@ -9,6 +9,10 @@ section, until the next heading or EOF.
 Both heuristics are applied regardless of whether the file is `.txt` or
 `.md` — a `.txt` file that happens to use ATX headings still gets nested
 `section_path`s from them.
+
+Line endings are normalised to `\n` first: CRLF and lone-CR files would
+otherwise defeat the "followed by a blank line" test and yield one block
+for the entire book.
 """
 
 import hashlib
@@ -66,6 +70,15 @@ def parse_txt(path: Path, *, book_id: str) -> tuple[BookDoc, ExtractionResult]:
         warnings.append("file is not valid UTF-8; decoded with errors replaced")
 
     fmt: Literal["txt", "md"] = "md" if path.suffix.lower() == ".md" else "txt"
+
+    # Normalise line endings before anything looks at line structure. Project
+    # Gutenberg ships CRLF, and the heading heuristic tests whether the NEXT
+    # line is blank — against "", which a CRLF file never yields because the
+    # line still holds "\r". Without this, every heading in every real book
+    # goes undetected and the whole book collapses into one block. Offsets
+    # index into canonical_text, which is built from this normalised text, so
+    # the char_start/char_end invariant is unaffected.
+    raw_text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
     lines = raw_text.split("\n")
 
     stack: list[tuple[int, str]] = []
