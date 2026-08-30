@@ -61,7 +61,8 @@ Last updated: 2026-08-30.
 - [x] `docs/evidence.md` records every verification — including a diagnosis I got wrong and retracted
 - [ ] Eval regression gate wired into CI as a blocking step
 - [ ] `specs/openapi.snapshot.json` drift guard green
-- [ ] ADR-001 (retrieval arm) and ADR-002 (catalog source) written
+- [x] ADR-002 (catalog source) written — records the Kaggle/Google Books/Goodreads rejections, enforced by a grep test
+- [ ] ADR-001 (retrieval arm) — blocked on the 4-arm eval table
 - [ ] Fresh-eyes pass: no dead code, no stale docstrings
 
 ## D. Nice to have — extendability
@@ -75,8 +76,14 @@ Last updated: 2026-08-30.
 
 ## E. Known gaps, stated plainly
 
-1. **No Forgejo remote yet** — every commit is local only. Repo creation was
-   blocked by a permission prompt; the command is ready to run.
+1. **No Forgejo remote yet** — every commit is local only. `tea repo create`
+   fails with `token does not have at least one of required scope(s):
+   [write:user]`, so this needs a human: either regenerate the `vaultos` tea
+   token with `write:repository` + `write:user`, or create `elgrassa/homelib`
+   in the web UI at `minips.local:3000`. Then:
+   `git remote add forgejo ssh://git@localhost:2222/elgrassa/homelib.git`.
+   **This is the single highest-risk gap** — the whole build exists on one
+   machine's disk with no off-machine copy.
 2. **dlt pipeline is red.** Its tests fail on foreign-key violations. Likely
    cause: dlt owns its destination schema and does not naturally load into
    hand-written tables carrying a `GENERATED ALWAYS AS` tsvector column and a
