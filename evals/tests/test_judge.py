@@ -10,6 +10,7 @@ one-off invocation against the local model.
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -673,3 +674,95 @@ def test_main_can_restrict_to_a_single_variant(
     # One arm cannot crown a winner, so the exit code is 1 by design.
     assert llm_eval.main(["--variant", "concise", "--report", str(tmp_path / "r.md")]) == 1
     assert seen == ["concise"]
+
+
+def test_report_flags_a_winner_that_declined_most_often() -> None:
+    """A variant can win by answering less, and the report must say so.
+
+    `degraded=False, citations=[]` is a legitimate reply, but it counts as a
+    success. With a judge scoring everything near 2/5 there is little room to
+    punish reticence, so the arm that hedges most can top the table while
+    being worse at the job. The ranking is not wrong here, it is
+    uninterpretable — and the report has to say which.
+    """
+    scores = [
+        VariantScore(
+            variant="hedger",
+            n=10,
+            mean_faithfulness=3.0,
+            mean_relevance=3.0,
+            mean_citation_quality=3.0,
+            mean_suggested_score=3.0,
+            n_answered=10,
+            n_ungrounded=8,
+        ),
+        VariantScore(
+            variant="committer",
+            n=10,
+            mean_faithfulness=2.0,
+            mean_relevance=2.0,
+            mean_citation_quality=2.0,
+            mean_suggested_score=2.0,
+            n_answered=10,
+            n_ungrounded=1,
+        ),
+        VariantScore(
+            variant="third",
+            n=10,
+            mean_faithfulness=2.0,
+            mean_relevance=2.0,
+            mean_citation_quality=2.0,
+            mean_suggested_score=1.5,
+            n_answered=10,
+            n_ungrounded=0,
+        ),
+    ]
+    path = Path(tempfile.mkdtemp()) / "llm_eval.md"
+
+    write_report(scores, path)
+    body = path.read_text()
+
+    assert "Winner: `hedger`" in body
+    assert "unproven" in body
+    assert "8/10" in body
+
+
+def test_report_does_not_flag_a_winner_that_grounded_its_answers() -> None:
+    """The caveat must not fire on every winner, or it says nothing."""
+    scores = [
+        VariantScore(
+            variant="good",
+            n=10,
+            mean_faithfulness=3.0,
+            mean_relevance=3.0,
+            mean_citation_quality=3.0,
+            mean_suggested_score=3.0,
+            n_answered=10,
+            n_ungrounded=0,
+        ),
+        VariantScore(
+            variant="worse",
+            n=10,
+            mean_faithfulness=2.0,
+            mean_relevance=2.0,
+            mean_citation_quality=2.0,
+            mean_suggested_score=2.0,
+            n_answered=10,
+            n_ungrounded=5,
+        ),
+        VariantScore(
+            variant="third",
+            n=10,
+            mean_faithfulness=2.0,
+            mean_relevance=2.0,
+            mean_citation_quality=2.0,
+            mean_suggested_score=1.5,
+            n_answered=10,
+            n_ungrounded=2,
+        ),
+    ]
+    path = Path(tempfile.mkdtemp()) / "llm_eval.md"
+
+    write_report(scores, path)
+
+    assert "unproven" not in path.read_text()

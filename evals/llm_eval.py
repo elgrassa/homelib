@@ -230,6 +230,16 @@ class VariantScore(BaseModel):
     mean_citation_quality: float
     mean_suggested_score: float
 
+    #: Answers that succeeded while citing nothing. `degraded=False` with an
+    #: empty `citations` list is a LEGITIMATE reply — it is the "the passages
+    #: do not answer this" response the prompt asks for, and sometimes that is
+    #: the honest answer. But it counts as a success, so a variant can climb
+    #: this table by declining more often, and a judge scoring everything near
+    #: 2/5 has little room to punish reticence. Without this column the
+    #: ranking cannot be distinguished from a measure of hedging.
+    n_ungrounded: int = 0
+    n_answered: int = 0
+
 
 # ── the one thing that varies between arms ──────────────────────────────────
 
@@ -408,6 +418,8 @@ def score_variants(
                 mean_relevance=_mean([j.relevance for j in judged]),
                 mean_citation_quality=_mean([j.citation_quality for j in judged]),
                 mean_suggested_score=_mean([j.suggested_score for j in judged]),
+                n_answered=len(cases),
+                n_ungrounded=sum(1 for case in cases if case.answer and not case.citations),
             )
         )
     return scores
@@ -441,24 +453,49 @@ def write_report(scores: list[VariantScore], path: Path) -> None:
         f"Judge prompt: version {JUDGE_PROMPT_VERSION}, hash `{current_hash}`",
         f"Answer arm: `{_ARM}`, k={DEFAULT_K}",
         "",
-        "| variant | n | faithfulness | relevance | citation_quality | suggested_score |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
+        "| variant | n | faithfulness | relevance | citation_quality | "
+        "suggested_score | ungrounded |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for score in sorted(scores, key=lambda s: s.variant):
         lines.append(
             f"| `{score.variant}` | {score.n} | {score.mean_faithfulness:.2f} | "
             f"{score.mean_relevance:.2f} | {score.mean_citation_quality:.2f} | "
-            f"{score.mean_suggested_score:.2f} |"
+            f"{score.mean_suggested_score:.2f} | {score.n_ungrounded}/{score.n_answered} |"
         )
+    lines.append("")
+    lines.append(
+        "`ungrounded` counts answers that succeeded while citing nothing — the "
+        'legitimate "the passages do not answer this" reply. It is here because '
+        "such an answer still counts as a success, so a variant can climb this "
+        "table by declining more often, and a judge scoring everything near 2/5 "
+        "has little room to punish reticence. **If the leading arm is also the "
+        "one declining most, this ranking is measuring hedging, not quality.**"
+    )
     lines.append("")
 
     winner = _winner(scores)
     if winner is not None:
+        most_ungrounded = max(scores, key=lambda s: s.n_ungrounded)
+        hedging = (
+            most_ungrounded.variant == winner.variant
+            and winner.n_ungrounded > 0
+            and sum(s.n_ungrounded for s in scores) > winner.n_ungrounded
+        )
         lines.append(
             f"**Winner: `{winner.variant}`** — highest mean suggested_score "
             f"({winner.mean_suggested_score:.2f}), the judge's own overall rating "
             "rather than an average of the sub-scores."
         )
+        if hedging:
+            lines.append("")
+            lines.append(
+                f"⚠ **Treat that winner as unproven.** `{winner.variant}` also "
+                f"declined to cite anything more often than any other arm "
+                f"({winner.n_ungrounded}/{winner.n_answered}), so its lead may be "
+                "reticence rather than quality — an arm that answers less has "
+                "less for a weak judge to mark down."
+            )
     else:
         empty = [score.variant for score in scores if score.n == 0]
         lines.append("**No winner marked.**")
