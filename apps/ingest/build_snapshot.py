@@ -28,14 +28,17 @@ def _clean_text_path(entry: ManifestEntry, books_dir: Path) -> Path:
     return books_dir / f"{entry.book_id}.clean.txt"
 
 
-def build_book(entry: ManifestEntry, books_dir: Path = BOOKS_DIR) -> BookDoc:
+def build_book(entry: ManifestEntry, books_dir: Path | None = None) -> BookDoc:
     """Parse one manifest entry into a `BookDoc` carrying its manifest metadata.
 
     `parse_file` derives title and authors from the filename, which is wrong for
     a real book — the manifest is the authority for those, so they are applied
     over the parsed result rather than guessed from a slug.
     """
-    path = _clean_text_path(entry, books_dir)
+    # Resolved at call time, not bound as a default: a default argument is
+    # captured at import, which silently ignores any later reconfiguration and
+    # makes the function untestable without touching the real data directory.
+    path = _clean_text_path(entry, books_dir if books_dir is not None else BOOKS_DIR)
     if not path.exists():
         raise FileNotFoundError(
             f"{path} missing — run `uv run python apps/ingest/fetch_corpus.py --fetch` first"
@@ -56,10 +59,11 @@ def build_book(entry: ManifestEntry, books_dir: Path = BOOKS_DIR) -> BookDoc:
 
 def build_snapshot(
     manifest_path: Path | None = None,
-    books_dir: Path = BOOKS_DIR,
-    out_path: Path = SNAPSHOT_PATH,
+    books_dir: Path | None = None,
+    out_path: Path | None = None,
 ) -> int:
     """Parse every manifest entry and write the gzipped snapshot. Returns book count."""
+    out_path = out_path if out_path is not None else SNAPSHOT_PATH
     entries = load_manifest() if manifest_path is None else load_manifest(manifest_path)
 
     docs: list[BookDoc] = []
@@ -69,9 +73,14 @@ def build_snapshot(
         print(f"[OK] {entry.book_id}: {len(doc.blocks)} blocks, {len(doc.canonical_text)} chars")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # mtime=0 so rebuilding an unchanged corpus produces an identical file
-    # rather than a spurious diff on every run.
-    with gzip.GzipFile(out_path, "wb", mtime=0) as raw:
+    # The snapshot is committed, so its bytes must depend on the corpus and
+    # nothing else. gzip stamps BOTH an mtime and the output filename into its
+    # header, either of which would make an unchanged corpus show up as a 6 MB
+    # diff — so mtime is zeroed and the filename is left empty deliberately.
+    with (
+        out_path.open("wb") as fh,
+        gzip.GzipFile(fileobj=fh, mode="wb", mtime=0, filename="") as raw,
+    ):
         for doc in docs:
             line = json.dumps(doc.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
             raw.write(line.encode("utf-8") + b"\n")
@@ -80,10 +89,11 @@ def build_snapshot(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the committed corpus snapshot.")
-    parser.add_argument("--out", type=Path, default=SNAPSHOT_PATH)
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
     count = build_snapshot(out_path=args.out)
+    args.out = args.out if args.out is not None else SNAPSHOT_PATH
     size_mb = args.out.stat().st_size / 1_000_000
     print(f"{count} books -> {args.out} ({size_mb:.1f} MB)")
     return 0
