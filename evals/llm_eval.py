@@ -122,6 +122,9 @@ _MIN_VARIANTS_FOR_A_WINNER = 3
 _JUDGE_METRIC_PREFIX = "judge."
 
 
+# The shipped prompt, imported so the control arm cannot drift from production.
+from homelib_rag.answer import _SYSTEM_PROMPT as _PRODUCTION_SYSTEM_PROMPT  # noqa: E402
+
 # ── the prompt variants under test ──────────────────────────────────────────
 
 # Every variant must keep the contract `homelib_rag.answer` parses and
@@ -180,6 +183,21 @@ PROMPT_VARIANTS: dict[str, str] = {
         "write the answer. Keep the reasoning to yourself: the `answer` field "
         "contains the conclusion for a reader, not your steps." + _OUTPUT_CONTRACT
     ),
+    # The INCUMBENT — the prompt `answer.py` actually ships, imported rather
+    # than copied so it cannot drift out of sync with production.
+    #
+    # Without it the bake-off compares three challengers to each other and says
+    # nothing about whether to change anything. A winner among alternatives is
+    # not evidence for switching; only a winner measured against what is
+    # already running is. This arm is the control.
+    #
+    # It runs LAST, which matters more than it should: arms execute in this
+    # dict's order, so anything that degrades over the run — memory pressure,
+    # a second model loading — lands hardest here and would read as "the
+    # prompt we ship is the worst one". That artifact has already been
+    # produced once. Do not interpret a poor showing from this arm without
+    # checking what the machine was doing.
+    "production": _PRODUCTION_SYSTEM_PROMPT,
 }
 
 
