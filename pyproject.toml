@@ -119,6 +119,23 @@ ignore = ["S101"]
 "**/tests/**/*.py" = ["S"]
 "scripts/**/*.py" = ["S603", "S607"]
 
+# B008 exists because a mutable default is evaluated once at import time. That
+# is exactly what FastAPI's Depends()/Query()/etc. are FOR — the marker object
+# in the default is how the framework discovers what to inject, and it is what
+# makes `app.dependency_overrides` work in tests. Rewriting these into calls
+# inside the body to silence the lint would break dependency injection while
+# fixing nothing real, so the calls are declared immutable instead.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.File",
+    "fastapi.Form",
+]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true
