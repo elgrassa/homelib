@@ -1,0 +1,129 @@
+{
+  "paths": {
+    "/health": [
+      "get"
+    ],
+    "/v1/ask": [
+      "post"
+    ],
+    "/v1/blocks/{block_id}": [
+      "get"
+    ],
+    "/v1/books": [
+      "get"
+    ],
+    "/v1/feedback": [
+      "post"
+    ],
+    "/v1/ingest": [
+      "post"
+    ],
+    "/v1/roadmap": [
+      "post"
+    ]
+  },
+  "schemas": {
+    "AskRequest": [
+      "query"
+    ],
+    "AskResponse": [
+      "answer",
+      "arm_used",
+      "citations",
+      "degraded",
+      "latency_ms",
+      "request_id",
+      "tokens"
+    ],
+    "Block": [
+      "block_id",
+      "book_id",
+      "char_end",
+      "char_start",
+      "ordinal",
+      "provenance",
+      "section_path",
+      "text"
+    ],
+    "BookSummary": [
+      "authors",
+      "blocks",
+      "book_id",
+      "chunks",
+      "format",
+      "title"
+    ],
+    "Citation": [
+      "book_id",
+      "book_title",
+      "chunk_id",
+      "page",
+      "quote",
+      "section_path"
+    ],
+    "ExtractionResult": [
+      "extraction_sha256",
+      "extractor_name",
+      "extractor_version",
+      "method"
+    ],
+    "FeedbackRequest": [
+      "feedback",
+      "request_id"
+    ],
+    "HTTPValidationError": [],
+    "Health": [
+      "books",
+      "chunks",
+      "db",
+      "llm",
+      "status"
+    ],
+    "IngestRequest": [],
+    "IngestResponse": [
+      "blocks",
+      "book_id",
+      "chunks",
+      "extraction"
+    ],
+    "LLMHealth": [
+      "model",
+      "provider",
+      "reachable"
+    ],
+    "OkResponse": [],
+    "Provenance": [
+      "format",
+      "source_sha256"
+    ],
+    "RoadmapRequest": [
+      "goal",
+      "interests",
+      "level"
+    ],
+    "RoadmapResponse": [
+      "rationale",
+      "request_id",
+      "steps"
+    ],
+    "RoadmapStep": [
+      "authors",
+      "book_id",
+      "est_effort",
+      "ol_key",
+      "order",
+      "prerequisites",
+      "title",
+      "why"
+    ],
+    "TokenUsage": [
+      "completion",
+      "prompt"
+    ],
+    "ValidationError": [
+      "loc",
+      "msg",
+      "type"
+    ]
+  }
+}
