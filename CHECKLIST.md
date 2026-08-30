@@ -53,7 +53,7 @@ Last updated: 2026-08-30.
 - [x] **Spec-first**: 18 one-page specs written before their code
 - [x] `just ci` = ruff + mypy --strict + pytest, **90% coverage floor enforced**
 - [x] Exact pins everywhere; `uv.lock` authoritative; CI uses `--frozen` so drift fails
-- [x] Forgejo CI with the pinned checkout SHA (hostexecutor runners never auto-clone)
+- [x] Forgejo CI with the pinned checkout SHA (hostexecutor runners never auto-clone) — **verified green on the real runner**, not just written
 - [x] Every new module ships behavioural tests in the same commit
 - [x] Degradation is contractual, not incidental — rerank returns `None`, rewrite falls back, hybrid reports the arm it actually used
 - [x] Privacy by default: queries logged as a 16-char sha256 prefix, plaintext opt-in
@@ -76,14 +76,9 @@ Last updated: 2026-08-30.
 
 ## E. Known gaps, stated plainly
 
-1. **No Forgejo remote yet** — every commit is local only. `tea repo create`
-   fails with `token does not have at least one of required scope(s):
-   [write:user]`, so this needs a human: either regenerate the `vaultos` tea
-   token with `write:repository` + `write:user`, or create `elgrassa/homelib`
-   in the web UI at `minips.local:3000`. Then:
-   `git remote add forgejo ssh://git@localhost:2222/elgrassa/homelib.git`.
-   **This is the single highest-risk gap** — the whole build exists on one
-   machine's disk with no off-machine copy.
+1. ~~No Forgejo remote~~ **Resolved 2026-08-30.** `elgrassa/homelib` is live;
+   36 commits pushed, CI green first try (run 12254), `main` seeded from that
+   verified commit and set as default. PR #1 open.
 2. **dlt pipeline is red.** Its tests fail on foreign-key violations. Likely
    cause: dlt owns its destination schema and does not naturally load into
    hand-written tables carrying a `GENERATED ALWAYS AS` tsvector column and a
