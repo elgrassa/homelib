@@ -30,8 +30,16 @@ step() {
 
 printf '\npre-push gate (fast — the full suite runs on the PR)\n'
 
-step "ruff check"        uv run ruff check .
-step "ruff format"       uv run ruff format --check .
+# Scoped to TRACKED files, not the whole working tree. A push contains
+# commits, not scratch: failing it because an unrelated untracked file is
+# mid-edit — a concurrent agent's work in progress, a scratch script — blocks
+# a push for something the push does not contain. That is how a gate teaches
+# people --no-verify, and a bypassed gate protects nothing. Files that ARE
+# part of the push are tracked, so they are still checked.
+mapfile -t tracked_py < <(git ls-files '*.py')
+
+step "ruff check"        uv run ruff check "${tracked_py[@]}"
+step "ruff format"       uv run ruff format --check "${tracked_py[@]}"
 step "mypy --strict"     uv run mypy
 
 # Skipped rather than failed when gitleaks is absent, because a contributor
