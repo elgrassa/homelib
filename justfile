@@ -82,24 +82,53 @@ drill TARGET="/tmp/homelib-drill":
 
 # ── publish ─────────────────────────────────────────────────────────────────
 
-# Push the public submission copy ONLY after Forgejo CI is green for this branch.
+# Push the public submission copy ONLY after Forgejo CI is green for THIS commit.
+#
+# The gate reads Forgejo's SQLite directly because this instance exposes no
+# logs API. Three things it is deliberately strict about:
+#
+#   * It keys on commit_sha, not branch. A branch-keyed check goes green on
+#     the last commit CI happened to see, which is not necessarily the commit
+#     about to be published.
+#   * It scopes to this repository. `feat/scaffold` is not a unique ref name
+#     on an instance hosting many repos.
+#   * Status 1 is SUCCESS in Forgejo's enum (1 success, 2 failure, 3 cancelled,
+#     4 skipped, 5 waiting, 6 running, 7 blocked). Verified against the live
+#     table: 8.5k rows at 1, and every job under a status=1 run is itself 1.
 publish:
     #!/usr/bin/env bash
     set -euo pipefail
     branch=$(git rev-parse --abbrev-ref HEAD)
+    sha=$(git rev-parse HEAD)
     if ! git remote get-url public >/dev/null 2>&1; then
       echo "✗ no 'public' remote configured (see docs/submission.md)"; exit 1
     fi
-    DB=/Volumes/ExternalSSDMini/CI/Forgejo/data/forgejo.db
-    if [[ -f "$DB" ]]; then
-      status=$(sqlite3 "$DB" "SELECT status FROM action_run WHERE ref='refs/heads/$branch' ORDER BY id DESC LIMIT 1" 2>/dev/null || echo "")
-      case "$status" in
-        3) echo "✓ Forgejo CI green for $branch" ;;
-        1|2) echo "⏳ Forgejo CI still running (status=$status)"; exit 1 ;;
-        *) echo "✗ Forgejo CI not green (status=${status:-none})"; exit 1 ;;
-      esac
-    else
-      echo "⚠ Forgejo DB not readable — verify CI in the web UI before continuing"; exit 1
+    if [[ -n "$(git status --porcelain)" ]]; then
+      echo "✗ working tree is dirty — publish exactly what CI verified"; exit 1
     fi
+    if ! git ls-remote --exit-code forgejo "$sha" >/dev/null 2>&1 \
+       && [[ "$(git rev-parse "forgejo/$branch" 2>/dev/null || echo none)" != "$sha" ]]; then
+      echo "✗ $sha is not on forgejo/$branch — push there first, CI runs on that"; exit 1
+    fi
+    DB=""
+    for candidate in "$HOME/CI/Forgejo/data/forgejo.db" \
+                     /Volumes/ExternalSSDMini/CI/Forgejo/data/forgejo.db; do
+      [[ -f "$candidate" ]] && { DB="$candidate"; break; }
+    done
+    if [[ -z "$DB" ]]; then
+      echo "⚠ Forgejo DB not found — verify CI in the web UI before continuing"; exit 1
+    fi
+    repo_id=$(sqlite3 "$DB" "SELECT id FROM repository WHERE lower_name='homelib' LIMIT 1")
+    if [[ -z "$repo_id" ]]; then
+      echo "✗ no 'homelib' repository in the Forgejo DB"; exit 1
+    fi
+    status=$(sqlite3 "$DB" "SELECT status FROM action_run WHERE repo_id=$repo_id AND commit_sha='$sha' ORDER BY id DESC LIMIT 1")
+    case "$status" in
+      1) echo "✓ Forgejo CI green for $sha" ;;
+      5|6|7) echo "⏳ Forgejo CI still in progress (status=$status)"; exit 1 ;;
+      2) echo "✗ Forgejo CI FAILED for $sha"; exit 1 ;;
+      "") echo "✗ no CI run recorded for $sha — has it been pushed to forgejo?"; exit 1 ;;
+      *) echo "✗ Forgejo CI not green (status=$status)"; exit 1 ;;
+    esac
     git push public "$branch:main"
-    echo "→ pinned commit: $(git rev-parse HEAD)"
+    echo "→ pinned commit: $sha"
