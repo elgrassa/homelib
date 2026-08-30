@@ -73,6 +73,13 @@ demo-ask Q:
 demo-roadmap INTERESTS:
     uv run python scripts/demo_roadmap.py --interests {{quote(INTERESTS)}}
 
+# ── drill ───────────────────────────────────────────────────────────────────
+
+# The reproducibility gate: clone into an empty dir, up, seed, ask, verify.
+# Runs on offset ports so it can never pass by reusing a stack you already have.
+drill TARGET="/tmp/homelib-drill":
+    bash scripts/cold_clone_drill.sh {{TARGET}}
+
 # ── publish ─────────────────────────────────────────────────────────────────
 
 # Push the public submission copy ONLY after Forgejo CI is green for this branch.
