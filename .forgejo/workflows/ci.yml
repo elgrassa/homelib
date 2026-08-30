@@ -22,8 +22,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-permissions:
-  contents: read
+# No `permissions:` block. Forgejo does not implement it and emits a workflow
+# warning saying so — it is GitHub Actions syntax that reads like a security
+# control here while granting and restricting nothing. Capabilities on this
+# instance come from Authorized Integrations, not from workflow YAML. Leaving
+# a no-op `contents: read` in place would be worse than omitting it, because
+# it looks like the job is sandboxed when it is not.
 
 jobs:
   gate:

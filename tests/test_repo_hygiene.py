@@ -107,3 +107,21 @@ def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
             "`push` must be scoped to main when `pull_request` is also a trigger, "
             f"otherwise every branch push runs CI twice; got branches={branches!r}"
         )
+
+
+def test_ci_declares_no_permissions_block() -> None:
+    """Forgejo ignores `permissions:` and warns about it.
+
+    It is GitHub Actions syntax. On this instance capabilities come from
+    Authorized Integrations, so a `permissions: contents: read` block grants
+    and restricts nothing while reading like a security control — the
+    dangerous kind of no-op, because it invites the reader to believe the job
+    is sandboxed.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+
+    assert "permissions" not in workflow, "top-level `permissions:` is ignored by Forgejo"
+    for name, job in workflow["jobs"].items():
+        assert "permissions" not in job, (
+            f"job {name!r} declares `permissions:`, which Forgejo ignores"
+        )
