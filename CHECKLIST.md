@@ -20,7 +20,7 @@ Last updated: 2026-08-30.
 | 2 | **Retrieval flow** — KB **and** LLM both used | 2 | 🟡 partial | Postgres FTS + pgvector done; answer path is in flight (WP-14) |
 | 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | 🟡 partial | 235-pair ground truth ✅, hit-rate/MRR ✅ (hand-computed tests); 4-arm comparison + ADR-001 pending |
 | 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ⬜ todo | ≥3 prompt variants + judge with bias control. **Budget: ~30–50 questions** (measured ~13s/answer) |
-| 5 | **Interface** — UI or API | 2 | 🟡 partial | FastAPI + Swagger and Streamlit both in flight |
+| 5 | **Interface** — UI or API | 2 | 🟡 partial | Streamlit UI ✅ done (3 tabs, 100% covered logic); FastAPI + Swagger in flight (WP-14) |
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | 🟡 partial | dlt pipeline in flight; corpus snapshot + catalog fetchers ✅ |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
