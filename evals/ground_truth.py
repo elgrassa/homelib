@@ -190,7 +190,13 @@ def _system_prompt(n: int) -> str:
         "NOT read the passage could still tell, from the question alone, "
         "roughly what it discusses. Never ask a generic question like 'what is "
         "this passage about' or 'what does the author discuss'. Never restate "
-        "the passage's opening sentence as a question. Respond with ONLY a "
+        "the passage's opening sentence as a question. Crucially, never refer "
+        "to the passage itself: phrases like 'according to the passage', 'in "
+        "this text', 'the excerpt', or 'the author' are forbidden, because a "
+        "search engine is given the question WITHOUT the passage and such "
+        "wording carries no clue about which passage to find. Write each "
+        "question as if asking someone who knows the whole library. Respond "
+        "with ONLY a "
         'JSON object of the form {"questions": ["...", "..."]} and no other '
         "text."
     )
@@ -241,6 +247,27 @@ def _echoes_opening(question: str, chunk_text: str) -> bool:
     return bool(q_words) and q_words == c_words
 
 
+# A question that points at "the passage" describes its own container rather
+# than its subject. Retrieval is handed the question ALONE, so these carry no
+# signal about which chunk to find and depress every arm equally — noise in the
+# measurement dressed up as difficulty. The prompt forbids them; this rejects
+# the ones a model emits anyway.
+_SELF_REFERENTIAL_RE = re.compile(
+    r"\b(?:according to|in|from|based on|per)\s+(?:this|the)\s+"
+    r"(?:passage|text|excerpt|extract|paragraph|section|chapter)\b"
+    # Verb-agnostic: "the passage implies", "does the passage imply", "the text
+    # describes" are the same defect in different grammatical clothing.
+    r"|\bthe\s+(?:passage|text|excerpt|extract|paragraph)\s+\w+s?\b"
+    r"|\bas (?:described|mentioned|stated|discussed) (?:in|by) the (?:passage|text|author)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_self_referential(question: str) -> bool:
+    """True when a question refers to its own source passage instead of its subject."""
+    return _SELF_REFERENTIAL_RE.search(question) is not None
+
+
 def _clean_questions(candidates: Sequence[str], chunk_text: str, n: int) -> list[str]:
     """Filter and dedupe raw LLM output down to at most `n` usable questions."""
     seen: set[tuple[str, ...]] = set()
@@ -252,6 +279,8 @@ def _clean_questions(candidates: Sequence[str], chunk_text: str, n: int) -> list
         if "?" not in question:
             continue
         if _echoes_opening(question, chunk_text):
+            continue
+        if _is_self_referential(question):
             continue
 
         key = tuple(_normalize_words(question))

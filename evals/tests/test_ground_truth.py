@@ -30,6 +30,7 @@ from evals.ground_truth import (
     main,
     sample_chunks,
     write_ground_truth,
+    _is_self_referential,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -469,3 +470,32 @@ def test_ground_truth_covers_most_books() -> None:
     # 18 books total; require broad coverage rather than every single one so
     # a couple of small/degraded books don't make this test brittle.
     assert len({r["book_id"] for r in rows}) >= 10
+
+
+def test_questions_are_not_self_referential() -> None:
+    """Ground truth must not point at "the passage" instead of its subject.
+
+    Retrieval is handed the question alone. "What causes wrinkles according to
+    the passage?" says nothing about WHICH passage, so it depresses every arm
+    equally — noise in the measurement wearing the costume of difficulty.
+
+    The first generated batch was 40% such questions; the prompt now forbids
+    them and _clean_questions rejects any the model emits anyway.
+    """
+    rows = [json.loads(line) for line in GROUND_TRUTH_PATH.read_text().splitlines() if line]
+    offenders = [r["question"] for r in rows if _is_self_referential(r["question"])]
+    ratio = len(offenders) / len(rows)
+    assert ratio <= 0.02, (
+        f"{len(offenders)}/{len(rows)} ({ratio:.0%}) questions refer to their own "
+        f"passage; e.g. {offenders[:3]}"
+    )
+
+
+def test_self_referential_detector_catches_real_examples() -> None:
+    """Pin the detector to the exact phrasings observed in the first batch."""
+    assert _is_self_referential("What causes wrinkles according to the passage?")
+    assert _is_self_referential("How does age correlate with expression according to the text?")
+    assert _is_self_referential("What does the passage imply about a philosopher?")
+    # ...and does not fire on questions that merely mention an author by name.
+    assert not _is_self_referential("What did Franklin say about industry and frugality?")
+    assert not _is_self_referential("How does Taylor define a fair day's work?")
