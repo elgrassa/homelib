@@ -98,7 +98,12 @@ jobs:
   # rediscovering.
   full-suite:
     name: full suite + coverage floor
-    runs-on: [macos-arm64, e2e]
+    # `heavy`, not `e2e`: both heavy runners carry `heavy` while only
+    # mac-heavy-1 carries `e2e`, so asking for e2e serialises this behind every
+    # other repo's e2e queue on a single machine — observed, with this job
+    # sitting in state 5 behind another project's backlog. Nothing here needs
+    # e2e specifically; it needs "not the quick lane".
+    runs-on: [macos-arm64, heavy]
     timeout-minutes: 45
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
