@@ -1,0 +1,172 @@
+# Shelf manifest — see specs/corpus.md.
+#
+# One entry per public-domain book. `apps/ingest/fetch_corpus.py --fetch`
+# downloads each `source_url` into data/books/ (git-ignored) and verifies
+# the download's sha256 against the pinned value below; `--verify-only`
+# re-hashes whatever is already on disk. All 18 titles here are Project
+# Gutenberg's plain-text mirrors (public domain in the US, no cost or
+# restriction on redistribution), chosen for an engineering / business /
+# self-education reading narrative. Every sha256 below was computed from a
+# real download on 2026-08-30 — none are placeholders.
+
+- book_id: franklin-autobiography
+  title: The Autobiography of Benjamin Franklin
+  authors: [Benjamin Franklin]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/148/pg148.txt
+  sha256: "32b5b6ba76ad51ec1f5630836a5da2f733e893d885772f846bd62f2111ec6eae"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: taylor-scientific-management
+  title: The Principles of Scientific Management
+  authors: [Frederick Winslow Taylor]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/6435/pg6435.txt
+  sha256: "1f504a9abe674ee616f13bf1db66ec25cbb1be0ff5fd9bfe70ab8593aa08a3b2"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: smith-wealth-of-nations
+  title: An Inquiry into the Nature and Causes of the Wealth of Nations
+  authors: [Adam Smith]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/3300/pg3300.txt
+  sha256: "e91d52dca43fd0fd69baf7776b00a5d8e74b69675b6b608ca8a0378aaf3ae58d"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: machiavelli-the-prince
+  title: The Prince
+  authors: [Niccolò Machiavelli]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/1232/pg1232.txt
+  sha256: "33496a305f7a4b933784fb5aec95f920fbc3d4687794817e4cc444aa6578d2e4"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: suntzu-art-of-war
+  title: The Art of War
+  authors: [Sun Tzu]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/132/pg132.txt
+  sha256: "c478f7e05a07bf190585fcea0bc4658ce22e47949ac18444eca53fb274878ffe"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: aurelius-meditations
+  title: Meditations
+  authors: [Marcus Aurelius]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/2680/pg2680.txt
+  sha256: "6977474f82a39dd88a4af31a59504821658174d33c177732c54357e4d680b96c"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: allen-as-a-man-thinketh
+  title: As a Man Thinketh
+  authors: [James Allen]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/4507/pg4507.txt
+  sha256: "5c189ac57a410e844895e9e054630cab10138d145952a72ccc200702076e2aa9"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: smiles-self-help
+  title: "Self Help; with Illustrations of Conduct and Perseverance"
+  authors: [Samuel Smiles]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/935/pg935.txt
+  sha256: "e7f4232f8880af072453521a95d72b3476d716e2485de08ab8e54c444f28802a"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: washington-up-from-slavery
+  title: "Up from Slavery: An Autobiography"
+  authors: [Booker T. Washington]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/2376/pg2376.txt
+  sha256: "084e7f54e60b9ae26ecf2ab23f1789db44d926c3b02106a984f475f9ccc7bdbe"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: keller-story-of-my-life
+  title: The Story of My Life
+  authors: [Helen Keller]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/2397/pg2397.txt
+  sha256: "b323e81058c4e3b1ec136c6789a1490fc6ca37946ce0e12389f9bc14b829ee9f"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: conwell-acres-of-diamonds
+  title: "Acres of Diamonds: Our Every-day Opportunities"
+  authors: [Russell H. Conwell]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/368/pg368.txt
+  sha256: "a0b8613f5a9c0ee604b53d6aa68388084bdefbf24e1f5e9749aafe2c8448efa3"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: barnum-art-of-money-getting
+  title: The Art of Money Getting
+  authors: [P. T. Barnum]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/8581/pg8581.txt
+  sha256: "ccf68ee545e68995f88d4cd2f534ecae9bf731b8996118d34b5a10bfc4958061"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: mackay-extraordinary-popular-delusions
+  title: Memoirs of Extraordinary Popular Delusions — Volume 1
+  authors: [Charles Mackay]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/636/pg636.txt
+  sha256: "1c6619cdfb8bcfaa5b392db14f487769ddec369d8a79719a653027e3d034485b"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: strunk-elements-of-style
+  title: The Elements of Style
+  authors: [William Strunk Jr.]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/37134/pg37134.txt
+  sha256: "fcc9a82788d649db7099424cd1c02e8c6457139478aefdaeb2a34809ae6a5e70"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: emerson-essays-second-series
+  title: Essays — Second Series
+  authors: [Ralph Waldo Emerson]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/2945/pg2945.txt
+  sha256: "2e7eb7281ade2ab623b9e4a790f79ed8e8b25dc1d95d31f9eda4f7a7dc471e6e"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: mill-on-liberty
+  title: On Liberty
+  authors: [John Stuart Mill]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/34901/pg34901.txt
+  sha256: "cfc8de9ac48709ef8e66922b32bac51335c883082e4da24251e1290816df904c"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: thoreau-walden
+  title: "Walden, and On The Duty Of Civil Disobedience"
+  authors: [Henry David Thoreau]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/205/pg205.txt
+  sha256: "2d9a76a2e3e8195c69430516ebd33c4d0757a53ad432ff6186b7b794e6fe99f9"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
+
+- book_id: ford-my-life-and-work
+  title: My Life and Work
+  authors: [Henry Ford]
+  language: en
+  source_url: https://www.gutenberg.org/cache/epub/7213/pg7213.txt
+  sha256: "f01c925ba4a15ccc6a5aa706418cf94149ddd7d8f390c65d132b8675435b00cf"
+  format: txt
+  license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
