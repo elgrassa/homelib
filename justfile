@@ -7,7 +7,7 @@ default:
 # ── local gates ─────────────────────────────────────────────────────────────
 
 # Full local gate: what CI runs. Green here == green there.
-ci: lint typecheck test
+ci: lint typecheck secrets test
 
 lint:
     uv run ruff check .
@@ -15,6 +15,19 @@ lint:
 
 typecheck:
     uv run mypy
+
+# Scan the whole HISTORY, not just the working tree: a secret that was
+# committed and then deleted is still in the repo, and this one is going
+# public. Skips with a loud warning rather than failing when gitleaks is not
+# installed, so a contributor without it is told rather than silently passing.
+secrets:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    if ! command -v gitleaks >/dev/null 2>&1; then
+      echo "⚠ gitleaks not installed — history NOT scanned (brew install gitleaks)"
+      exit 0
+    fi
+    gitleaks git --config .gitleaks.toml --redact --no-banner .
 
 test:
     uv run pytest -q --cov --cov-report=term-missing

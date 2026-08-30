@@ -80,7 +80,7 @@ members = ["packages/*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
-testpaths = ["packages", "apps", "evals"]
+testpaths = ["packages", "apps", "evals", "tests"]
 pythonpath = ["."]
 filterwarnings = ["error", "ignore::DeprecationWarning"]
 markers = [

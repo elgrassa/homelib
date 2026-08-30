@@ -25,6 +25,12 @@ jobs:
       UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Full history. The secret scan below reads the git log, and on the
+          # default shallow clone it would see exactly one commit and report
+          # clean every time — a scanner that always passes is worse than none,
+          # because it is believed. The repo is ~6 MB, so this costs nothing.
+          fetch-depth: 0
 
       # uv is installed on the Mac runners at ~/.local/bin/uv. `uv sync
       # --frozen` refuses to update uv.lock, so a lock that drifted from
@@ -40,6 +46,11 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv run ruff check .
           uv run ruff format --check .
+
+      # Scans HISTORY, not the working tree: a secret that was committed and
+      # later deleted is still in the repo, and this one goes public.
+      - name: Secret scan (gitleaks, full history)
+        run: gitleaks git --config .gitleaks.toml --redact --no-banner .
 
       - name: Type check (mypy --strict)
         run: |

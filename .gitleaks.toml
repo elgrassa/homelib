@@ -3,14 +3,30 @@ title = "homelib gitleaks config"
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Local-development placeholders committed on purpose"
-paths = [
-  '''\.env\.example$''',
-  '''docker/docker-compose\.yml$''',
-  '''README\.md$''',
-]
+# Allowlists here are matched on the exact known-safe string, never on the
+# file it lives in. A `paths` entry exempts the WHOLE file, so an entry meant
+# to cover a placeholder in the README would silently allow a real key pasted
+# into the README later. Measured, not assumed: a path-scoped version of this
+# file suppressed a planted GitHub PAT and AWS key ID that gitleaks otherwise
+# flags — including with matchCondition = "AND", which did not narrow it.
+
+# Committed local-development placeholders, and one runtime lookup that only
+# looks like a credential: the cold-clone drill reads GRAFANA_PASSWORD out of
+# .env at run time, so the match is on curl's -u flag, not on a literal.
+[[allowlists]]
+description = "Local-dev placeholders and the drill's runtime password lookup"
+regexTarget = "line"
 regexes = [
   '''homelib_local_dev''',
   '''LLM_API_KEY=ollama''',
+  '''-u "admin:\$\(grep''',
 ]
+
+# eval-gate's MetricSpec.key holds a metric identifier such as
+# "hybrid_rerank.hit_rate_at_5"; the generic-api-key rule fires on the field
+# NAME. Matched against the extracted secret rather than the line, so a real
+# key sharing a line with a metric name is still reported — a dotted lowercase
+# identifier is not a shape any credential takes.
+[[allowlists]]
+description = "MetricSpec.key values are dotted metric identifiers, not secrets"
+regexes = ['''^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$''']
