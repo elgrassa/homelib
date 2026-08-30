@@ -5,9 +5,10 @@ Unit tests (the default `uv run pytest` run) stub `_connect` and
 live Postgres or downloads an embedding model.
 
 Integration tests (`@pytest.mark.integration`) create and drop their OWN
-throwaway database (`homelib_test_index`) on the same Postgres server the
-project's `homelib` database lives on, and never touch `homelib` itself —
-another agent may be concurrently loading that database. The session fixture
+throwaway database on the same Postgres server the project's `homelib`
+database lives on, and never touch `homelib` itself — another agent may be
+concurrently loading that database. The throwaway name is unique per process
+(see `_TEST_DB_NAME`); a constant name was not enough. The session fixture
 that creates it skips the whole integration suite (rather than failing) if no
 Postgres server is reachable at all, so a plain `uv run pytest` — which does
 not filter by marker — still passes in an environment with no database, e.g.
@@ -16,6 +17,7 @@ CI (see `.forgejo/workflows/ci.yml`, which runs no Postgres service).
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -29,7 +31,17 @@ from psycopg import sql
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = _REPO_ROOT / "docker" / "initdb" / "01-schema.sql"
 _ADMIN_DSN = "postgresql://homelib:homelib_local_dev@localhost:5432/postgres"
-_TEST_DB_NAME = "homelib_test_index"
+# The throwaway database name must be unique per test PROCESS, not constant.
+# Two test runs against the same Postgres both DROP and CREATE this name, so
+# whichever drops second deletes the other's database out from under it —
+# mid-test, with connections already open. That is not hypothetical: CI run
+# 12259 failed with `database "homelib_test_index" does not exist` on six
+# tests while the identical push run passed, because a push and its
+# pull_request fire two runs of the same commit on the same host.
+#
+# The pid separates processes on one host; the CI run id is folded in so two
+# runners sharing one Postgres server stay disjoint too.
+_TEST_DB_NAME = f"homelib_test_index_{os.environ.get('GITHUB_RUN_ID', 'local')}_{os.getpid()}"
 _TEST_DSN = f"postgresql://homelib:homelib_local_dev@localhost:5432/{_TEST_DB_NAME}"
 
 
@@ -398,6 +410,19 @@ def _seed(dsn: str) -> None:
                 (spec["chunk_id"], vector_literal),
             )
         conn.commit()
+
+
+def test_throwaway_database_name_is_unique_per_process() -> None:
+    """A constant name lets two concurrent runs delete each other's database.
+
+    Guards the exact regression behind CI run 12259: a push and its
+    pull_request run the same commit on the same host, both dropped and
+    recreated a fixed `homelib_test_index`, and six tests failed with
+    `database ... does not exist` while the identical push run passed.
+    """
+    assert _TEST_DB_NAME != "homelib_test_index", "throwaway db name is constant again"
+    assert str(os.getpid()) in _TEST_DB_NAME
+    assert _TEST_DSN.endswith(_TEST_DB_NAME)
 
 
 @pytest.fixture(scope="session")

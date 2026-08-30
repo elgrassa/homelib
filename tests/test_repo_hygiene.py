@@ -84,3 +84,26 @@ def test_just_ci_includes_the_secret_scan() -> None:
     ci_line = next(line for line in JUSTFILE.read_text().splitlines() if line.startswith("ci:"))
 
     assert "secrets" in ci_line, f"`just ci` omits the secret scan: {ci_line!r}"
+
+
+def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
+    """A branch push plus an open PR must not fire two runs of the same commit.
+
+    With `push` unscoped and `pull_request` both present, every push to a
+    branch with an open PR starts two runs of the identical tree on the same
+    host. They are not independent: run 12259 (pull_request) went red on six
+    tests with `database "homelib_test_index" does not exist` while run 12258
+    (push, same commit) passed, because the two raced over a shared throwaway
+    database. The per-process database name fixes the race; scoping `push` to
+    main removes the second run entirely.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    # PyYAML parses a bare `on:` key as the boolean True.
+    triggers = workflow.get("on") or workflow[True]
+
+    if "push" in triggers and "pull_request" in triggers:
+        branches = (triggers.get("push") or {}).get("branches")
+        assert branches == ["main"], (
+            "`push` must be scoped to main when `pull_request` is also a trigger, "
+            f"otherwise every branch push runs CI twice; got branches={branches!r}"
+        )
