@@ -82,6 +82,10 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedE
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# Specs contain illustrative signatures (`def f(...) -> X: ...`), not runnable
+# code. Ruff formats Python fences inside Markdown, which would rewrite them
+# into something that reads worse and says less. Prose is out of scope.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "S", "UP", "RUF", "SIM", "C4", "PTH", "RET", "TID"]
