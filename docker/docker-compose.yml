@@ -11,16 +11,14 @@
 # healthcheck, and dependants wait on `service_healthy` rather than racing a
 # container that is up but not yet listening.
 #
-# NOT YET REPRODUCIBLE: these images carry tags but no digests, because Docker
-# Hub was unreachable from this machine when the file was written (even
-# `docker pull alpine` timed out). Reproducibility is a graded criterion, so
-# WP-07 must replace every tag below with `<tag>@sha256:<digest>` once the
-# registry responds. Until then a rebuild can silently pick up a different
-# image than the one this stack was verified against.
+# Every image is pinned by digest as well as tag. The tag says what it is and
+# stays readable; the digest is what actually runs, so a rebuild months from
+# now gets the same bytes this stack was verified against. Digests were read
+# from images actually pulled on 2026-08-30, not copied from a registry page.
 
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg17@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f  # PostgreSQL 17.11
     environment:
       POSTGRES_USER: homelib
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -36,7 +34,7 @@ services:
       retries: 10
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
     volumes:
       - ollama:/root/.ollama
     ports: ["127.0.0.1:11434:11434"]
@@ -50,7 +48,7 @@ services:
   # One-shot: pulls the chat model so the first /v1/ask never cold-fails on a
   # missing model. Runs to completion and exits; `restart: no` keeps it exited.
   model-init:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
     entrypoint: ["/bin/sh", "-c", "OLLAMA_HOST=http://ollama:11434 ollama pull ${LLM_MODEL}"]
     depends_on:
       ollama: {condition: service_healthy}
@@ -112,7 +110,7 @@ services:
       retries: 10
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:13.0.2@sha256:5dad0df181cb644a14e13617b913b261a54f7d4fd4510721dba420929f35bea2
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
