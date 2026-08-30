@@ -36,6 +36,18 @@ test:
 test-fast:
     uv run pytest -q --no-cov -x
 
+# What the pre-push hook runs. Everything cheap, nothing slow: the integration
+# tests, the embedding-model loads and the coverage floor are the PR's job.
+# Keep this under a minute — a slow pre-push gate teaches people --no-verify.
+gate-fast:
+    bash .githooks/pre-push
+
+# Opt-in: point git at .githooks so the pre-push gate runs. Undo with
+# `git config --unset core.hooksPath`.
+hooks:
+    git config core.hooksPath .githooks
+    @echo "✓ pre-push gate installed (undo: git config --unset core.hooksPath)"
+
 fmt:
     uv run ruff format .
     uv run ruff check --fix .

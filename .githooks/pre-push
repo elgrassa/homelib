@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Fast local gate. Deliberately NOT the full suite.
+#
+# The division of labour is: this hook catches the things that are cheap to
+# check and embarrassing to push (a syntax error, a type error, a committed
+# secret, a broken unit test). Everything expensive — the integration tests
+# against a live Postgres, the embedding-model loads, the coverage floor —
+# runs on the PR, where it can take five minutes without anyone waiting on it.
+#
+# Budget: this must stay under ~1 minute. Measured at the time it was written:
+# 355 tests in 7.5s, plus lint, mypy and a full-history secret scan. If it ever
+# creeps toward the point where it is faster to push and wait, people will
+# start passing --no-verify, and then it protects nothing.
+#
+# The 13 tests it skips are marked integration/slow/llm. They are not optional,
+# they just belong on the other side of the push.
+set -uo pipefail
+
+fail=0
+step() {
+    local name="$1"; shift
+    if "$@" >/tmp/homelib-prepush.log 2>&1; then
+        printf '  ✓ %s\n' "$name"
+    else
+        printf '  ✗ %s\n' "$name"
+        sed 's/^/      /' /tmp/homelib-prepush.log | tail -25
+        fail=1
+    fi
+}
+
+printf '\npre-push gate (fast — the full suite runs on the PR)\n'
+
+step "ruff check"        uv run ruff check .
+step "ruff format"       uv run ruff format --check .
+step "mypy --strict"     uv run mypy
+
+# Skipped rather than failed when gitleaks is absent, because a contributor
+# without it should be told, not blocked. CI hard-errors on a missing binary,
+# so the guarantee is not lost — only deferred.
+if command -v gitleaks >/dev/null 2>&1; then
+    step "gitleaks"      gitleaks git --config .gitleaks.toml --redact --no-banner .
+else
+    printf '  ⚠ gitleaks not installed — history not scanned here (CI still enforces it)\n'
+fi
+
+step "tests (fast)"      uv run pytest -q --no-cov -m "not integration and not slow and not llm"
+
+if [[ "$fail" -ne 0 ]]; then
+    printf '\n✗ pre-push gate failed. Fix, or push with --no-verify if you know why.\n\n'
+    exit 1
+fi
+
+printf '\n✓ pre-push gate passed. Full suite + coverage floor run on the PR.\n\n'

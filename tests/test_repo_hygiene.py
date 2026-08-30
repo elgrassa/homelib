@@ -125,3 +125,36 @@ def test_ci_declares_no_permissions_block() -> None:
         assert "permissions" not in job, (
             f"job {name!r} declares `permissions:`, which Forgejo ignores"
         )
+
+
+def test_pre_push_hook_stays_fast_by_excluding_the_slow_markers() -> None:
+    """The pre-push gate must not grow into the full suite.
+
+    Quality gates live on the PR; this hook exists only to catch what is cheap
+    to check and embarrassing to push. The moment it starts running the
+    integration tests, the embedding-model loads or the coverage floor, it
+    stops being a fast gate and people start reaching for --no-verify — at
+    which point it protects nothing at all.
+    """
+    hook = REPO_ROOT / ".githooks/pre-push"
+    assert hook.exists(), "pre-push hook is missing"
+    assert hook.stat().st_mode & 0o111, "pre-push hook is not executable"
+
+    body = hook.read_text()
+    for marker in ("integration", "slow", "llm"):
+        assert f"not {marker}" in body, f"pre-push hook no longer excludes `{marker}` tests"
+    assert "--no-cov" in body, "pre-push hook runs the coverage floor; that belongs on the PR"
+
+
+def test_ci_runs_the_full_suite_the_hook_skips() -> None:
+    """Whatever the hook defers must actually be enforced somewhere.
+
+    A fast local gate is only safe because the PR runs everything. If CI ever
+    picks up the hook's marker exclusions too, the slow tests would run
+    nowhere and both gates would be green on a suite nobody executed.
+    """
+    commands = " ".join(str(step.get("run", "")) for step in _gate_steps())
+
+    assert "pytest" in commands, "CI runs no tests at all"
+    assert "not integration" not in commands, "CI excludes the tests the hook already defers"
+    assert "--cov" in commands, "CI does not enforce the coverage floor"
