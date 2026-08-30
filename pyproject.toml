@@ -46,6 +46,10 @@ dev = [
     "ruff==0.16.5",
     "mypy==2.3.1",
     "types-pyyaml==6.0.12.20260815",
+    # OCR is an optional extra of homelib-core so production installs stay slim,
+    # but the scanned-PDF path is a real feature and must be exercised by the
+    # suite rather than skipped — so dev/CI installs it explicitly.
+    "pymupdf==1.28.2",
 ]
 
 [tool.uv]
