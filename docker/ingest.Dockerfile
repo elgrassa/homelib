@@ -2,10 +2,15 @@
 # Shares the API image's model cache strategy so seeding never hits the network.
 FROM python:3.13-slim-bookworm
 
+# UV_NO_CACHE: uv's download cache is worth ~1.4 GB inside the dependency
+# layer and is never read again at runtime. Layers are immutable, so
+# deleting it in a later step would not shrink the image — it must never
+# be written in the first place.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
     HF_HOME=/opt/models \
