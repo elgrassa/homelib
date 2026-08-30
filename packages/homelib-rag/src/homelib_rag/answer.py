@@ -328,10 +328,14 @@ def _build_context_prompt(
         title, authors = book_meta.get(hit.book_id, ("(unknown title)", []))
         section = " / ".join(hit.section_path) if hit.section_path else "(no section)"
         page = hit.page if hit.page is not None else "unknown"
-        lines.append(
-            f"[{i}] chunk_id={hit.chunk_id!r} book={title!r} authors={authors!r} "
-            f"section={section!r} page={page}"
-        )
+        # No chunk_id on this line. Nothing reads one back — `answer()` maps
+        # the passage number to the real chunk itself — and _SYSTEM_PROMPT
+        # describes this line as "its number in square brackets, then the
+        # book's title, its authors, the section, and the page", which was
+        # simply untrue while a 16-hex id sat at the front of it. Leaving it
+        # there dangled the exact token that produced the invented
+        # `10028766648516879691` in the first place.
+        lines.append(f"[{i}] book={title!r} authors={authors!r} section={section!r} page={page}")
         lines.append(hit.text)
         lines.append("")
     return "\n".join(lines)

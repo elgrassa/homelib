@@ -58,7 +58,16 @@ fmt:
 # looks for docker/.env — it does not pick up the repo-root .env on its own.
 # Without --env-file the stack boots with a blank POSTGRES_PASSWORD and an empty
 # LLM_MODEL, warning but not failing. Every compose call therefore passes it.
-compose := "docker compose --env-file .env -f docker/docker-compose.yml"
+# `-p homelib` is not decoration. Compose derives the project name from the
+# directory holding the compose file, which here is `docker/` — so the stack
+# comes up as project "docker", named after the most generic directory name in
+# software. Two consequences, both observed: a Docker restart brought the stack
+# back under a different project than the one that had been seeded, pointing at
+# a fresh EMPTY volume while `homelib_pgdata` sat there full; and any other
+# project on this machine with a `docker/` directory computes the same names.
+# The same class of bug as the fixed test-database name — a constant, shared
+# identifier on a shared host.
+compose := "docker compose -p homelib --env-file .env -f docker/docker-compose.yml"
 
 # Refuse to run against a missing .env rather than silently using blank values.
 _require-env:

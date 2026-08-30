@@ -30,14 +30,25 @@ for.
 
 ```bash
 cp .env.example .env
-docker compose --env-file .env -f docker/docker-compose.yml up -d --build
-docker compose --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
+docker compose -p homelib --env-file .env -f docker/docker-compose.yml up -d --build
+docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
 open http://localhost:8501
 ```
 
-`--env-file` is not optional: the compose file lives in `docker/`, so Compose
-treats that as the project directory and would otherwise start Postgres with a
-blank password. `just up && just seed` does the same thing and checks for you.
+Neither flag is optional, and both exist because the compose file lives in
+`docker/`:
+
+- `--env-file .env` — Compose treats `docker/` as the project directory and
+  looks for `docker/.env`, so without this it starts Postgres with a blank
+  password. It warns rather than failing, so the stack boots misconfigured.
+- `-p homelib` — Compose otherwise names the project after that same
+  directory, i.e. `docker`. That collides with any other project on your
+  machine laid out the same way, and it means a Docker restart can bring the
+  stack back attached to a different, empty volume while the seeded one sits
+  untouched. Both observed here.
+
+`just up && just seed` does all of this for you and refuses to run without a
+`.env`, which is the recommended path.
 
 Ports (`API_PORT`, `UI_PORT`, `GRAFANA_PORT`, `POSTGRES_PORT`, `OLLAMA_PORT`)
 are overridable in `.env` if something already listens on a default.
