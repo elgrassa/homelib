@@ -19,7 +19,7 @@ Last updated: 2026-08-30.
 | 1 | **Problem description** | 2 | ✅ done | README states the problem in user terms: unsearchable shelf, unplanned reading order |
 | 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Postgres FTS + pgvector + grounded answer with validated citations (WP-14) |
 | 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms × 235 questions, 0 degraded; ADR-001 records the choice and the evidence |
-| 4 | **LLM evaluation** — multiple approaches, best one used | 2 | 🟡 partial | Harness ✅ (3 variants, judge with bias control, prompt-hash drift). Live bake-off still to run — it already found the answer-path defect |
+| 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms (3 challengers + production control) × 30 questions, judge with bias control. **Null result, recorded in ADR-003**: run-to-run variance exceeds between-arm spread, so the incumbent stays |
 | 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
