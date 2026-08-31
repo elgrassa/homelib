@@ -63,6 +63,12 @@ and hedging wins under a judge with no room to punish it. Had the harness not
 counted ungrounded successes, `stepwise` would have been crowned and the shipped
 prompt replaced with one that answers *less often*.
 
+Stated plainly, because it is the general lesson and not a detail of this run:
+**the arm that answered least scored best.** That is the clean demonstration
+that the metric and the goal had come apart. Any future prompt work on this
+system needs the grounded-answer rate as a *primary* metric, not a column added
+after someone got suspicious.
+
 ## Consequences
 
 **Positive**
