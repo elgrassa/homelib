@@ -159,6 +159,7 @@ def search_lexical(q: str, k: int) -> list[Hit]:
                     text=text,
                     section_path=list(section_path),
                     page=_first_page(cur, block_ids),
+                    block_ids=list(block_ids or []),
                 )
             )
         return hits
@@ -199,6 +200,7 @@ def search_vector(q: str, k: int) -> list[Hit]:
                     text=text,
                     section_path=list(section_path),
                     page=_first_page(cur, block_ids),
+                    block_ids=list(block_ids or []),
                 )
             )
         return hits

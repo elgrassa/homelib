@@ -286,10 +286,17 @@ def test_format_citation_label_handles_missing_page_and_section() -> None:
     assert format_citation_label(citation) == "Walden · — · page —"
 
 
-def test_block_id_for_citation_derives_from_chunk_id() -> None:
-    citation = _make_citation(chunk_id="chunk-42")
+def test_block_id_for_citation_uses_the_block_id_not_the_chunk_id() -> None:
+    """`/v1/blocks/{id}` is keyed on block ids; a chunk_id 404s there.
 
-    assert block_id_for_citation(citation) == "chunk-42"
+    The previous version of this test asserted the chunk_id was returned, and
+    passed happily while the "show full source" button was broken end to end.
+    A test can only be as right as the contract it encodes.
+    """
+    citation = _make_citation(chunk_id="chunk-42")
+    citation.block_id = "blk-7"
+
+    assert block_id_for_citation(citation) == "blk-7"
 
 
 def test_normalize_level_accepts_every_known_level() -> None:

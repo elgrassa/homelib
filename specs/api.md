@@ -25,12 +25,20 @@ the reviewer-facing API documentation, and the README links it.
 Supporting shapes:
 
 ```
-Citation    {chunk_id, book_id, book_title, section_path: list[str],
+Citation    {chunk_id, block_id, book_id, book_title, section_path: list[str],
              page: int|None, quote: str}
 RoadmapStep {order: int, ol_key: str|None, book_id: str|None, title: str,
              authors: list[str], why: str, prerequisites: list[int],
              est_effort: "light"|"medium"|"deep"}
 ```
+
+`Citation` carries **both** a `chunk_id` and a `block_id`, and the distinction
+is load-bearing rather than redundant. A chunk is the retrieval unit; a block is
+the document unit a reader opens, and `GET /v1/blocks/{block_id}` is keyed on
+the latter. Passing a `chunk_id` there returns 404 — which is precisely how the
+UI's "show full source" action was broken until the cold-clone drill tried to
+resolve a real citation end to end. A citation nobody can open is not a
+citation, so the id needed to open it belongs in the shape.
 
 `arm: None` on `/v1/ask` means "use the production winner" — the arm chosen on
 evidence in `docs/adrs/ADR-001-retrieval-arm.md`, not a hardcoded preference.

@@ -82,6 +82,13 @@ def test_citation_required_fields_match_spec() -> None:
     committed = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
     assert set(committed["schemas"]["Citation"]) == {
         "chunk_id",
+        # Not redundant with chunk_id. A chunk is the retrieval unit; a block
+        # is the document unit a reader opens, and GET /v1/blocks/{block_id}
+        # is keyed on the latter. Citations carried only chunk_id until the
+        # cold-clone drill tried to resolve one and got a 404 — the UI's "show
+        # full source" action had never worked. A citation nobody can open is
+        # not a citation, so the id needed to open it is required here.
+        "block_id",
         "book_id",
         "book_title",
         "section_path",

@@ -88,6 +88,7 @@ def _judge_body(
 def _citation(chunk_id: str = "c1", quote: str = "the assembly line moved") -> Citation:
     return Citation(
         chunk_id=chunk_id,
+        block_id="blk-1",
         book_id="ford-my-life-and-work",
         book_title="My Life and Work",
         section_path=["Chapter 5"],

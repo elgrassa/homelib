@@ -54,6 +54,7 @@
       "title"
     ],
     "Citation": [
+      "block_id",
       "book_id",
       "book_title",
       "chunk_id",

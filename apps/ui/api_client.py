@@ -46,6 +46,7 @@ class TokenUsage(BaseModel):
 
 class Citation(BaseModel):
     chunk_id: str
+    block_id: str = ""
     book_id: str
     book_title: str
     section_path: list[str]

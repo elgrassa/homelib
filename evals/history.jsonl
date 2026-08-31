@@ -1,0 +1,4 @@
+{"git_sha": "0105e9a7ccf845b195810729e9bb948ae2524e40", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.17446808510638298, "hybrid_rerank.mrr_at_5": 0.16737588652482271}, "regressions": ["hybrid_rerank.hit_rate_at_5", "hybrid_rerank.mrr_at_5"], "ts": "2026-08-30T15:33:14.420937+00:00"}
+{"git_sha": "9e261c3b82860b34aa64c65c70c610c6cdbe04f6", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.17446808510638298, "hybrid_rerank.mrr_at_5": 0.16737588652482271}, "regressions": [], "ts": "2026-08-30T15:56:31.449521+00:00"}
+{"git_sha": "581f4a64861074894844b885fb70a209151f42fc", "metrics": {"judge.mean_faithfulness": 2.3666666666666667}, "regressions": ["judge.mean_faithfulness"], "ts": "2026-08-30T20:30:42.685829+00:00"}
+{"git_sha": "8be2b40d946414d34f9af6fd1948a42bac1487d5", "metrics": {"judge.mean_faithfulness": 2.3666666666666667}, "regressions": ["judge.mean_faithfulness"], "ts": "2026-08-30T21:22:03.442882+00:00"}

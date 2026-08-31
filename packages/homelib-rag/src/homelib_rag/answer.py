@@ -245,6 +245,12 @@ class Citation(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     chunk_id: str
+    #: The block a reader can open, via GET /v1/blocks/{block_id}. Distinct
+    #: from `chunk_id` on purpose: chunks are a retrieval unit and blocks are
+    #: the document unit, and that endpoint is keyed on the latter. Passing a
+    #: chunk_id to it 404s, which is exactly how the "show full source" path
+    #: was broken until the cold-clone drill caught it.
+    block_id: str
     book_id: str
     book_title: str
     section_path: list[str]
@@ -495,6 +501,7 @@ def answer(
         citations.append(
             Citation(
                 chunk_id=source.chunk_id,
+                block_id=source.block_ids[0] if source.block_ids else "",
                 book_id=source.book_id,
                 book_title=title,
                 section_path=source.section_path,

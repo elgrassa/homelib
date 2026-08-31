@@ -69,12 +69,15 @@ def record_vote(feedback_sent: set[str], request_id: str) -> set[str]:
 def block_id_for_citation(citation: Citation) -> str:
     """The block id to resolve for a citation's "show full source" action.
 
-    Citations carry ``chunk_id``, not a block id directly (specs/api.md's
-    ``Citation`` shape has no ``block_id`` field); this is the single place
-    that derivation happens so it can be swapped out without touching the
-    rendering code.
+    This used to return ``chunk_id``, because the Citation shape carried no
+    block id — and ``GET /v1/blocks/{block_id}`` is keyed on block ids, so the
+    button 404'd every time. Nothing caught it: the UI test asserted the
+    derivation returned the chunk_id, which it faithfully did. The cold-clone
+    drill found it by trying to resolve a real citation end to end.
+
+    The seam the original author left here is what made the fix one line.
     """
-    return citation.chunk_id
+    return citation.block_id
 
 
 def format_citation_label(citation: Citation) -> str:

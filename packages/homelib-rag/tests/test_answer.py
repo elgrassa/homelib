@@ -279,6 +279,7 @@ def test_validate_citations_raises_for_unknown_chunk_id() -> None:
     hits = [_hit(chunk_id="c1", text="hello world")]
     bad = [
         Citation(
+            block_id="blk-1",
             chunk_id="does-not-exist",
             book_id="b1",
             book_title="T",
@@ -295,7 +296,13 @@ def test_validate_citations_raises_for_non_verbatim_quote() -> None:
     hits = [_hit(chunk_id="c1", text="hello world")]
     bad = [
         Citation(
-            chunk_id="c1", book_id="b1", book_title="T", section_path=[], page=None, quote="goodbye"
+            block_id="blk-1",
+            chunk_id="c1",
+            book_id="b1",
+            book_title="T",
+            section_path=[],
+            page=None,
+            quote="goodbye",
         )
     ]
     with pytest.raises(CitationValidationError):
@@ -306,7 +313,13 @@ def test_validate_citations_passes_for_genuine_citation() -> None:
     hits = [_hit(chunk_id="c1", text="hello world")]
     good = [
         Citation(
-            chunk_id="c1", book_id="b1", book_title="T", section_path=[], page=None, quote="hello"
+            block_id="blk-1",
+            chunk_id="c1",
+            book_id="b1",
+            book_title="T",
+            section_path=[],
+            page=None,
+            quote="hello",
         )
     ]
     _validate_citations(good, hits)  # must not raise
@@ -532,3 +545,26 @@ def test_context_prompt_never_shows_a_chunk_id() -> None:
     assert "chunk_id" not in sent_prompt
     assert "b4e8f2cb74bee0e8" not in sent_prompt
     assert "[1]" in sent_prompt
+
+
+def test_citation_carries_a_block_id_that_can_be_resolved() -> None:
+    """A citation nobody can open is not a citation.
+
+    Found by the cold-clone drill, which is the only place it could have been:
+    every unit test asserted on `chunk_id` and passed, while end to end the
+    UI's "show full source block" button and the drill's own resolution check
+    both called `/v1/blocks/{chunk_id}` against an endpoint keyed on
+    `block_id`. Verified against the live stack — a chunk_id returns 404 and a
+    block_id returns 200 — so the feature had never worked.
+
+    `chunks.block_ids` was already being selected by the index query and used
+    to derive `page`; it simply never reached the `Hit`.
+    """
+    hits = [_hit(chunk_id="c1", text="The fox jumps high.")]
+    hits[0].block_ids = ["blk-1", "blk-2"]
+    client = _ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is False
+    assert response.citations[0].block_id == "blk-1"
