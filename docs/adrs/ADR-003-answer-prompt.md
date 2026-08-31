@@ -86,6 +86,55 @@ after someone got suspicious.
   7B breaking its JSON contract and is not something rewording fixes.
 - The judge baseline can only be a loose floor (see below).
 
+## A model swap does not fix it either (2026-08-31)
+
+A second session ran `gemma4:26b-a4b-it-qat` against the incumbent on the same
+12 questions, same hits, judge pinned to qwen. **Verdict: do not swap.**
+
+| | qwen2.5:7b | gemma4:26b-a4b |
+|---|---:|---:|
+| grounded | 4/12 | 3/12 |
+| ungrounded declines | 3 | **7** |
+| `malformed_json` (the bare `{}`) | **4** | **0** |
+| 180s timeouts | 0 | 2 |
+| median latency | 15.2 s | **68.1 s** |
+
+Half the hypothesis was right: gemma **eliminates the bare `{}` entirely**,
+4 → 0. It is a strictly better JSON-contract follower. It then trades that
+failure for a worse one — every one of its 7 ungrounded answers is verbatim
+"The provided passages do not answer the question", and on questions 2, 3 and 4
+qwen returned valid grounded citations *from the same hits*. That is
+over-refusal, not incapacity.
+
+**Suspected cause, and a real follow-up for this ADR's subject.** `_SYSTEM_PROMPT`
+says: *"If the passages do not answer the question, say so plainly and return an
+empty `citations` list rather than guessing."* That sentence exists to prevent
+fabrication, and it works — but it is an invitation to decline, and gemma
+accepts it far more readily than qwen. So the same prompt line that protects
+faithfulness is plausibly suppressing the grounded-answer rate, and the
+prompt/model pairing matters more than either alone. Tuning the decline
+invitation is the most promising remaining prompt work, and it is *not* what any
+of the four bake-off arms varied.
+
+Latency is disqualifying independently: ~68 s median against production's 30 s
+client ceiling, plus two hard timeouts. Reported despite a contended box because
+the contamination ran *against* qwen (gemma's arm had the quieter machine) and
+qwen was still 4.5× faster — the bias cannot produce that result.
+
+## Correction: these measurements are less stable than either of us claimed
+
+The same session re-ran the **incumbent, unchanged** — same model, prompt,
+questions and hits — and got **8/12 grounded on one run and 4/12 on the next**.
+Five of twelve questions flipped. The per-question determinism previously
+asserted is retracted.
+
+That matters for this ADR in both directions. It independently confirms the null
+result from a second angle: my four runs spread 0.47 on judge score, theirs
+spread 0.34 on grounded rate, and it is the same underlying instability. But it
+also means **my own 25/30 grounded figure for the incumbent is one draw, not a
+stable measurement**, and should not be quoted as a property of the system. n=30
+is more trustworthy than n=12; neither is enough.
+
 **What would make this measurable**
 - A stronger judge, or a rubric with more spread than 1–5 on three axes.
 - A larger n, which needs a faster answer model.
