@@ -22,9 +22,9 @@ Last updated: 2026-08-30.
 | 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms (3 challengers + production control) × 30 questions, judge with bias control. **Null result, recorded in ADR-003**: run-to-run variance exceeds between-arm spread, so the incumbent stays |
 | 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
-| 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | 🟡 partial | Dashboard ✅ 6 panels, every query executed against the live schema. Feedback loop needs the API |
+| 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | ✅ done | 6 panels + feedback loop **verified live end to end**: ask → request_id → 👍 → persisted in `query_log` |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
-| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 partial | Exact pins ✅, snapshot committed ✅, digests ✅; full cold-clone drill blocked on the API |
+| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 partial | Exact pins ✅, snapshot ✅, digests ✅, context window now pinned ✅. **Remaining core work: run `just drill`** — no longer blocked, the API is up |
 | 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | ✅ done | All three implemented **and measured**. Rewrite compared on a matched sample and rejected on evidence — a recorded negative result |
 | 11 | **Bonus: cloud deployment** | 2 | ⬜ optional | Buffer-day only. Never at the cost of 1–10 |
 | 12 | **Bonus: extras** | 3 | 🟡 partial | Eval regression gate ✅ built; audiobook + Obsidian BookShelf are buffer-day |
