@@ -29,8 +29,10 @@ def _fake_embeddings(texts: list[str]) -> list[list[float]]:
 @pytest.fixture(autouse=True)
 def _mock_embed_texts(monkeypatch: pytest.MonkeyPatch) -> None:
     import apps.ingest.pipeline as pipeline_mod
+    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
 
     monkeypatch.setattr(pipeline_mod, "embed_texts", _fake_embeddings)
+    monkeypatch.setattr(sqlite_pipeline_mod, "embed_texts", _fake_embeddings)
 
 
 def _book(
@@ -177,8 +179,8 @@ def test_metadata_only_never_indexed(tmp_path: Path) -> None:
     conn.close()
 
     assert book_row is not None and book_row[0] == "metadata_only"
-    assert block_count == (0,)
-    assert chunk_count == (0,)
+    assert int(block_count[0]) == 0
+    assert int(chunk_count[0]) == 0
 
 
 def test_unknown_rights_fail_closed(tmp_path: Path) -> None:
@@ -211,9 +213,9 @@ def test_unknown_rights_fail_closed(tmp_path: Path) -> None:
     conn.close()
 
     assert book_row is not None and book_row[0] == "unknown"
-    assert block_count == (0,)
-    assert chunk_count == (0,)
-    assert embedding_count == (0,)
+    assert int(block_count[0]) == 0
+    assert int(chunk_count[0]) == 0
+    assert int(embedding_count[0]) == 0
 
 
 def test_wp03_does_not_break_wp02_seed_counts(tmp_path: Path) -> None:

@@ -10,12 +10,14 @@ blocks/chunks/embeddings.
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import logging
 import os
 import sqlite3
 import tempfile
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -24,25 +26,32 @@ import yaml
 from dlt.common.pipeline import LoadInfo
 from dlt.destinations import sqlalchemy
 from dlt.destinations.impl.sqlalchemy.configuration import SqlalchemyCredentials
+from dlt.extract import DltResource
 from dlt.pipeline.exceptions import PipelineStepFailed
 from homelib_core.chunk import chunk_book
 from homelib_core.models import BookDoc
 
 from apps.ingest.pipeline import (
+    _CHUNK_EMBED_BATCH,
+    _RUN_RETRY_ATTEMPTS,
+    _RUN_RETRY_DELAY_SECONDS,
     DEFAULT_EMBED_MODEL,
     EMBED_DIM,
     STAGING_DATASET,
-    _RUN_RETRY_ATTEMPTS,
-    _RUN_RETRY_DELAY_SECONDS,
-    homelib_source,
+    _iter_books,
+    blocks_resource,
+    books_resource,
+    catalog_resource,
+    chunks_resource,
+    embed_texts,
 )
 from apps.store.sqlite import can_index_text, connect, migrate
 
 __all__ = [
     "CANONICAL_COUNTS",
+    "CATALOG_PATH",
     "REPO_ROOT",
     "SNAPSHOT_PATH",
-    "CATALOG_PATH",
     "expected_chunk_ids_from_snapshot",
     "manifest_rights_by_book_id",
     "run_sqlite_pipeline",
@@ -63,9 +72,93 @@ CANONICAL_COUNTS: dict[str, int] = {
 }
 
 
+def _serialize_lists(row: dict[str, Any], *, list_fields: tuple[str, ...]) -> dict[str, Any]:
+    serialized = dict(row)
+    for field in list_fields:
+        value = serialized.get(field)
+        if isinstance(value, list):
+            serialized[field] = json.dumps(value)
+    return serialized
+
+
+@dlt.resource(name="books", write_disposition="replace", primary_key="book_id")
+def sqlite_books_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
+    for row in books_resource(snapshot):
+        yield _serialize_lists(row, list_fields=("authors",))
+
+
+@dlt.resource(
+    name="blocks",
+    write_disposition="replace",
+    primary_key="block_id",
+    columns={
+        "section_path": {"data_type": "text"},
+        "page": {"data_type": "bigint"},
+        "spine_index": {"data_type": "bigint"},
+        "anchor": {"data_type": "text"},
+    },
+)
+def sqlite_blocks_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
+    for row in blocks_resource(snapshot):
+        yield _serialize_lists(row, list_fields=("section_path",))
+
+
+@dlt.resource(name="chunks", write_disposition="replace", primary_key="chunk_id")
+def sqlite_chunks_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
+    for row in chunks_resource(snapshot):
+        yield _serialize_lists(row, list_fields=("block_ids", "section_path"))
+
+
+@dlt.resource(
+    name="chunk_embeddings",
+    write_disposition="replace",
+    primary_key="chunk_id",
+    columns={"embedding": {"data_type": "text"}},
+)
+def sqlite_chunk_embeddings_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
+    """Embeddings as JSON text — dlt sqlalchemy merge breaks on json-typed vectors."""
+    ids: list[str] = []
+    texts: list[str] = []
+    for doc in _iter_books(snapshot):
+        for chunk in chunk_book(doc):
+            ids.append(chunk.chunk_id)
+            texts.append(chunk.text)
+            if len(ids) >= _CHUNK_EMBED_BATCH:
+                vectors = embed_texts(texts)
+                for chunk_id, vector in zip(ids, vectors, strict=True):
+                    yield {"chunk_id": chunk_id, "embedding": json.dumps(vector)}
+                ids, texts = [], []
+    if ids:
+        vectors = embed_texts(texts)
+        for chunk_id, vector in zip(ids, vectors, strict=True):
+            yield {"chunk_id": chunk_id, "embedding": json.dumps(vector)}
+
+
+@dlt.resource(
+    name="catalog",
+    write_disposition="replace",
+    primary_key="ol_key",
+    columns={"description": {"data_type": "text"}},
+)
+def sqlite_catalog_resource(catalog: Path) -> Iterator[dict[str, Any]]:
+    for row in catalog_resource(catalog):
+        yield _serialize_lists(row, list_fields=("authors", "subjects"))
+
+
+@dlt.source
+def sqlite_homelib_source(snapshot: Path, catalog: Path) -> Iterable[DltResource]:
+    return [
+        sqlite_books_resource(snapshot),
+        sqlite_blocks_resource(snapshot),
+        sqlite_chunks_resource(snapshot),
+        sqlite_chunk_embeddings_resource(snapshot),
+        sqlite_catalog_resource(catalog),
+    ]
+
+
 def staging_db_path(canonical_db: Path) -> Path:
     """Path to the dlt-owned staging SQLite file for `canonical_db`."""
-    return canonical_db.parent / f"{canonical_db.name}__{STAGING_DATASET}.sqlite"
+    return canonical_db.parent / f"{canonical_db.stem}__{STAGING_DATASET}.sqlite"
 
 
 def manifest_rights_by_book_id(repo_root: Path = REPO_ROOT) -> dict[str, str]:
@@ -104,13 +197,12 @@ def expected_chunk_ids_from_snapshot(snapshot: Path = SNAPSHOT_PATH) -> list[str
 
 def _make_pipeline(canonical_db: Path) -> dlt.Pipeline:
     credentials = SqlalchemyCredentials(f"sqlite:///{canonical_db}")
+    pipeline_token = hashlib.sha256(str(canonical_db).encode()).hexdigest()[:16]
     return dlt.pipeline(
-        pipeline_name="homelib_sqlite_ingest",
+        pipeline_name=f"homelib_sqlite_ingest_{pipeline_token}",
         destination=sqlalchemy(credentials=credentials),
         dataset_name=STAGING_DATASET,
-        pipelines_dir=str(
-            Path(tempfile.gettempdir()) / f"homelib_sqlite_dlt_{os.getpid()}"
-        ),
+        pipelines_dir=str(Path(tempfile.gettempdir()) / f"homelib_sqlite_dlt_{os.getpid()}"),
     )
 
 
@@ -124,14 +216,23 @@ def _json_list(value: Any) -> list[str]:
     return []
 
 
+def _load_indexable_book_ids_temp(conn: sqlite3.Connection, indexable_book_ids: set[str]) -> None:
+    """Stage indexable book ids in a temp table for static IN-subquery filters."""
+    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _indexable_book_ids (book_id TEXT PRIMARY KEY)")
+    conn.execute("DELETE FROM _indexable_book_ids")
+    conn.executemany(
+        "INSERT INTO _indexable_book_ids (book_id) VALUES (?)",
+        [(book_id,) for book_id in sorted(indexable_book_ids)],
+    )
+
+
 def _sync_books(
     conn: sqlite3.Connection,
     *,
     rights_by_book: dict[str, str],
 ) -> None:
     rows = conn.execute(
-        "SELECT book_id, title, authors, language, source_url, license_note "
-        "FROM staging.books"
+        "SELECT book_id, title, authors, language, source_url, license_note FROM staging.books"
     ).fetchall()
     for row in rows:
         book_id = str(row[0])
@@ -164,15 +265,14 @@ def _sync_books(
 def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    placeholders = ",".join("?" for _ in indexable_book_ids)
+    _load_indexable_book_ids_temp(conn, indexable_book_ids)
     rows = conn.execute(
-        f"""
+        """
         SELECT block_id, book_id, ordinal, section_path, text,
                char_start, char_end, format, page, spine_index, anchor
         FROM staging.blocks
-        WHERE book_id IN ({placeholders})
-        """,
-        tuple(sorted(indexable_book_ids)),
+        WHERE book_id IN (SELECT book_id FROM _indexable_book_ids)
+        """
     ).fetchall()
     for row in rows:
         section_path = row[3] if isinstance(row[3], str) else json.dumps(_json_list(row[3]))
@@ -213,14 +313,13 @@ def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
 def _sync_chunks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    placeholders = ",".join("?" for _ in indexable_book_ids)
+    _load_indexable_book_ids_temp(conn, indexable_book_ids)
     rows = conn.execute(
-        f"""
+        """
         SELECT chunk_id, book_id, block_ids, section_path, text, char_start, char_end
         FROM staging.chunks
-        WHERE book_id IN ({placeholders})
-        """,
-        tuple(sorted(indexable_book_ids)),
+        WHERE book_id IN (SELECT book_id FROM _indexable_book_ids)
+        """
     ).fetchall()
     for row in rows:
         block_ids = row[2] if isinstance(row[2], str) else json.dumps(_json_list(row[2]))
@@ -245,15 +344,14 @@ def _sync_chunks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
 def _sync_chunk_embeddings(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    placeholders = ",".join("?" for _ in indexable_book_ids)
+    _load_indexable_book_ids_temp(conn, indexable_book_ids)
     rows = conn.execute(
-        f"""
+        """
         SELECT e.chunk_id, e.embedding
         FROM staging.chunk_embeddings e
         JOIN staging.chunks c ON c.chunk_id = e.chunk_id
-        WHERE c.book_id IN ({placeholders})
-        """,
-        tuple(sorted(indexable_book_ids)),
+        WHERE c.book_id IN (SELECT book_id FROM _indexable_book_ids)
+        """
     ).fetchall()
     for chunk_id, embedding in rows:
         if isinstance(embedding, str):
@@ -336,7 +434,7 @@ def _run_with_retry(pipeline: dlt.Pipeline, snapshot: Path, catalog: Path) -> Lo
     for attempt in range(1, _RUN_RETRY_ATTEMPTS + 1):
         pipeline.abort_packages()
         try:
-            return pipeline.run(homelib_source(snapshot, catalog))
+            return pipeline.run(sqlite_homelib_source(snapshot, catalog))
         except FileNotFoundError as exc:
             last_error = exc
             logger.warning("sqlite pipeline.run attempt %d failed: %s", attempt, exc)
