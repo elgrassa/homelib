@@ -548,7 +548,13 @@ def run_pipeline(
     return info
 
 
-def _run_with_retry(pipeline: dlt.Pipeline, snapshot: Path, catalog: Path) -> LoadInfo:
+def _run_with_retry(
+    pipeline: dlt.Pipeline,
+    snapshot: Path,
+    catalog: Path,
+    *,
+    source: Iterable[DltResource] | None = None,
+) -> LoadInfo:
     """`pipeline.run()`, retrying past a specific class of transient local
     filesystem race observed in some sandboxed environments: dlt's own local
     package storage under `~/.dlt/pipelines/<name>` occasionally raises
@@ -562,10 +568,11 @@ def _run_with_retry(pipeline: dlt.Pipeline, snapshot: Path, catalog: Path) -> Lo
     clean rather than tripping over it again.
     """
     last_error: Exception | None = None
+    load_source = source if source is not None else homelib_source(snapshot, catalog)
     for attempt in range(1, _RUN_RETRY_ATTEMPTS + 1):
         pipeline.abort_packages()
         try:
-            return pipeline.run(homelib_source(snapshot, catalog))
+            return pipeline.run(load_source)
         except FileNotFoundError as exc:
             last_error = exc
             logger.warning(

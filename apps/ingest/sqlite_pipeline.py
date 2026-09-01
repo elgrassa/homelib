@@ -16,7 +16,6 @@ import logging
 import os
 import sqlite3
 import tempfile
-import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -27,18 +26,16 @@ from dlt.common.pipeline import LoadInfo
 from dlt.destinations import sqlalchemy
 from dlt.destinations.impl.sqlalchemy.configuration import SqlalchemyCredentials
 from dlt.extract import DltResource
-from dlt.pipeline.exceptions import PipelineStepFailed
 from homelib_core.chunk import chunk_book
 from homelib_core.models import BookDoc
 
 from apps.ingest.pipeline import (
     _CHUNK_EMBED_BATCH,
-    _RUN_RETRY_ATTEMPTS,
-    _RUN_RETRY_DELAY_SECONDS,
     DEFAULT_EMBED_MODEL,
     EMBED_DIM,
     STAGING_DATASET,
     _iter_books,
+    _run_with_retry,
     blocks_resource,
     books_resource,
     catalog_resource,
@@ -253,7 +250,7 @@ def _sync_books(
             (
                 book_id,
                 row[1],
-                row[2] if isinstance(row[2], str) else json.dumps(_json_list(row[2])),
+                str(row[2]),
                 row[3],
                 row[4],
                 row[5],
@@ -275,7 +272,7 @@ def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
         """
     ).fetchall()
     for row in rows:
-        section_path = row[3] if isinstance(row[3], str) else json.dumps(_json_list(row[3]))
+        section_path = str(row[3])
         conn.execute(
             """
             INSERT INTO blocks (
@@ -322,8 +319,8 @@ def _sync_chunks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
         """
     ).fetchall()
     for row in rows:
-        block_ids = row[2] if isinstance(row[2], str) else json.dumps(_json_list(row[2]))
-        section_path = row[3] if isinstance(row[3], str) else json.dumps(_json_list(row[3]))
+        block_ids = str(row[2])
+        section_path = str(row[3])
         conn.execute(
             """
             INSERT INTO chunks (
@@ -354,10 +351,7 @@ def _sync_chunk_embeddings(conn: sqlite3.Connection, *, indexable_book_ids: set[
         """
     ).fetchall()
     for chunk_id, embedding in rows:
-        if isinstance(embedding, str):
-            embedding_json = embedding
-        else:
-            embedding_json = json.dumps(_json_list(embedding))
+        embedding_json = str(embedding)
         conn.execute(
             """
             INSERT INTO chunk_embeddings (chunk_id, embedding, model, dim)
@@ -379,8 +373,8 @@ def _sync_catalog(conn: sqlite3.Connection) -> None:
         """
     ).fetchall()
     for row in rows:
-        authors = row[2] if isinstance(row[2], str) else json.dumps(_json_list(row[2]))
-        subjects = row[3] if isinstance(row[3], str) else json.dumps(_json_list(row[3]))
+        authors = str(row[2])
+        subjects = str(row[3])
         conn.execute(
             """
             INSERT INTO catalog (
@@ -425,27 +419,10 @@ def _sync_staging_to_canonical(
         conn.rollback()
         raise
     finally:
-        conn.execute("DETACH DATABASE staging")
-        conn.close()
-
-
-def _run_with_retry(pipeline: dlt.Pipeline, snapshot: Path, catalog: Path) -> LoadInfo:
-    last_error: Exception | None = None
-    for attempt in range(1, _RUN_RETRY_ATTEMPTS + 1):
-        pipeline.abort_packages()
         try:
-            return pipeline.run(sqlite_homelib_source(snapshot, catalog))
-        except FileNotFoundError as exc:
-            last_error = exc
-            logger.warning("sqlite pipeline.run attempt %d failed: %s", attempt, exc)
-        except PipelineStepFailed as exc:
-            if not isinstance(exc.__cause__, FileNotFoundError):
-                raise
-            last_error = exc
-            logger.warning("sqlite pipeline.run attempt %d failed: %s", attempt, exc)
-        time.sleep(_RUN_RETRY_DELAY_SECONDS)
-    assert last_error is not None
-    raise last_error
+            conn.execute("DETACH DATABASE staging")
+        finally:
+            conn.close()
 
 
 def run_sqlite_pipeline(
@@ -465,6 +442,11 @@ def run_sqlite_pipeline(
         rights_by_book if rights_by_book is not None else manifest_rights_by_book_id(repo_root)
     )
     pipeline = _make_pipeline(db_path)
-    info = _run_with_retry(pipeline, snapshot, catalog)
+    info = _run_with_retry(
+        pipeline,
+        snapshot,
+        catalog,
+        source=sqlite_homelib_source(snapshot, catalog),
+    )
     _sync_staging_to_canonical(db_path, rights_by_book=resolved_rights)
     return info
