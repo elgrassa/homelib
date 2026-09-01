@@ -1,7 +1,7 @@
-"""SQLite store: migrations, minimal seed, principal isolation (WP02).
+"""SQLite store: migrations, minimal seed, principal isolation (WP02+).
 
-Additive to v1 Postgres compose. No FTS5, no paid-tier tables, no 18/729/9168
-ingest (WP03). Seed uses v1 `data/manifest.yaml` + `data/catalog.jsonl` heads.
+Additive to v1 Postgres compose. No FTS5, no paid-tier tables. Corpus ingest
+(WP03) loads blocks/chunks/embeddings via `apps.ingest.sqlite_pipeline`.
 """
 
 from __future__ import annotations
@@ -62,6 +62,11 @@ def _now_iso() -> str:
 
 def _new_id() -> str:
     return uuid.uuid4().hex
+
+
+def can_index_text(rights_status: str) -> bool:
+    """Full-text indexing is allowed only for explicit bundle/public-domain rights."""
+    return rights_status in {"public_domain", "licensed_bundle"}
 
 
 def rights_status_from_manifest(entry: dict[str, Any]) -> str:
@@ -177,6 +182,41 @@ CREATE TABLE feedback (
 );
 """
 
+_SQL_V3 = """
+CREATE TABLE blocks (
+    block_id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL,
+    section_path TEXT NOT NULL DEFAULT '[]',
+    text TEXT NOT NULL,
+    char_start INTEGER NOT NULL,
+    char_end INTEGER NOT NULL,
+    format TEXT NOT NULL,
+    page INTEGER,
+    spine_index INTEGER,
+    anchor TEXT
+);
+CREATE INDEX ix_blocks_book_ordinal ON blocks (book_id, ordinal);
+
+CREATE TABLE chunks (
+    chunk_id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+    block_ids TEXT NOT NULL,
+    section_path TEXT NOT NULL DEFAULT '[]',
+    text TEXT NOT NULL,
+    char_start INTEGER NOT NULL,
+    char_end INTEGER NOT NULL
+);
+CREATE INDEX ix_chunks_book ON chunks (book_id);
+
+CREATE TABLE chunk_embeddings (
+    chunk_id TEXT PRIMARY KEY REFERENCES chunks(chunk_id) ON DELETE CASCADE,
+    embedding TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT 'sentence-transformers/all-MiniLM-L6-v2',
+    dim INTEGER NOT NULL DEFAULT 384
+);
+"""
+
 _SQL_V2 = """
 CREATE TABLE listen_progress (
     principal_id TEXT NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
@@ -217,7 +257,11 @@ CREATE TABLE bookmarks (
 );
 """
 
-MIGRATIONS: Final[tuple[tuple[int, str], ...]] = ((1, _SQL_V1), (2, _SQL_V2))
+MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
+    (1, _SQL_V1),
+    (2, _SQL_V2),
+    (3, _SQL_V3),
+)
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -382,6 +426,9 @@ def row_counts(conn: sqlite3.Connection) -> dict[str, int]:
     counts: dict[str, int] = {}
     count_sql = {
         "books": "SELECT COUNT(*) FROM books",
+        "blocks": "SELECT COUNT(*) FROM blocks",
+        "chunks": "SELECT COUNT(*) FROM chunks",
+        "chunk_embeddings": "SELECT COUNT(*) FROM chunk_embeddings",
         "catalog": "SELECT COUNT(*) FROM catalog",
         "playlist": "SELECT COUNT(*) FROM playlist",
         "playlist_item": "SELECT COUNT(*) FROM playlist_item",

@@ -25,7 +25,8 @@ dependencies = [
     # data
     "psycopg[binary]==3.3.4",
     "pgvector==0.5.0",
-    "dlt[postgres]==1.30.0",
+    "dlt[postgres,sqlalchemy]==1.30.0",
+    "sqlalchemy==2.0.43",
     # llm + embeddings
     "openai==3.6.0",
     "sentence-transformers==6.0.0",
