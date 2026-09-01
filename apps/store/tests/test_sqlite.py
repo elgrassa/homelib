@@ -249,6 +249,16 @@ def test_logical_checksum_stable_across_two_builds(tmp_path: Path) -> None:
     conn.close()
 
 
+def test_can_index_text_allows_only_bundle_and_public_domain() -> None:
+    from apps.store.sqlite import can_index_text
+
+    assert can_index_text("public_domain")
+    assert can_index_text("licensed_bundle")
+    assert not can_index_text("unknown")
+    assert not can_index_text("metadata_only")
+    assert not can_index_text("forbidden")
+
+
 def test_unknown_rights_default_fail_closed(tmp_path: Path) -> None:
     conn = connect(_fresh(tmp_path))
     migrate(conn)

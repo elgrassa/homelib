@@ -14,8 +14,12 @@ from apps.ingest.sqlite_pipeline import (
     CANONICAL_COUNTS,
     REPO_ROOT,
     SNAPSHOT_PATH,
+    _json_list,
+    _sync_staging_to_canonical,
     expected_chunk_ids_from_snapshot,
+    manifest_rights_by_book_id,
     run_sqlite_pipeline,
+    staging_db_path,
 )
 from apps.store.sqlite import connect, migrate, row_counts
 
@@ -84,6 +88,146 @@ def _corpus_counts(conn: sqlite3.Connection) -> dict[str, int]:
             conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
         ),
     }
+
+
+def test_staging_db_path_uses_dataset_suffix(tmp_path: Path) -> None:
+    db = tmp_path / "homelib.sqlite"
+    assert staging_db_path(db).name == "homelib__homelib_staging.sqlite"
+
+
+def test_manifest_rights_maps_gutenberg_to_public_domain() -> None:
+    rights = manifest_rights_by_book_id(REPO_ROOT)
+    assert rights["franklin-autobiography"] == "public_domain"
+    assert len(rights) == 18
+
+
+def test_json_list_accepts_json_text_and_python_lists() -> None:
+    assert _json_list('["a", "b"]') == ["a", "b"]
+    assert _json_list(["x"]) == ["x"]
+    assert _json_list('{"not": "list"}') == []
+    assert _json_list(42) == []
+
+
+def test_pipeline_retries_transient_file_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
+
+    snapshot = tmp_path / "one.jsonl.gz"
+    catalog = tmp_path / "catalog.jsonl"
+    _write_snapshot(snapshot, [_book("retry-book")])
+    catalog.write_text(
+        json.dumps(
+            {
+                "ol_key": "/works/OL1W",
+                "title": "T",
+                "authors": ["A"],
+                "subjects": ["s"],
+                "first_publish_year": 2020,
+                "description": None,
+                "provenance_note": "n",
+            }
+        )
+        + "\n"
+    )
+    db_path = _fresh_db(tmp_path)
+    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
+    attempts = {"count": 0}
+
+    class _FakeLoadInfo:
+        def __init__(self) -> None:
+            self.loads_ids: list[str] = []
+
+    def _flaky_run(_source: object) -> _FakeLoadInfo:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise FileNotFoundError("transient dlt package race")
+        return _FakeLoadInfo()
+
+    monkeypatch.setattr(pipeline, "run", _flaky_run)
+    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
+    monkeypatch.setattr(sqlite_pipeline_mod.time, "sleep", lambda _seconds: None)
+
+    info = sqlite_pipeline_mod._run_with_retry(pipeline, snapshot, catalog)
+    assert isinstance(info, _FakeLoadInfo)
+    assert attempts["count"] == 2
+
+
+def test_manifest_rights_rejects_non_list_manifest(tmp_path: Path) -> None:
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "manifest.yaml").write_text("not_a_list: true\n")
+    with pytest.raises(TypeError, match=r"manifest.yaml must be a list"):
+        manifest_rights_by_book_id(tmp_path)
+
+
+def test_manifest_rights_skips_non_dict_entries(tmp_path: Path) -> None:
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "manifest.yaml").write_text(
+        "- plain string\n- book_id: ok-book\n  license_note: Public domain (US)\n"
+    )
+    rights = manifest_rights_by_book_id(tmp_path)
+    assert rights == {"ok-book": "public_domain"}
+
+
+def test_sync_staging_rolls_back_on_catalog_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
+
+    db_path = _fresh_db(tmp_path)
+    migrate(connect(db_path))
+    staging = sqlite_pipeline_mod.staging_db_path(db_path)
+    staging_conn = sqlite3.connect(staging)
+    staging_conn.executescript(
+        """
+        CREATE TABLE books (
+            book_id TEXT, title TEXT, authors TEXT, language TEXT,
+            source_url TEXT, license_note TEXT
+        );
+        INSERT INTO books VALUES ('b', 't', '[]', 'en', '', '');
+        CREATE TABLE blocks (
+            block_id TEXT, book_id TEXT, ordinal INTEGER, section_path TEXT, text TEXT,
+            char_start INTEGER, char_end INTEGER, format TEXT, page INTEGER,
+            spine_index INTEGER, anchor TEXT
+        );
+        CREATE TABLE chunks (
+            chunk_id TEXT, book_id TEXT, block_ids TEXT, section_path TEXT, text TEXT,
+            char_start INTEGER, char_end INTEGER
+        );
+        CREATE TABLE chunk_embeddings (chunk_id TEXT, embedding TEXT);
+        CREATE TABLE catalog (
+            ol_key TEXT PRIMARY KEY, title TEXT, authors TEXT, subjects TEXT,
+            first_publish_year INTEGER, description TEXT, provenance_note TEXT
+        );
+        """
+    )
+    staging_conn.close()
+
+    def _boom_catalog(_conn: sqlite3.Connection) -> None:
+        raise RuntimeError("catalog sync failed")
+
+    monkeypatch.setattr(sqlite_pipeline_mod, "_sync_catalog", _boom_catalog)
+    with pytest.raises(RuntimeError, match="catalog sync failed"):
+        sqlite_pipeline_mod._sync_staging_to_canonical(
+            db_path, rights_by_book={"b": "public_domain"}
+        )
+
+    conn = connect(db_path)
+    assert int(conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]) == 0
+    conn.close()
+
+
+def test_sync_staging_raises_when_staging_file_missing(tmp_path: Path) -> None:
+    db_path = _fresh_db(tmp_path)
+    conn = connect(db_path)
+    migrate(conn)
+    conn.close()
+    with pytest.raises(FileNotFoundError, match="staging database missing"):
+        _sync_staging_to_canonical(db_path, rights_by_book={})
+
+
+def test_expected_chunk_ids_match_canonical_count() -> None:
+    assert len(expected_chunk_ids_from_snapshot(SNAPSHOT_PATH)) == CANONICAL_COUNTS["chunks"]
 
 
 def test_chunk_ids_match_v1_snapshot(tmp_path: Path) -> None:
