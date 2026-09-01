@@ -109,6 +109,13 @@ def test_json_list_accepts_json_text_and_python_lists() -> None:
     assert _json_list(42) == []
 
 
+def test_serialize_lists_preserves_already_serialized_fields() -> None:
+    from apps.ingest.sqlite_pipeline import _serialize_lists
+
+    row = {"authors": '["Ada"]', "title": "T"}
+    assert _serialize_lists(row, list_fields=("authors",))["authors"] == '["Ada"]'
+
+
 def test_expected_chunk_ids_match_canonical_count() -> None:
     assert len(expected_chunk_ids_from_snapshot(SNAPSHOT_PATH)) == CANONICAL_COUNTS["chunks"]
 
@@ -228,6 +235,37 @@ def test_pipeline_raises_after_retry_exhausted(
     monkeypatch.setattr(pipeline_mod.time, "sleep", lambda _seconds: None)
 
     with pytest.raises(FileNotFoundError, match="persistent race"):
+        pipeline_mod._run_with_retry(
+            pipeline,
+            snapshot,
+            catalog,
+            source=sqlite_pipeline_mod.sqlite_homelib_source(snapshot, catalog),
+        )
+    pipeline.drop()
+
+
+def test_pipeline_propagates_non_transient_pipeline_step_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dlt.pipeline.exceptions import PipelineStepFailed
+
+    import apps.ingest.pipeline as pipeline_mod
+    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
+
+    snapshot = tmp_path / "one.jsonl.gz"
+    catalog = tmp_path / "catalog.jsonl"
+    _write_snapshot(snapshot, [_book("hard-fail-book")])
+    catalog.write_text("{}\n")
+    db_path = _fresh_db(tmp_path)
+    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
+
+    def _hard_fail(_source: object) -> None:
+        raise PipelineStepFailed(pipeline, "load", "load-1", ValueError("schema mismatch"))
+
+    monkeypatch.setattr(pipeline, "run", _hard_fail)
+    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
+
+    with pytest.raises(PipelineStepFailed):
         pipeline_mod._run_with_retry(
             pipeline,
             snapshot,
