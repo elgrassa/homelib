@@ -1,15 +1,19 @@
 # spec: ingestion — `apps/ingest/pipeline.py` (dlt)
 
-**Implemented by:** WP-09.
+**Implemented by:** WP-09 (v1 dlt → Postgres). **v2 target:** WP03 dlt → SQLite
+(ADR-004). Idempotency contract unchanged. Compose Postgres stays until a
+later WP drops it; this spec must not be read as “delete Postgres now”.
+
 **Consumed by:** `homelib_rag.index` (reads `chunks`/`chunk_embeddings` from
-Postgres), `apps/api` `POST /v1/ingest`.
+the configured store), `apps/api` `POST /v1/ingest` (selfhosted; demo → 403).
 
 ## Purpose
 
-Load the corpora (specs/corpus.md) into Postgres as three related resources —
-books, blocks, chunks — computing chunk embeddings at load time, using
-**dlt** (the rubric-named ingestion tool) so re-running the pipeline is a
-safe, idempotent operation rather than a truncate-and-reload script.
+Load the corpora (specs/corpus.md) into the configured store as three related
+resources — books, blocks, chunks — computing chunk embeddings at load time,
+using **dlt** (the rubric-named ingestion tool) so re-running the pipeline is a
+safe, idempotent operation rather than a truncate-and-reload script. v1
+destination is Postgres; v2 destination is SQLite (`dlt[sqlalchemy]`).
 
 ## Public interface
 

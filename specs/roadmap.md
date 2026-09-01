@@ -1,6 +1,9 @@
 # spec: roadmap — `homelib_rag.roadmap`
 
 **Implemented by:** WP-14 · **Consumed by:** `homelib_rag.agent` (`build_roadmap` tool), `apps/api` (`POST /v1/roadmap`).
+**v2:** product §8 splits this into `POST /v1/mentor/intake` (proposal) and
+`POST /v1/paths` (accepted artifact). Keep this module until WP06; do not
+ship both `/v1/roadmap` and `/v1/paths` as two sources of truth in OpenAPI.
 
 ## Purpose
 

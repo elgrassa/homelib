@@ -69,3 +69,21 @@ re-ran itself (subagent claims are never accepted as evidence).
 | Commercial-split pivot | ADR-010 | owner 2026-09-01 evening | **Supersedes** a separate `homelib-commercial-private` remote this week. One Forgejo repo (`elgrassa/homelib`) until public GitHub; paid tier lands in the **same** Forgejo copy after it is private. `docs/plan-v2.md` §9 still names the two-repo split (verbatim freeze). Do not resurrect a second remote. | 2026-09-01 |
 | Course `project.md` sha256 | WP00 | `curl` raw.githubusercontent.com DataTalksClub/llm-zoomcamp `project.md` | **`fde0647a0df91470234593854c619307bf07aa28062d4e090065a57e348c896b`** (matches plan WP11 prefix `fde0647a…`). Re-check at WP11 before submit. | 2026-09-01 |
 | Mockups + HTML prototype | docs/mockups | md5 dedupe of owner stills | Eight distinct frames + standalone HTML sha256 `693888a9d320b1479d7adf6eb103ce56db9eb805894cbfbc66f5a3d6dc678869`. Voice mockup = Coming soon (ADR-009). Topology Apple FM = metaphor (ADR-006). | 2026-09-01 |
+| WP01 specs | feat/wp01-specs | `ls specs/*.md`; contradiction pass vs product.md | **New v2 files:** principals, editions, provider, coffee-table, progress, scene-search, observatory, rights, connectors, client, rotunda, projection, audio (13). OpenAPI snapshot **unchanged** (v1 live API; first API PR regenerates). Contradiction pass: Grafana→Observatory (ADR-005); Postgres→SQLite target (ADR-004, compose still Postgres); `/v1/roadmap` vs intake+paths; `/v1/books` vs resources; timeout 90 vs 300; snapshot-vs-§8 (docs this WP). Paid-tier tables not added. v1 `degraded` flag still present. | 2026-09-01 |
+
+---
+
+## Plan addendum — post-merge corrections (2026-09-01)
+
+Authoritative until `docs/plan-v2.md` is corrected in the WP01 docs PR. Do **not**
+silently rewrite `docs/plan-v2.md` (verbatim freeze); record deltas here and in
+specs/CHECKLIST instead.
+
+| # | Correction | Supersedes in `docs/plan-v2.md` | Where recorded |
+|---|---|---|---|
+| 1 | **Weekdays:** Sep 1 2026 = **Tuesday**; Sep 7 = **Monday** (submission day); deadline night Mon Sep 7 → Tue Sep 8 01:00. Retract "Sunday Sep 7 submission / no Monday build day". Scope-cut Sat Sep 5 18:00; GO/NO-GO Sun Sep 6 18:00 unchanged. | ⏰ banner, §8 calendar labels | table row "Calendar weekday discrepancy"; this section |
+| 2 | **§8 Sep 2 gate** VOID "canary live / canary loads publicly" → **local `APP_MODE=demo` smoke green; SQLite tests green**. | §8 Sep 2 row | this section; CHECKLIST §F |
+| 3 | **WP04** VOID "ONNX-vs-torch measured on deployed canary" → measured locally under `APP_MODE=demo` (RSS) vs Community Cloud documented limits; no live canary until owner deploys Mon Sep 7. | WP04 verify line | table row "Late-deploy"; `specs/evals-retrieval.md` |
+| 4 | **§2 GO/NO-GO** VOID "public demo loads logged-out" at Sat gate → **local `APP_MODE=demo` rehearsal green** (fresh session-isolated state, resettable seed, RSS within limits). Live-URL check moves to Mon Sep 7 after deploy. NO-GO ⇒ submit v1 **Monday**. | §2 safety track | CHECKLIST §F; this section |
+| 5 | **Stacked-review protocol:** oldest-first ~10 PRs into `v2`; rebase-merge only; restack after merge; newer PRs draft; `v2`→`main` blocked until v2 drill green. PR #4 closed history. | — | CHECKLIST §I |
+| 6 | **Progress snapshot:** v1 fallback 100% (`v1-fallback`=`535f58b`); v2 build ≈14% (WP00 done; WP01 ~70% drafted on `feat/wp01-specs`; WP02–WP11 not started). Review queue 0/~10; 1 of 7 build days consumed. | — | CHECKLIST §F; this section |

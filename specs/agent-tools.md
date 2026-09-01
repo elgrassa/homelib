@@ -1,6 +1,9 @@
 # spec: agent-tools — `homelib_rag.agent`
 
 **Implemented by:** WP-14 · **Consumed by:** `apps/api` (`/v1/ask`, `/v1/roadmap`), `roadmap.py`, `answer.py`.
+**v2 tool allowlist** (product §7.7, `specs/provider.md`): `search_library`,
+`get_block`, `get_resource`, `propose_playlist`, `build_path`. v1 names below
+remain live until WP06. Mutating tools create **proposals**.
 
 ## Purpose
 

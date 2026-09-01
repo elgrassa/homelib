@@ -7,7 +7,8 @@
 Merge the two independent rankings from `homelib_rag.index` (`search_lexical`,
 `search_vector`) into one ranking that beats either arm alone, using Reciprocal
 Rank Fusion — and do it in a way that degrades to a working single arm instead
-of failing a request when one backend is unreachable. `Hit` is defined in
+of failing a request when one backend is unreachable. v2 lexical arm is FTS5
+instead of Postgres `tsvector`; the RRF contract does not change. `Hit` is defined in
 `specs/indexing.md`; this module only reorders and re-scores it.
 
 ## Public interface

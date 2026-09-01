@@ -1,6 +1,10 @@
 # spec: ui — `apps/ui` (Streamlit)
 
-**Implemented by:** WP-14 (ask tab, against the live API), WP-16 (feedback wiring), WP-17 (library tab polish).
+**Implemented by:** WP-14/16/17 (v1 three-tab HTTP UI). **v2 target:** WP08
+vertical experience via `HomelibClient` (`specs/client.md`). Destinations:
+product §5.1 (Crossroads, Shelf, Discover, Coffee Table, Mentor, Observatory)
+not the HTML nav labels.
+
 **Consumed by:** the human reviewer; nothing consumes this — it is the leaf.
 
 ## Purpose
@@ -8,9 +12,9 @@
 A reviewer-facing surface with zero setup beyond `docker compose up`, built
 entirely on the public API contract in `specs/api.md`. The binding constraint:
 **the UI never opens a database connection or imports anything from
-`homelib_rag`/`homelib_core` internals — every action is an HTTP call to
-`API_URL`.** This keeps the API the single contract every consumer, including
-the UI itself, is forced to go through.
+`homelib_rag`/`homelib_core` internals — every action goes through
+`HomelibClient`.** v1 is HTTP-only `ApiClient`. v2 demo uses `InProcessClient`;
+selfhosted uses `HttpClient`. The AST boundary test stays.
 
 ## Public interface
 

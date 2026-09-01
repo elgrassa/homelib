@@ -1,6 +1,8 @@
 # spec: data-model — WP00 schema draft (ideas only)
 
-**Implemented by:** WP02 (migrations). **This PR:** draft only. No Alembic, no FTS5, no dropping Postgres compose.
+**Implemented by:** WP02 (migrations). **WP01:** still draft — no Alembic, no
+FTS5, no dropping Postgres compose. Field-level HTTP: `specs/api.md`. Identity:
+`specs/principals.md`. Playlist: `specs/coffee-table.md`. Rights: `specs/rights.md`.
 
 **Status:** draft. Grounded in the HTML prototype's actual JS, `specs/product.md` §§4–8, and `docs/mockups/`. Contradictions are listed, not silently resolved.
 
@@ -135,11 +137,16 @@ CONFUSION: product §7.4 lists `resources` / `documents` as well as books. v1 is
 4. **Naming: `books` (v1) vs `resources` (product §7.4).** Need one canonical id for citations this week (`book_id` / `block_id` as v1) so ground truth survives.
 5. **Product §7.4** lists `playlists`/`playlist_items`/`progress_events`/`query_events`; this draft uses `playlist`/`playlist_item`/`read_progress`/`query_log` to match the WP00 brief. WP02 picks one and snapshots it.
 6. **Embeddings:** product §7.5 cached matrix vs a `chunk_embeddings` table. Both: table (or sidecar file) durable; matrix is the query cache keyed by `index_revision`.
-7. **v1 Postgres vs v2 SQLite** (ADR-004). Compose stays Postgres until WP02. This draft is the target, not the running stack.
+7. **v1 Postgres vs v2 SQLite** (ADR-004). Compose Postgres stays on `main` / v1 fallback. WP02 adds SQLite **additively**; this draft is the target store, not a license to drop the tagged compose service.
 8. **Apple FM in topology mockup vs LM Studio this week** (ADR-006).
 9. **Voice mentor mockup vs ADR-009.**
 10. **Two-repo split in product §4.6 diagram / `docs/plan-v2.md` §9 vs ADR-010 evening pivot.** Schema follows ADR-010: no second remote; paid tables not created this week.
 11. **Calendar weekdays** in `docs/plan-v2.md` vs machine `cal 9 2026` — evidence only; not a schema issue.
+12. **Grafana vs Observatory.** `specs/monitoring.md` (v1) vs ADR-005 / `specs/observatory.md`. v2 scored surface is Observatory; Grafana may remain in compose until WP10.
+13. **`POST /v1/roadmap` (live v1) vs `POST /v1/mentor/intake` + `POST /v1/paths` (product §8).** Keep roadmap until WP06; do not dual-write OpenAPI.
+14. **`GET /v1/books` vs `GET /v1/resources`.** Citation identity stays `book_id` this week; resources is the Discover/shelf list.
+15. **`LLM_TIMEOUT_SECONDS=90` (product §7.2) vs Compose 300 (plan §0.2).** Editions spec: Compose stays 300; 90 is demo-cloud suggestion only.
+16. **WP01 “commit OpenAPI snapshot” vs no new routes this WP.** Snapshot stays v1-aligned; first API PR regenerates it.
 
 ## 7. WP02 red-test hooks
 

@@ -1,9 +1,13 @@
 # spec: monitoring — `query_log` + Grafana + `scripts/demo_traffic.py`
 
-**Implemented by:** WP-16.
+**Implemented by:** WP-16 (v1, live on `v1-fallback` / current `main` compose).
+**v2 target:** `specs/observatory.md` + ADR-005 — Grafana is **not** the v2
+product. This file remains the field-level owner of `query_log` and
+`demo_traffic.py`. WP10 reads the same table from SQLite.
+
 **Consumed by:** rubric Monitoring criterion — **both halves required**: in-UI
-thumbs feedback (specs/ui.md) AND the Grafana dashboard below. Neither alone
-satisfies the rubric row.
+thumbs feedback (specs/ui.md) AND a dashboard of ≥5 charts. v1 = Grafana;
+v2 = Observatory. Neither feedback nor charts alone satisfies the rubric row.
 
 ## Purpose
 
@@ -60,14 +64,15 @@ feedback               text NULL            -- "up"|"down"|NULL, set by POST /v1
 ```
 
 Privacy rule: `query_sha256_prefix` is written unconditionally and is what the
-Grafana dashboard and eval tooling read; `query_plaintext` exists purely for a
+Grafana dashboard (v1) / Observatory (v2) and eval tooling read; `query_plaintext` exists purely for a
 human operator who explicitly opted in per-request (e.g. a debug flag on
 `/v1/ask`) and is never required by any downstream consumer.
 
-**Grafana dashboard** — `docker/grafana/provisioning/dashboards/homelib.json`,
+**Grafana dashboard (v1 only)** — `docker/grafana/provisioning/dashboards/homelib.json`,
 committed, loaded by Grafana's file provisioner (no manual "add panel" step).
 Datasource: the same Postgres, via a read-only role provisioned in
-`docker/initdb/`. Minimum 5 panels, all backed by `query_log`:
+`docker/initdb/`. v2 compose may keep this service until Observatory is green
+(ADR-005); do not treat Grafana as the scored v2 surface. Minimum 5 panels, all backed by `query_log`:
 
 ```
 1. Queries/hour        -- count(*) grouped by 1-hour bucket on ts

@@ -1,6 +1,11 @@
 # spec: evals-retrieval — `evals/ground_truth.py` + `evals/retrieval_eval.py`
 
 **Implemented by:** WP-12 (lexical/vector/hybrid), WP-13 (+rerank, +rewrite).
+**v2:** WP04 re-runs arms on FTS5 + matrix; scene-search metrics in
+`specs/scene-search.md`. Chunk ids must stay v1-identical (`test_chunk_ids_match_v1_snapshot`).
+**ONNX/runtime memory (addendum 2026-09-01):** measure peak RSS under
+`APP_MODE=demo` locally against Streamlit Community Cloud documented limits
+(ADR-006); not on a deployed canary until owner deploys Mon Sep 7.
 **Consumed by:** `docs/adrs/ADR-001-retrieval-arm.md`, `apps/api` (production `arm` default).
 
 ## Purpose

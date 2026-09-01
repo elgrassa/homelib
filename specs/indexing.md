@@ -1,12 +1,18 @@
 # spec: indexing — `homelib_rag.index`
 
-**Implemented by:** WP-10. **Consumed by:** `homelib_rag.hybrid` (WP-11), `homelib_rag.rerank` (WP-13), `apps/api` `/v1/ask` (WP-14).
+**Implemented by:** WP-10 (v1: Postgres FTS + pgvector). **v2 target:** WP04 —
+SQLite FTS5 + cached NumPy matrix (ADR-004). `Hit` shape is unchanged so
+hybrid/rerank/eval keep working. This file still owns `Hit`.
+
+**Consumed by:** `homelib_rag.hybrid` (WP-11), `homelib_rag.rerank` (WP-13), `apps/api` `/v1/ask` (WP-14).
 
 ## Purpose
 
-Two independent retrieval arms over the same Postgres store — lexical (full-text
+Two independent retrieval arms over the same store — lexical (full-text
 search) and semantic (vector similarity) — each returning a ranked list of
-chunks a caller can cite back to a page. This is the floor both `hybrid_search`
+chunks a caller can cite back to a page. v1 store is Postgres; v2 store is
+SQLite + FTS5 + a contiguous float32 matrix keyed by `index_revision` (never
+per-query BLOB decode). This is the floor both `hybrid_search`
 and the eval harness are built on: if either arm is wrong, everything above it
 is wrong for a reason nobody will see until the eval table looks strange.
 
@@ -31,7 +37,8 @@ it by name — they do not redefine its fields.
 
 ## Data contracts (field-level)
 
-Schema created by `docker/initdb/*.sql`, read by both search functions:
+Schema created by `docker/initdb/*.sql` **on v1**. v2 tables: `specs/data-model.md`
+(SQLite). Same logical columns; `tsv` / `vector(384)` become FTS5 + BLOB/matrix:
 
 ```sql
 books             (book_id text PRIMARY KEY, title text, authors text[],

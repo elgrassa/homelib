@@ -1,7 +1,14 @@
 # spec: api — `apps/api` (FastAPI)
 
-**Implemented by:** WP-14 (ask/roadmap), WP-16 (feedback), WP-09 (ingest).
-**Consumed by:** the Streamlit UI, the demo scripts, and reviewers via Swagger.
+**Implemented by (v1, live):** WP-14 (ask/roadmap), WP-16 (feedback), WP-09 (ingest).
+**v2 target:** WP06–WP10 implement product.md §8. This file is the field-level
+contract. **`specs/openapi.snapshot.json` stays the v1 snapshot until the
+first API implementation PR** (plan WP01: drift test from that PR, not this
+docs WP). Public request models: `extra="forbid"`. Provider payloads:
+`raw_json` only.
+
+**Consumed by:** Streamlit via `specs/client.md` (`InProcessClient` |
+`HttpClient`), demo scripts, Swagger.
 
 ## Purpose
 
@@ -10,7 +17,13 @@ access; if something is not on this surface, the UI cannot do it. FastAPI
 auto-generates OpenAPI at `/openapi.json` and Swagger UI at `/docs` — that is
 the reviewer-facing API documentation, and the README links it.
 
-## Endpoints (all under `/v1` except health)
+Identity: mutating v2 routes require a principal (`specs/principals.md`).
+`APP_MODE=demo` sends `X-Demo-Session-Id`; missing owner → **403**, never a
+null-owner insert.
+
+## Endpoints — live v1 (OpenAPI snapshot)
+
+These paths are what `test_openapi_snapshot_matches` pins today.
 
 | Endpoint | Request | Response |
 |---|---|---|
@@ -43,6 +56,218 @@ citation, so the id needed to open it belongs in the shape.
 `arm: None` on `/v1/ask` means "use the production winner" — the arm chosen on
 evidence in `docs/adrs/ADR-001-retrieval-arm.md`, not a hardcoded preference.
 
+## v2 target — product.md §8 (markdown this WP; not in the snapshot yet)
+
+All request models `extra="forbid"` (unknown JSON → **422**). Shared
+`degraded: bool` means a fallback path ran; never a silent 500 for vector/LLM
+down. `Citation` is unchanged from v1 (both `chunk_id` and `block_id`).
+
+### `GET /health`
+
+Request: none.
+
+Response `Health`:
+
+```
+status: "ok"|"degraded"
+db: bool
+llm: {provider: str, model: str, reachable: bool}   # never keys
+books: int
+chunks: int
+index_revision: str | None          # v2; null until WP04 matrix exists
+app_mode: "demo"|"selfhosted"       # v2
+```
+
+### `POST /v1/search`
+
+Request `SearchRequest`:
+
+```
+query: str                          # required, stripped; empty → 422
+mode: "exact"|"keyword"|"semantic"|"smart"   # default "smart"
+k: int = 5                          # 1..50
+wing_id: str | None
+area_id: str | None
+scope: "library"|"wing"|"shelf"|"discover" = "library"
+```
+
+Response `SearchResponse`:
+
+```
+request_id: str
+hits: list[SearchHit]
+mode_used: str                      # arm actually used after degradation
+degraded: bool
+latency_ms: int
+```
+
+`SearchHit`: `resource_id, book_id, chunk_id, block_id, title, section_path,
+quote, score, char_start, char_end, open_anchor, rights_status`.
+
+LLM offline: Exact/Keyword/Semantic/Smart still return hits.
+
+### `POST /v1/ask`
+
+Keep the live v1 `AskRequest` / `AskResponse`. Optional v2 fields (additive,
+defaults keep v1 behaviour):
+
+```
+conversation_id: str | None = None
+wing_id: str | None = None
+resource_id: str | None = None      # book/chapter scope when set
+```
+
+Do not add these to the OpenAPI snapshot until the route is implemented.
+
+### `POST /v1/mentor/intake`
+
+Replaces the *product* role of v1 `POST /v1/roadmap` (that path stays live
+until WP06 removes or aliases it).
+
+Request `MentorIntakeRequest`:
+
+```
+goal: str                           # required
+interests: list[str] = []
+level: "beginner"|"intermediate"|"advanced"|None = None
+```
+
+Response `MentorIntakeResponse`:
+
+```
+request_id: str
+proposed_area: {name: str, copy: str | None} | None
+proposed_wing: {name: str, area_name: str | None, copy: str | None} | None
+proposed_path: {title: str, kind: "reading"|"learning"|"action",
+                steps: list[PathStepPreview]} | None
+rationale: str
+citations: list[Citation]
+degraded: bool
+high_stakes_notice: str | None      # informational; never auto-executes
+```
+
+None of the proposed rows are persisted as active Areas/Wings/playlist items
+until the user POSTs the accept routes.
+
+### `POST /v1/paths`
+
+Request `CreatePathRequest`:
+
+```
+intake_request_id: str | None
+title: str
+kind: "reading"|"learning"|"action"
+steps: list[PathStep]               # same fields as v1 RoadmapStep
+```
+
+Response `PathResponse`: `{path_id, title, kind, steps, accepted: true}`.
+POST **creates an accepted artifact** (user already confirmed). Fail-closed
+parse; one bounded repair (v1 roadmap lesson).
+
+### `GET /v1/areas` / `POST /v1/areas`
+
+GET → `list[Area {id, name, copy, wing_count: int}]` (seed + principal’s own).
+
+POST `CreateAreaRequest {name: str, copy: str | None}` → `Area`.
+AI must not call this without user confirmation.
+
+### `GET /v1/wings` / `POST /v1/wings`
+
+GET query: `area_id: str | None`.
+
+Response `list[Wing {id, area_id, name, kind: str, copy, resource_count: int}]`.
+
+POST `CreateWingRequest {area_id: str, name: str, kind: str | None, copy: str | None}`
+→ `Wing`. Same acceptance rule as Areas.
+
+### `GET /v1/resources`
+
+Query: `source: "shelf"|"discover"|None`, `wing_id`, `q`, `rights_status`,
+`format`, `language`.
+
+Response `ResourceList`:
+
+```
+items: list[ResourceSummary]
+unique_count: int                   # not the sum of provider counts
+approximate_provider_counts: dict[str, int]   # UI prefixes ~
+degraded: bool                      # a connector timed out
+```
+
+`ResourceSummary`: `id, book_id | None, title, authors: list[str],
+source: "shelf"|"discover", rights_status, can_index_text, full_text_available,
+format | None`.
+
+v1 `GET /v1/books` remains until WP08; `book_id` is the citation identity
+this week (`specs/data-model.md` naming confusion).
+
+### `POST /v1/resources/{id}/search`
+
+See `specs/scene-search.md`. Request `SceneSearchRequest`:
+
+```
+query: str
+mode: "exact"|"keyword"|"semantic"|"smart"|"ask"
+chapter_id: str | None = None
+k: int = 5
+```
+
+Response `SceneSearchResponse`: `{request_id, resource_id, hits: list[SceneHit],
+mode_used, degraded, latency_ms}`.
+
+### `GET /v1/blocks/{id}`
+
+Unchanged: `Block` (`specs/core-models.md`). `{id}` is **block_id**, not
+chunk_id. Product §8 name for the v1 route.
+
+### `GET /v1/playlists/current` / `POST /v1/playlists/current`
+
+GET → `Playlist` (`specs/coffee-table.md`). Empty table → `{items: [], ...}`
+200, not 404.
+
+POST `PlaylistAcceptRequest {accept_item_ids: list[str] | None}` — `None`
+accepts all `proposed` items. Response: `Playlist`.
+
+### `POST /v1/playlists/current/items`
+
+`AddPlaylistItemRequest {resource_id: str, origin: PlaylistOrigin}` → `Playlist`.
+
+### `PATCH /v1/playlists/current/items`
+
+`PatchPlaylistItemsRequest {items: list[{id: str, ordinal: int | None,
+status: PlaylistStatus | None}]}` → `Playlist`. Unknown id → **404**.
+Duplicate/gap ordinals → **422**.
+
+### `DELETE /v1/playlists/current/items/{item_id}`
+
+Sets `status=removed`; resource row remains. Response: `Playlist`.
+
+(Product lists DELETE on the collection; a single-item path is the
+unambiguous reading. Do not delete-by-body-only without an id.)
+
+### `POST /v1/progress`
+
+Request: `ProgressEvent` (`specs/progress.md`). Response `{ok: true}`.
+
+### `POST /v1/bookmarks`
+
+Request `BookmarkRequest {resource_id, block_id, char_start, char_end,
+note: str | None}`. Response `Bookmark {id, ...same fields, created_at}`.
+
+### `POST /v1/feedback`
+
+Unchanged v1. Comment optional.
+
+### `GET /v1/observatory`
+
+Response: `ObservatoryResponse` (`specs/observatory.md`). Never plaintext
+queries or keys.
+
+### `GET /v1/audio/capabilities`
+
+Response: `AudioCapabilities` (`specs/audio.md`). `can_generate` is false
+this week.
+
 ## Error and degradation behavior
 
 - Errors use FastAPI's envelope: `HTTPException` → `{detail: str}`.
@@ -60,8 +285,10 @@ evidence in `docs/adrs/ADR-001-retrieval-arm.md`, not a hardcoded preference.
 
 `evals/tests/test_openapi_snapshot.py` asserts the generated `openapi.json`
 (paths, schema names, required fields) matches the committed
-`specs/openapi.snapshot.json`. Changing the API means regenerating the snapshot
-in the same PR — deliberately, with the diff visible in review.
+`specs/openapi.snapshot.json`. Changing the **implemented** API means
+regenerating the snapshot in the same PR — deliberately, with the diff
+visible in review. WP01 does not add routes; leaving the snapshot on v1 is
+intentional, not drift.
 
 ## Named red tests
 
@@ -71,6 +298,9 @@ in the same PR — deliberately, with the diff visible in review.
   response is 200 with `degraded is True` and `arm_used == "lexical"`.
 - `test_health_never_leaks_key_material` — `/health` body contains no substring
   of the configured `LLM_API_KEY`.
+- v2 (first API PR, not this WP): `test_search_unknown_fields_422`;
+  `test_private_write_requires_principal` on playlist POST;
+  `test_blocks_chunk_id_still_404`.
 
 ## Verify
 
