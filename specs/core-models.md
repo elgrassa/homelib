@@ -77,10 +77,13 @@ CatalogEntry ol_key: str               # Open Library work key, e.g. "/works/OL2
 
 ## Invariants
 
-1. **`model_config = ConfigDict(extra="allow")` on EVERY model.** Metadata we
-   did not anticipate must survive a round trip rather than being silently
-   dropped at the boundary. This is not stylistic: silent metadata loss is the
-   single defect this spec exists to prevent.
+1. **`model_config = ConfigDict(extra="allow")` on every v1 ingest/corpus model
+   in this package.** Metadata we did not anticipate must survive a round trip
+   at the ingest boundary. **v2 public API and provider-boundary models**
+   (`specs/api.md`, `specs/provider.md`, `specs/rights.md`,
+   `specs/connectors.md`) use `extra="forbid"` with vendor payloads in
+   explicit `raw_json` fields — not `extra="allow"`. WP03+ implements the
+   rights/index gate; ingest models here are unchanged.
 2. `canonical_text[b.char_start:b.char_end] == b.text` for every block.
 3. `block_id` is stable: same `(book_id, section_path, ordinal)` always yields
    the same id across runs and processes, so citations survive re-ingestion.

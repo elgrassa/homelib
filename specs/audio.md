@@ -27,8 +27,9 @@ public-domain book, generation is still off until post-capstone.
 
 ## Data contracts (field-level)
 
-At most one bundled preview asset in the seed. `listen_progress` columns
-exist (`specs/progress.md`) but the player is optional.
+At most one bundled preview asset in the seed. `listen_progress` table and
+columns exist (`specs/progress.md`); `POST kind=listen` may persist rows but
+no player consumes them this week (ADR-009).
 
 Microphone / STT: not in the public demo.
 

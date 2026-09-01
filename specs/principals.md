@@ -60,8 +60,8 @@ X-Demo-Session-Id   request header on mutating HTTP calls in APP_MODE=demo
 
 Shared seed (`books`, `chunks`, seed `wings`/`areas`, `catalog`) is read-only
 and has no owner. Private tables (`playlist`, `playlist_item`, `read_progress`,
-`conversation`, `message`, `feedback`, `bookmarks`) require `principal_id`
-NOT NULL.
+`listen_progress`, `conversation`, `message`, `feedback`, `bookmarks`,
+principal-owned `areas`) require `principal_id` NOT NULL on mutating rows.
 
 ## Error/degradation behavior
 
@@ -69,9 +69,9 @@ NOT NULL.
   owner). Never insert with `principal_id` NULL.
 - Unknown / expired demo session on a mutating route → **401**; the client
   mints a new session and retries once.
-- Session A cannot read session B's playlist, conversation, progress, bookmarks
-  or feedback. A leaked id is not an ACL bypass: queries filter by the
-  authenticated principal, not by a client-supplied owner field.
+- Session A cannot read session B's playlist, conversation, progress, bookmarks,
+  principal-owned areas, or feedback. A leaked id is not an ACL bypass: queries
+  filter by the authenticated principal, not by a client-supplied owner field.
 - `APP_MODE=demo` restart restores seed counts; all mutable principal rows are
   gone (`test_demo_reset_restores_seed`).
 - Health and public catalog/search of the seed corpus do not require a session.
@@ -81,7 +81,8 @@ NOT NULL.
 - `test_private_write_requires_principal` — INSERT playlist / progress /
   conversation / feedback with `principal_id` NULL is refused.
 - `test_demo_sessions_cannot_read_each_other` — two sessions; A cannot SELECT
-  B's private rows.
+  B's private rows (playlist, read_progress, conversation, bookmarks,
+  principal-owned areas).
 - `test_demo_reset_restores_seed` — after reset, seed book/chunk/wing counts
   and logical checksums match canonical seed; private rows are empty.
 - `test_restart_persists` — `APP_MODE=selfhosted`: playlist ordinal, last-opened

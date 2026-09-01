@@ -62,7 +62,8 @@ see `ProviderHealth` booleans.
 supports_tools               bool   # if False, agent loop must not send tools=
 supports_structured_output   bool   # if False, parse text → Pydantic; one bounded repair
 raw_json                     dict   # vendor body; public request models extra="forbid"
-max_tokens                   int    # answers 400; paths/roadmap 1600 (v1 truncation lesson)
+max_tokens                   int    # default 800 (editions/product/.env.example);
+                                  # POST /v1/paths and v1 POST /v1/roadmap may use up to 1600
 timeout_seconds              float  # Compose default 300; demo cloud may use 90
 ```
 

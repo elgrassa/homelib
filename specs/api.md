@@ -43,6 +43,12 @@ Citation    {chunk_id, block_id, book_id, book_title, section_path: list[str],
 RoadmapStep {order: int, ol_key: str|None, book_id: str|None, title: str,
              authors: list[str], why: str, prerequisites: list[int],
              est_effort: "light"|"medium"|"deep"}
+
+PathStepPreview {order: int, title: str, why: str,
+                 est_effort: "light"|"medium"|"deep" | None = None}
+                 # mentor-intake proposal only; no persisted ids yet
+
+PathStep          same fields as RoadmapStep (persisted `POST /v1/paths`)
 ```
 
 `Citation` carries **both** a `chunk_id` and a `block_id`, and the distinction

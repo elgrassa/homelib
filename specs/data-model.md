@@ -63,8 +63,11 @@ This week vs later. Identity and corpus are load-bearing for scored RAG. UX tabl
 
 ### This week — library UX
 
-- `areas` — user-extensible; not hard-coded “AI Engineering”.
-- `wings` — `id`, `area_id`, `name`, `kind` (topic/crossroads/hidden — HTML kinds are a hint, not a closed enum), `copy`, `principal_id` (seed rows: a well-known system principal or null-owner **read-only seed**).
+- `areas` — `id`, `name`, `copy`, `principal_id` FK NOT NULL on user-created rows.
+  Seed rows may use `principal_id` NULL (read-only shared). `POST /v1/areas` is
+  principal-required; session A's Area must not be visible to session B
+  (`test_demo_sessions_cannot_read_each_other`).
+- `wings` — `id`, `area_id`, `name`, `kind` (topic/crossroads/hidden — HTML kinds are a hint, not a closed enum), `copy`, `principal_id` (seed rows: null-owner **read-only seed**; user-created rows NOT NULL).
 - `wing_membership` — `wing_id`, `book_id` or `resource_id`, ordinal.
 
 CONFUSION: product §7.4 lists `resources` / `documents` as well as books. v1 is `books`. Draft: keep `books` as the indexed corpus table this week; `resources` can alias or wait for WP02 if Discover metadata-only rows need a wider type.
@@ -74,10 +77,21 @@ CONFUSION: product §7.4 lists `resources` / `documents` as well as books. v1 is
 - `playlist` — one “current” table per principal (`id`, `principal_id`, `last_opened_item_id`, `updated_at`).
 - `playlist_item` — `playlist_id`, `resource_id`/`book_id`, `ordinal`, `origin` (`mentor_proposal` \| `manual_shelf` \| `manual_discover` \| `roadmap`), `status` (`proposed`, `queued`, `reading`, `listening`, `paused`, `completed`, `skipped`, `removed`), `accepted_at`, `manual` boolean. Rules: acceptance-required; manual survives regen; no silent reinsert of completed/removed; remove keeps the resource.
 
+### This week — bookmarks
+
+- `bookmarks` — `id`, `principal_id` FK NOT NULL, `resource_id`, `book_id`,
+  `block_id`, `char_start`, `char_end`, `note` (nullable), `created_at`.
+  Owned table per `specs/principals.md`. Product §7.4 `notes` without a
+  separate §8 route are inline `bookmarks.note` this week (no `notes` table).
+
 ### This week — progress
 
-- `read_progress` — `principal_id`, `book_id`, `block_id`/`char_offset`, `updated_at`. Independent of listen.
-- `listen_progress` — **columns reserved**, unused (ADR-009). No production audio rows.
+- `read_progress` — `principal_id` FK NOT NULL, `resource_id`, `book_id`,
+  `block_id`, `char_offset`, `updated_at`; PK `(principal_id, resource_id)`.
+  Field names match `specs/progress.md`. Independent of listen.
+- `listen_progress` — same columns as `read_progress`; table exists and
+  `POST /v1/progress` with `kind=listen` may persist rows (ADR-009), but no
+  player or production audio consumes them this week.
 
 ### This week — Mentor
 
@@ -146,14 +160,17 @@ CONFUSION: product §7.4 lists `resources` / `documents` as well as books. v1 is
 13. **`POST /v1/roadmap` (live v1) vs `POST /v1/mentor/intake` + `POST /v1/paths` (product §8).** Keep roadmap until WP06; do not dual-write OpenAPI.
 14. **`GET /v1/books` vs `GET /v1/resources`.** Citation identity stays `book_id` this week; resources is the Discover/shelf list.
 15. **`LLM_TIMEOUT_SECONDS=90` (product §7.2) vs Compose 300 (plan §0.2).** Editions spec: Compose stays 300; 90 is demo-cloud suggestion only.
-16. **WP01 “commit OpenAPI snapshot” vs no new routes this WP.** Snapshot stays v1-aligned; first API PR regenerates it.
+16. **`LLM_MAX_OUTPUT_TOKENS=800` (editions/product) vs `max_tokens` 1600 for paths (provider.md).** Canonical default **800** everywhere (`.env.example`, editions, product §7.2). `POST /v1/paths` / v1 `POST /v1/roadmap` may request up to **1600** per route (v1 truncation lesson); not a second env default.
+17. **`extra="forbid"` + `raw_json` (api/product/provider/rights/connectors) vs `extra="allow"` on v1 `homelib_core` ingest models (`specs/core-models.md`).** Ingest/corpus round-trip keeps `extra="allow"`; v2 public API and provider-boundary models (`RightsManifest`, `ConnectorHit`, `GenerationRequest`) use `extra="forbid"` + explicit `raw_json` for vendor payloads. WP03+ implements the gate; no contradiction at the HTTP boundary.
+18. **Product §12.2 Sep 2 “Public canary loads” vs addendum VOID.** Addendum §2: Sep 2 gate is local `APP_MODE=demo` smoke + SQLite tests green; live canary moves to Mon Sep 7 owner deploy (`docs/evidence.md` addendum).
+19. **WP01 “commit OpenAPI snapshot” vs no new routes this WP.** Snapshot stays v1-aligned; first API PR regenerates it.
 
 ## 7. WP02 red-test hooks
 
 | Test | Schema attachment |
 |---|---|
 | `test_private_write_requires_principal` | INSERT into `playlist` / `playlist_item` / `read_progress` / `conversation` / `feedback` with `principal_id` NULL → refused (CHECK or application + FK). Seed catalog/`books` remain read-only shared rows. |
-| `test_demo_sessions_cannot_read_each_other` | Two `demo_session` rows; session A cannot SELECT session B's `playlist_item` / `conversation` / `read_progress`. |
+| `test_demo_sessions_cannot_read_each_other` | Two `demo_session` rows; session A cannot SELECT session B's `playlist_item` / `conversation` / `read_progress` / `bookmarks` / principal-owned `areas`. |
 | `test_restart_persists` | Home/`selfhosted`: playlist ordinal, last-opened item, `read_progress` survive process restart (same SQLite file). Demo: see next test. |
 | `test_demo_reset_restores_seed` | `APP_MODE=demo`: restart or reset wipes mutable principal rows; seed `books`/`chunks`/`wings` counts + logical checksums match the canonical seed. |
 

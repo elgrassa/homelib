@@ -15,7 +15,7 @@ HomeLib must satisfy a public capstone rubric (logged-out URL, Compose) and a re
 
 | Edition | This week |
 |---|---|
-| Public showcase | Streamlit Community Cloud, `APP_MODE=demo`, app-owner cloud LLM, resettable seed, session-isolated mutable state. **Created on submission day (Sun Sep 7), not before.** Rehearse `APP_MODE=demo` locally. ONNX-vs-torch is decided against Community Cloud's *documented* memory limits, not a live canary. |
+| Public showcase | Streamlit Community Cloud, `APP_MODE=demo`, app-owner cloud LLM, resettable seed, session-isolated mutable state. **Created on submission day (Sun Sep 7), not before.** Rehearse `APP_MODE=demo` locally. ONNX-vs-torch is decided against Community Cloud's *documented* memory limits, not a live canary. **Calendar cross-ref:** machine `cal 9 2026` shows Sep 7 = **Monday**; `docs/plan-v2.md` weekday labels are frozen verbatim — see `docs/evidence.md` addendum §1. |
 | Home / reviewer | Self-hosted Streamlit + FastAPI. **LM Studio preferred on Mac** (`host.docker.internal:1234/v1`). **Ollama for reviewer Compose.** Persistent SQLite in home; Compose still Postgres until WP02. |
 | Persistent cloud trial | Post-capstone (product §15). |
 

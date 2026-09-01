@@ -30,13 +30,19 @@ LLM_MODE=managed|openai_compatible|apple_future
 LLM_BASE_URL=
 LLM_MODEL=
 LLM_TIMEOUT_SECONDS=300          # Compose/reviewer default (plan §0.2)
-LLM_MAX_OUTPUT_TOKENS=800
+LLM_MAX_OUTPUT_TOKENS=800        # canonical default; paths/roadmap routes may request up to 1600
 HOMELIB_BIND=127.0.0.1           # lan profile is an explicit opt-in
 ```
 
 `LLM_TIMEOUT_SECONDS=90` in product.md §7.2 is the **demo / cloud-provider**
 suggestion. Reviewer Compose stays **300** (v1 measured ~70s uncontended on
 CPU-only in-VM Ollama). Do not silently tighten Compose to 90.
+
+`LLM_MAX_OUTPUT_TOKENS=800` is the **canonical env default** (matches
+`.env.example` and `apps/runtime_settings.py`). `POST /v1/paths` and v1
+`POST /v1/roadmap` may pass up to **1600** to the provider for structured
+path output (v1 truncation lesson) — that is a per-route ceiling, not a second
+default.
 
 ## Data contracts (field-level)
 
