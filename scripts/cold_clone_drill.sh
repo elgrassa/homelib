@@ -113,10 +113,10 @@ def ask(question: str) -> dict:
         return json.load(r)
 
 
-def resolves(chunk_id: str) -> bool:
+def resolves(block_id: str) -> bool:
     try:
         with urllib.request.urlopen(
-            f"http://localhost:{port}/v1/blocks/{chunk_id}", timeout=30
+            f"http://localhost:{port}/v1/blocks/{block_id}", timeout=30
         ) as r:
             json.load(r)
         return True
@@ -143,8 +143,11 @@ for attempt, question in enumerate(QUESTIONS, start=1):
         outcomes.append(f"{attempt}. answered but cited nothing")
         continue
     first = citations[0]
-    if not resolves(first["chunk_id"]):
-        outcomes.append(f"{attempt}. citation {first['chunk_id']} did not resolve")
+    # Citation carries both ids; /v1/blocks takes the BLOCK id (the source
+    # passage a reader opens). Resolving the chunk_id here was the drill's own
+    # instance of the exact bug it caught in the product.
+    if not resolves(first["block_id"]):
+        outcomes.append(f"{attempt}. citation block {first['block_id']} did not resolve")
         continue
 
     section = "/".join(first.get("section_path") or []) or "(no section)"
