@@ -86,6 +86,7 @@ services:
       # and ~49 tok/s prefill, so a real /v1/ask costs ~70s minimum — well
       # past a GPU-host-sized timeout. See homelib_rag.answer._TIMEOUT_SECONDS.
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-300}
+      APP_MODE: ${APP_MODE:-selfhosted}
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -120,6 +121,7 @@ services:
       dockerfile: docker/ui.Dockerfile
     environment:
       API_URL: http://api:8000
+      APP_MODE: ${APP_MODE:-selfhosted}
     ports: ["127.0.0.1:${UI_PORT:-8501}:8501"]
     depends_on:
       api: {condition: service_healthy}

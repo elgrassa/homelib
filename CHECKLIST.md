@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-08-30.
+Last updated: 2026-09-01.
 
 ---
 
@@ -105,3 +105,78 @@ Last updated: 2026-08-30.
    are the model returning a bare `{}` or quoting text that appears in no
    passage. Both are correctly rejected rather than passed off as grounded.
    This is what the prompt-variant bake-off exists to move.
+
+---
+
+## F. v2 work packages (WP00–WP11)
+
+v1 evidence above stays. This section tracks the rebuild. Status vocabulary unchanged: `done` means a command in [`docs/evidence.md`](docs/evidence.md).
+
+| WP | Scope | Status |
+|---|---|---|
+| **WP00** | Plan freeze, `v1-fallback` tag, ADRs, mockups, CI `v2` trigger, demo-mode config skeleton, schema *draft* | 🟡 landing this PR — tag exists; FTS5 demo smoke is **not** this PR |
+| **WP01** | Specs + OpenAPI snapshot for §8 endpoints | ⬜ |
+| **WP02** | SQLite, principals, isolation tests | ⬜ |
+| **WP03** | Ingest + rights; chunk ids match v1 | ⬜ |
+| **WP04** | FTS5 + matrix + evals | ⬜ |
+| **WP05** | Lawful connectors | ⬜ |
+| **WP06** | Mentor + cited answer | ⬜ |
+| **WP07** | Coffee Table + progress | ⬜ |
+| **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ⬜ |
+| **WP09** | Projection; static doors before rotunda | ⬜ |
+| **WP10** | Observatory ≥5 charts + feedback | ⬜ |
+| **WP11** | Docs, drill, owner publish + Cloud | ⬜ |
+
+**GO/NO-GO** Sat Sep 6 18:00 (product §12.4). NO-GO ⇒ submit v1 (`v1-fallback`). Never trade a scored 2-point row for polish / Home/Pro / rotunda / TTS.
+
+### Cut order (HTML prototype first)
+
+1. standalone HTML prototype (reference copy in `docs/mockups/`; do not ship it)
+2. Memory Sphere particles and polish
+3. two-page projection (keep one-page)
+4. custom rotating-room (keep static door grid)
+5. live Standard Ebooks/Gutenberg (keep fixtures + live OL)
+6. full audio generation (keep one preview)
+7. rewrite in production if eval does not justify it (v1 already evaluated and rejected)
+
+### Scored bar — do not drop for v2 UX
+
+Problem description; KB+LLM flow; multiple retrieval evals; multiple LLM evals; UI **and** API; dlt ingest; feedback **and** ≥5 charts; full compose; reproducible pins + data; hybrid; rerank; query rewrite evaluated (v1 rejected on evidence — still counts); cloud deploy on submission day (owner). Peer reviews: owner, after submit.
+
+---
+
+## G. Never commit before public GitHub (`just publish`)
+
+Paid tier lands in the **same Forgejo repo after** the public snapshot and Forgejo is private (ADR-010). Until then, do **not** commit:
+
+- [ ] arbitrary personal-book ingestion
+- [ ] hardened EPUB/PDF/OCR pipelines (beyond v1 parsers already public)
+- [ ] persistent private conversations/artifacts beyond demo-session / single-principal capstone paths
+- [ ] LM Studio discovery and model-management UI
+- [ ] production local TTS/STT
+- [ ] Silver Memory generation
+- [ ] polished sphere and rotunda assets
+- [ ] household profiles and LAN authentication
+- [ ] backup, restore and migration
+- [ ] Obsidian plugin
+- [ ] native Apple companion
+- [ ] installers, signed releases and automatic updates
+- [ ] offline commercial licence verification
+- [ ] signing keys or proprietary visual assets
+
+Public showcase copy (HomeLib Home blurb + waitlist link) on the Streamlit demo is allowed.
+
+---
+
+## H. WP00 landing checklist (this PR)
+
+- [x] `v1-fallback` tag at PR #3 merge (`535f58b1a47d3545c1e4b6a36e75c06b58f5a640`)
+- [x] `specs/product.md` + `docs/plan-v2.md` (verbatim)
+- [x] ADR-004 … ADR-010 (ADR-010 = single-repo delayed paid tier)
+- [x] `docs/mockups/` UX SOT + HTML prototype reference
+- [x] `specs/data-model.md` draft
+- [x] CI `on.push.branches: [main, v2]`
+- [x] `APP_MODE` config skeleton (not FTS5)
+- [ ] Forgejo CI green on this PR
+- [ ] rebase-merge into `main`; branch `v2` from that SHA
+

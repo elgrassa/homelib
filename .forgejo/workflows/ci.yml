@@ -2,15 +2,18 @@ name: ci
 
 # Forgejo Actions CI. This instance's runners are hostexecutor: no job gets an
 # automatic clone, so EVERY job must start with actions/checkout.
-# `push` is scoped to main deliberately. With `push` on every branch AND
-# `pull_request`, an open PR makes each push fire TWO runs of the same commit
-# on the same host — not merely wasteful (2 x ~5m40s on a shared runner) but
-# actively breaking: the two runs raced over a shared throwaway test database
-# and one deleted the other's mid-test (run 12259 red, identical push run
-# green). Branch work is covered by its PR run; main is covered here.
+# `push` is scoped to `main` and the `v2` integration branch. With `push` on
+# every branch AND `pull_request`, an open PR makes each push fire TWO runs
+# of the same commit on the same host — not merely wasteful (2 x ~5m40s on a
+# shared runner) but actively breaking: the two runs raced over a shared
+# throwaway test database and one deleted the other's mid-test (run 12259 red,
+# identical push run green). Feature-branch work is covered by its PR run;
+# `main` and `v2` (the integration branch that feature PRs target) are covered
+# here. A long-lived `v2`→`main` PR would re-introduce the double run on
+# pushes to `v2`; keep that PR short-lived (drill-green only).
 on:
   push:
-    branches: [main]
+    branches: [main, v2]
   pull_request:
 
 # Scoped off main so a merge run is never cancelled by a later push.

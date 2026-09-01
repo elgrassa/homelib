@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Homelib Magic Library</title>
+  <style>
+    html { color-scheme: light dark; background: light-dark(#efe7d8, #0e0c0a); }
+    body { margin: 0; padding: clamp(10px, 2vw, 24px); background: inherit; }
+  </style>
+</head>
+<body>
+<div id="homelib-magic-library">
+  <style>
+    #homelib-magic-library {
+      --hl-ink: light-dark(#241c16, #f8f0df);
+      --hl-muted: light-dark(#756758, #c9baa5);
+      --hl-shell: light-dark(#f7f0e3, #15120f);
+      --hl-panel: light-dark(#fffaf0, #211b16);
+      --hl-panel-2: light-dark(#eee0c7, #30251d);
+      --hl-line: light-dark(#cab995, #66523d);
+      --hl-gold: light-dark(#8a5b13, #e2b85f);
+      --hl-gold-soft: light-dark(#ead8ac, #4a391f);
+      --hl-green: light-dark(#315c4b, #89b9a2);
+      color: var(--hl-ink);
+      font-family: Georgia, "Times New Roman", serif;
+      width: 100%;
+    }
+    #homelib-magic-library * { box-sizing: border-box; }
+    #homelib-magic-library .hl-icon { display: inline-block; min-width: 1em; text-align: center; }
+    #homelib-magic-library .hl-window {
+      min-height: 680px;
+      overflow: hidden;
+      border: 1px solid var(--hl-line);
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--hl-gold) 18%, transparent), transparent 30%),
+        linear-gradient(160deg, var(--hl-shell), var(--hl-panel-2));
+      box-shadow: 0 24px 60px color-mix(in srgb, var(--hl-ink) 18%, transparent);
+    }
+    #homelib-magic-library .hl-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--hl-line);
+      background: color-mix(in srgb, var(--hl-panel) 88%, transparent);
+    }
+    #homelib-magic-library .hl-brand { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: .04em; }
+    #homelib-magic-library .hl-brand i { color: var(--hl-gold); }
+    #homelib-magic-library .hl-nav { display: flex; gap: 6px; font-family: system-ui, sans-serif; }
+    #homelib-magic-library .hl-nav button {
+      min-height: 36px;
+      border: 0;
+      border-radius: 9px;
+      padding: 7px 11px;
+      color: var(--hl-muted);
+      background: transparent;
+      font: inherit;
+      cursor: pointer;
+    }
+    #homelib-magic-library .hl-nav button[aria-current="page"] { color: var(--hl-ink); background: var(--hl-gold-soft); }
+    #homelib-magic-library .hl-main { padding: 26px 26px 30px; }
+    #homelib-magic-library .hl-heading { max-width: 680px; margin: 0 auto 18px; text-align: center; }
+    #homelib-magic-library h1 { margin: 0 0 7px; font-weight: 500; font-size: clamp(28px, 4vw, 46px); }
+    #homelib-magic-library .hl-sub { margin: 0; color: var(--hl-muted); font-family: system-ui, sans-serif; }
+    #homelib-magic-library .hl-search {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      max-width: 690px;
+      margin: 0 auto 20px;
+      padding: 7px;
+      border: 1px solid var(--hl-line);
+      border-radius: 14px;
+      background: var(--hl-panel);
+      box-shadow: 0 10px 30px color-mix(in srgb, var(--hl-ink) 10%, transparent);
+    }
+    #homelib-magic-library .hl-search input {
+      min-width: 0;
+      min-height: 44px;
+      border: 0;
+      padding: 0 12px;
+      color: var(--hl-ink);
+      background: transparent;
+      font: 16px system-ui, sans-serif;
+    }
+    #homelib-magic-library .hl-search button,
+    #homelib-magic-library .hl-actions button,
+    #homelib-magic-library .hl-turn {
+      min-height: 44px;
+      border: 1px solid var(--hl-gold);
+      border-radius: 10px;
+      padding: 9px 15px;
+      color: var(--hl-panel);
+      background: var(--hl-gold);
+      font: 500 14px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #homelib-magic-library .hl-room {
+      position: relative;
+      height: 350px;
+      max-width: 900px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--hl-line);
+      border-radius: 18px;
+      background:
+        linear-gradient(90deg, transparent 49.6%, color-mix(in srgb, var(--hl-gold) 26%, transparent) 50%, transparent 50.4%),
+        repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 15%, transparent) 0 2px, transparent 2px 82px),
+        linear-gradient(var(--hl-panel-2), var(--hl-shell) 72%);
+      perspective: 900px;
+    }
+    #homelib-magic-library .hl-room::after {
+      content: "";
+      position: absolute;
+      left: -10%; right: -10%; bottom: -95px; height: 185px;
+      border-top: 1px solid var(--hl-line);
+      border-radius: 50%;
+      background: repeating-radial-gradient(ellipse at center, color-mix(in srgb, var(--hl-gold) 12%, transparent) 0 2px, transparent 2px 28px);
+      transform: rotateX(62deg);
+    }
+    #homelib-magic-library .hl-compass { position: absolute; top: 13px; left: 16px; z-index: 5; color: var(--hl-muted); font: 13px system-ui, sans-serif; }
+    #homelib-magic-library .hl-stage {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 0; height: 0;
+      transform-style: preserve-3d;
+      transition: transform 700ms cubic-bezier(.2,.75,.25,1);
+    }
+    #homelib-magic-library .hl-door {
+      position: absolute;
+      left: -68px; top: -115px;
+      width: 136px; height: 230px;
+      border: 0;
+      padding: 0;
+      color: var(--hl-ink);
+      background: transparent;
+      cursor: pointer;
+      transform-style: preserve-3d;
+    }
+    #homelib-magic-library .hl-door-face {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+      gap: 9px;
+      padding: 16px 9px;
+      border: 2px solid var(--hl-line);
+      border-radius: 68px 68px 9px 9px;
+      background:
+        radial-gradient(circle at 76% 50%, var(--hl-gold) 0 4px, transparent 5px),
+        repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 28%, transparent) 0 1px, transparent 1px 27px),
+        var(--hl-panel);
+      box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--hl-line) 22%, transparent), 0 20px 35px color-mix(in srgb, var(--hl-ink) 20%, transparent);
+      transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+    }
+    #homelib-magic-library .hl-door:hover .hl-door-face,
+    #homelib-magic-library .hl-door:focus-visible .hl-door-face { transform: translateY(-5px); border-color: var(--hl-gold); }
+    #homelib-magic-library .hl-door[aria-pressed="true"] .hl-door-face {
+      border-color: var(--hl-gold);
+      box-shadow: inset 0 0 0 8px var(--hl-gold-soft), 0 0 30px color-mix(in srgb, var(--hl-gold) 42%, transparent);
+    }
+    #homelib-magic-library .hl-door-name { max-width: 110px; font-weight: 500; line-height: 1.15; text-align: center; }
+    #homelib-magic-library .hl-door-kind { color: var(--hl-muted); font: 11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+    #homelib-magic-library .hl-turn {
+      position: absolute; right: 14px; top: 12px; z-index: 6;
+      min-height: 36px; padding: 7px 10px;
+      color: var(--hl-ink); background: var(--hl-panel);
+    }
+    #homelib-magic-library .hl-result {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 20px;
+      max-width: 900px;
+      margin: 14px auto 0;
+      padding: 14px 16px;
+      border: 1px solid var(--hl-line);
+      border-radius: 14px;
+      background: var(--hl-panel);
+      font-family: system-ui, sans-serif;
+    }
+    #homelib-magic-library .hl-result h2 { margin: 0 0 4px; font: 500 18px Georgia, serif; }
+    #homelib-magic-library .hl-result p { margin: 0; color: var(--hl-muted); }
+    #homelib-magic-library .hl-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    #homelib-magic-library .hl-actions button:first-child { color: var(--hl-ink); background: transparent; }
+    #homelib-magic-library .hl-status { min-height: 20px; margin-top: 8px; color: var(--hl-green); font: 13px system-ui, sans-serif; }
+    @media (prefers-reduced-motion: reduce) {
+      #homelib-magic-library .hl-stage, #homelib-magic-library .hl-door-face { transition: none; }
+    }
+    @media (max-width: 720px) {
+      #homelib-magic-library .hl-topbar { align-items: flex-start; flex-direction: column; }
+      #homelib-magic-library .hl-nav { width: 100%; overflow-x: auto; }
+      #homelib-magic-library .hl-main { padding: 20px 13px; }
+      #homelib-magic-library .hl-room { height: 380px; }
+      #homelib-magic-library .hl-door { left: -58px; width: 116px; height: 205px; }
+      #homelib-magic-library .hl-result { grid-template-columns: 1fr; }
+      #homelib-magic-library .hl-actions { justify-content: flex-start; }
+    }
+    @media (max-width: 440px) {
+      #homelib-magic-library .hl-search { grid-template-columns: 1fr; }
+      #homelib-magic-library .hl-search button { width: 100%; }
+    }
+  </style>
+
+  <section class="hl-window" aria-label="Homelib discovery screen concept">
+    <header class="hl-topbar">
+      <div class="hl-brand"><span class="hl-icon" aria-hidden="true">▤</span><span>homelib</span></div>
+      <nav class="hl-nav" aria-label="Primary navigation">
+        <button type="button" aria-current="page">Explore</button>
+        <button type="button">Ask my shelf</button>
+        <button type="button">Reading path</button>
+        <button type="button">My library</button>
+      </nav>
+    </header>
+
+    <main class="hl-main">
+      <div class="hl-heading">
+        <h1>Where should the library take you?</h1>
+        <p class="hl-sub">Name a topic, or choose a door. The room turns toward the most useful collection.</p>
+      </div>
+
+      <form class="hl-search" id="hl-search-form">
+        <input id="hl-topic" value="AI agent evaluation" aria-label="Topic or goal" placeholder="Try: build reliable AI agents" />
+        <button type="submit"><span class="hl-icon" aria-hidden="true">✦</span> Reveal a path</button>
+      </form>
+
+      <section class="hl-room" aria-label="Rotating library room">
+        <div class="hl-compass" id="hl-compass">Facing: AI Engineering</div>
+        <button type="button" class="hl-turn" id="hl-turn"><span class="hl-icon" aria-hidden="true">↻</span> Turn the room</button>
+        <div class="hl-stage" id="hl-stage"></div>
+      </section>
+
+      <section class="hl-result" aria-live="polite">
+        <div>
+          <h2 id="hl-result-title">AI Engineering wing</h2>
+          <p id="hl-result-copy">Search cited passages from books on your shelf, or discover a structured route through the wider catalog.</p>
+          <div class="hl-status" id="hl-status"></div>
+        </div>
+        <div class="hl-actions">
+          <button type="button" id="hl-ask">Ask this wing</button>
+          <button type="button" id="hl-roadmap">Build reading path</button>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <script>
+    (() => {
+      const root = document.getElementById('homelib-magic-library');
+      const stage = root.querySelector('#hl-stage');
+      const compass = root.querySelector('#hl-compass');
+      const title = root.querySelector('#hl-result-title');
+      const copy = root.querySelector('#hl-result-copy');
+      const status = root.querySelector('#hl-status');
+      const topic = root.querySelector('#hl-topic');
+      const wings = [
+        { name: 'AI Engineering', kind: 'topic wing', copy: 'Search cited passages from books on your shelf, or discover a structured route through the wider catalog.' },
+        { name: 'Software Craft', kind: 'topic wing', copy: 'Explore design, testing, delivery, and the practices that turn code into dependable software.' },
+        { name: 'Systems & Scale', kind: 'topic wing', copy: 'Follow the shelves toward distributed systems, performance, infrastructure, and reliability.' },
+        { name: 'Business & Strategy', kind: 'topic wing', copy: 'Connect product, entrepreneurship, management, and go-to-market ideas into an ordered path.' },
+        { name: 'Ideas in Common', kind: 'crossroads', copy: 'Let the agent combine evidence across several wings when your question does not belong to one shelf.' },
+        { name: 'Surprise Me', kind: 'hidden door', copy: 'Open an adjacent subject selected from your interests without losing the route back.' }
+      ];
+      let active = 0;
+      const angle = 360 / wings.length;
+
+      wings.forEach((wing, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'hl-door';
+        button.setAttribute('aria-label', `Enter ${wing.name}`);
+        button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+        button.innerHTML = `<span class="hl-door-face"><span class="hl-icon" aria-hidden="true">▯</span><span class="hl-door-name">${wing.name}</span><span class="hl-door-kind">${wing.kind}</span></span>`;
+        button.style.transform = `rotateY(${index * angle}deg) translateZ(300px)`;
+        button.addEventListener('click', () => selectWing(index));
+        stage.appendChild(button);
+      });
+
+      function selectWing(index, message = '') {
+        active = (index + wings.length) % wings.length;
+        stage.style.transform = `rotateY(${-active * angle}deg)`;
+        root.querySelectorAll('.hl-door').forEach((door, i) => door.setAttribute('aria-pressed', i === active ? 'true' : 'false'));
+        compass.textContent = `Facing: ${wings[active].name}`;
+        title.textContent = `${wings[active].name} ${wings[active].kind === 'topic wing' ? 'wing' : ''}`.trim();
+        copy.textContent = wings[active].copy;
+        status.textContent = message;
+      }
+
+      root.querySelector('#hl-turn').addEventListener('click', () => selectWing(active + 1));
+      root.querySelector('#hl-search-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const q = topic.value.toLowerCase();
+        let destination = 4;
+        if (/ai|agent|llm|model|rag/.test(q)) destination = 0;
+        else if (/test|code|software|java|python|delivery/.test(q)) destination = 1;
+        else if (/system|scale|cloud|devops|kubernetes|performance/.test(q)) destination = 2;
+        else if (/business|product|market|startup|management/.test(q)) destination = 3;
+        selectWing(destination, `The room found a direction for “${topic.value || 'your topic'}”.`);
+      });
+      root.querySelector('#hl-ask').addEventListener('click', () => { status.textContent = `Opening cited search inside ${wings[active].name}…`; });
+      root.querySelector('#hl-roadmap').addEventListener('click', () => { status.textContent = `Preparing a goal-based reading path through ${wings[active].name}…`; });
+      selectWing(0);
+    })();
+  </script>
+</div>
+</body>
+</html>

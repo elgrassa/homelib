@@ -95,7 +95,8 @@ def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
     tests with `database "homelib_test_index" does not exist` while run 12258
     (push, same commit) passed, because the two raced over a shared throwaway
     database. The per-process database name fixes the race; scoping `push` to
-    main removes the second run entirely.
+    main and the v2 integration branch leaves feature-branch work on the PR
+    trigger only.
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     # PyYAML parses a bare `on:` key as the boolean True.
@@ -103,9 +104,10 @@ def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
 
     if "push" in triggers and "pull_request" in triggers:
         branches = (triggers.get("push") or {}).get("branches")
-        assert branches == ["main"], (
-            "`push` must be scoped to main when `pull_request` is also a trigger, "
-            f"otherwise every branch push runs CI twice; got branches={branches!r}"
+        assert branches == ["main", "v2"], (
+            "`push` must be scoped to main and the v2 integration branch when "
+            "`pull_request` is also a trigger, otherwise every feature-branch "
+            f"push runs CI twice; got branches={branches!r}"
         )
 
 
