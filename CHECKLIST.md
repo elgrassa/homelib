@@ -115,8 +115,8 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | WP | Scope | Status |
 |---|---|---|
 | **WP00** | Plan freeze, `v1-fallback` tag, ADRs, mockups, CI `v2` trigger, demo-mode config skeleton, schema *draft* | ✅ done — PR #4 merged; `v2`=`main`=`e288f21` |
-| **WP01** | Specs + OpenAPI snapshot for §8 endpoints | ✅ done for review — PR #5 @ `adaa4d0`; Opus blockers closed; Pavlo oldest queue item |
-| **WP02** | SQLite, principals, isolation tests | 🟡 PR #6 WIP @ `c8e834e` — fix round pushed; blocked until #5 merges |
+| **WP01** | Specs + OpenAPI snapshot for §8 endpoints | ✅ done — PR #5 @ `6ac26b3` |
+| **WP02** | SQLite, principals, isolation tests | 🟡 PR #6 WIP — Pavlo review fix round |
 | **WP03** | Ingest + rights; chunk ids match v1 | ⬜ |
 | **WP04** | FTS5 + matrix + evals | ⬜ |
 | **WP05** | Lawful connectors | ⬜ |
