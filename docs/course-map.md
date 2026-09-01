@@ -10,14 +10,14 @@ Module list verified 2026-08-29 against the course repository on
 
 | Module | Tools taught | Where homelib demonstrates it | Status |
 |---|---|---|---|
-| **01 Agentic RAG** | minsearch, sqlitesearch, OpenAI API, ToyAIKit-style agent loop, **function calling** | `homelib_rag.agent`: an explicit tool-calling loop over `search_shelf` / `search_catalog` / `build_roadmap` / `get_block` | pending (WP-14) |
-| **02 Vector Search** | sentence-transformers, numpy from scratch, minsearch VectorSearch, sqlitesearch, **pgvector**, `all-MiniLM-L6-v2` | pgvector cosine index + the course's own embedding model; lexical-vs-vector arms measured against each other | pending (WP-09/10/12) |
-| **03 Orchestration** | Kestra flows, AI copilot, multi-agent YAML | Ingestion is orchestrated with **dlt**. See "Why dlt and not Kestra" below | pending (WP-09) |
-| **Workshop: dlt** | **dlt**, DuckDB, marimo, Pydantic AI + Logfire | `apps/ingest/pipeline.py` is a real dlt pipeline with idempotent loading | pending (WP-09) |
-| **04 Evaluation** | LLM-as-a-judge, **hit rate, MRR**, LLM-generated ground truth, structured outputs | Ground-truth generator, 4-arm retrieval eval, 3-prompt judge eval | metrics **done**; arms pending (WP-12/15) |
-| **05 Monitoring** | Streamlit chat + dashboard, PostgreSQL, **Grafana**, token/cost tracking, 👍/👎 feedback | `query_log` + in-UI feedback + a provisioned Grafana dashboard | schema + provisioning **done**; panels pending (WP-16) |
-| **06 Best Practices** | Elasticsearch hybrid, LangChain retriever, **RRF** reranking | RRF hybrid, cross-encoder rerank, and query rewriting — all three | pending (WP-11/13) |
-| **07 Project example** | fitness-assistant: Flask, compose, PG logging, Grafana | homelib mirrors its structure at a higher bar: FastAPI, an eval regression gate, an agentic layer | in progress |
+| **01 Agentic RAG** | minsearch, sqlitesearch, OpenAI API, ToyAIKit-style agent loop, **function calling** | `homelib_rag.agent`: an explicit tool-calling loop over `search_shelf` / `search_catalog` / `build_roadmap` / `get_block` | **done** — 7 endpoints, agent loop, roadmap, grounded citations shipped and verified; author-hallucination closed structurally (WP-14) |
+| **02 Vector Search** | sentence-transformers, numpy from scratch, minsearch VectorSearch, sqlitesearch, **pgvector**, `all-MiniLM-L6-v2` | pgvector cosine index + the course's own embedding model; lexical-vs-vector arms measured against each other | **done** — pgvector + `all-MiniLM-L6-v2` live against the real corpus; lexical/vector/hybrid arms measured (WP-09/10/12) |
+| **03 Orchestration** | Kestra flows, AI copilot, multi-agent YAML | Ingestion is orchestrated with **dlt**. See "Why dlt and not Kestra" below | **done** — dlt pipeline verified: 37 tests, 0 skipped, against a live Postgres (WP-09) |
+| **Workshop: dlt** | **dlt**, DuckDB, marimo, Pydantic AI + Logfire | `apps/ingest/pipeline.py` is a real dlt pipeline with idempotent loading | **done** — same pipeline: 37 tests, 0 skipped, against a live Postgres (WP-09) |
+| **04 Evaluation** | LLM-as-a-judge, **hit rate, MRR**, LLM-generated ground truth, structured outputs | Ground-truth generator, 4-arm retrieval eval, 3-prompt judge eval | **done** — retrieval: 4 arms × 235 questions, winner recorded in ADR-001 (WP-12). LLM judge: 4-arm bake-off × 30 questions, **null result** — incumbent kept, per ADR-003 (WP-15) |
+| **05 Monitoring** | Streamlit chat + dashboard, PostgreSQL, **Grafana**, token/cost tracking, 👍/👎 feedback | `query_log` + in-UI feedback + a provisioned Grafana dashboard | **done** — 6 Grafana panels verified against the live schema; feedback loop verified live end-to-end, ask → 👍 → row in `query_log` (WP-16) |
+| **06 Best Practices** | Elasticsearch hybrid, LangChain retriever, **RRF** reranking | RRF hybrid, cross-encoder rerank, and query rewriting — all three | **done** — all three implemented and measured; rewrite **rejected on evidence** on a matched sample (WP-11/13) |
+| **07 Project example** | fitness-assistant: Flask, compose, PG logging, Grafana | homelib mirrors its structure at a higher bar: FastAPI, an eval regression gate, an agentic layer | **in progress** — build complete and CI green; the cold-clone drill found and fixed a real citation-resolution bug, and a clean re-run is still pending before submission |
 
 ## How we run each piece
 
