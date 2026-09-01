@@ -40,6 +40,7 @@ class _ScriptedClient:
         *,
         tools: Any = None,
         response_format: Any = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         self.calls += 1
         return self._responses.pop(0)

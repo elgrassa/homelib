@@ -34,8 +34,9 @@ class _ScriptedClient:
         *,
         tools: Any = None,
         response_format: Any = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
-        self.calls.append({"messages": list(messages)})
+        self.calls.append({"messages": list(messages), "max_tokens": max_tokens})
         result = self._responses.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -99,6 +100,26 @@ def test_roadmap_schema_fail_closed() -> None:
 
     with pytest.raises(RoadmapParseError):
         build_roadmap(["economics"], "beginner", "learn basics", client=client, catalog=catalog)
+
+
+def test_roadmap_requests_a_larger_completion_cap() -> None:
+    """The client's 400-token default is sized for answers; a multi-step
+    roadmap's JSON does not fit in it, and a truncated body fails parsing
+    every time. Both roadmap calls must pass an explicit larger cap."""
+    client = _ScriptedClient(
+        [
+            LLMResponse(content="not json", usage=LLMUsage(prompt_tokens=1, completion_tokens=1)),
+            LLMResponse(
+                content="still not json", usage=LLMUsage(prompt_tokens=1, completion_tokens=1)
+            ),
+        ]
+    )
+    catalog = _catalog_returning([_entry("/works/OL1W")])
+
+    with pytest.raises(RoadmapParseError):
+        build_roadmap(["economics"], "beginner", "learn basics", client=client, catalog=catalog)
+
+    assert [call["max_tokens"] for call in client.calls] == [1600, 1600]
 
 
 def test_roadmap_schema_repairs_on_second_attempt() -> None:

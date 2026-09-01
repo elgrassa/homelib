@@ -43,6 +43,7 @@ class _ScriptedClient:
         *,
         tools: Any = None,
         response_format: Any = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         result = self._responses.pop(0)
         if isinstance(result, Exception):
@@ -304,6 +305,25 @@ def test_ask_no_rewrite_when_disabled() -> None:
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q", "rewrite": False})
+
+    assert resp.status_code == 200
+    assert "called" not in captured
+
+
+def test_ask_rewrite_defaults_to_false_when_omitted() -> None:
+    """ADR-001 (docs/adrs/ADR-001-retrieval-arm.md) measured query rewriting
+    against hybrid_rerank and rejected it — a request that does not name
+    `rewrite` at all must not silently rewrite anyway."""
+    captured: dict[str, Any] = {}
+
+    def _rewrite(query: str) -> str:
+        captured["called"] = True
+        return "should not be used " + query
+
+    deps = _make_deps(rewrite_query=_rewrite, llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "q"})
 
     assert resp.status_code == 200
     assert "called" not in captured

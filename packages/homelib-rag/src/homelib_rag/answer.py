@@ -67,7 +67,13 @@ _DEFAULT_BASE_URL = "http://localhost:11434/v1"
 _DEFAULT_API_KEY = "ollama"
 _DEFAULT_MODEL = "qwen2.5:7b-instruct"
 _DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/homelib"
-_TIMEOUT_SECONDS = 30.0
+# Measured on the pure-compose stack (CPU-only Ollama in the Docker VM):
+# prefill ~49 tok/s, generation ~7.4 tok/s uncontended, so a real /v1/ask
+# (~1,900-token prompt, ~240-token answer) costs ~70s MINIMUM. A 30s ceiling
+# was a production value only a GPU-backed host could meet — on the compose
+# stack every ask timed out on prefill alone, degrading 100% of answers.
+# Env-tunable so a GPU host can still tighten it.
+_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "300"))
 
 # A passage list this long is not "a few relevant chunks" anymore; cap the
 # prompt rather than let an unusually large `hits` list blow the context
@@ -152,6 +158,7 @@ class OpenAICompatibleClient(Protocol):
         *,
         tools: Sequence[dict[str, Any]] | None = None,
         response_format: Mapping[str, Any] | None = None,
+        max_tokens: int = 400,
     ) -> LLMResponse: ...
 
 
@@ -189,11 +196,18 @@ class OpenAIClient:
         *,
         tools: Sequence[dict[str, Any]] | None = None,
         response_format: Mapping[str, Any] | None = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": [m.model_dump(exclude_none=True) for m in messages],
             "timeout": self._timeout,
+            # Bounds worst-case CPU generation time; measured answers run
+            # ~240 tokens, so the 400 default leaves headroom without letting
+            # a runaway completion turn a slow host's timeout into the only
+            # backstop. Callers producing longer structured output (the
+            # roadmap's multi-step JSON) pass a larger cap explicitly.
+            "max_tokens": max_tokens,
         }
         if tools:
             kwargs["tools"] = list(tools)

@@ -57,6 +57,7 @@ class _ScriptedClient:
         *,
         tools: Any = None,
         response_format: Any = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         self.calls.append(list(messages))
         index = min(len(self.calls) - 1, len(self._responses) - 1)
@@ -290,7 +291,14 @@ class _PerQuestionClient:
         self._bodies = bodies
         self.calls: list[list[ChatMessage]] = []
 
-    def chat(self, messages: Any, *, tools: Any = None, response_format: Any = None) -> LLMResponse:
+    def chat(
+        self,
+        messages: Any,
+        *,
+        tools: Any = None,
+        response_format: Any = None,
+        max_tokens: int = 400,
+    ) -> LLMResponse:
         self.calls.append(list(messages))
         joined = "\n".join(m.content for m in messages)
         for key, body in self._bodies.items():

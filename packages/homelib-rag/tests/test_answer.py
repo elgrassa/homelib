@@ -8,6 +8,9 @@ seam) and every LLM call goes through a scripted fake `OpenAICompatibleClient`
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from typing import Any, ClassVar
 
 import pytest
@@ -43,6 +46,7 @@ class _ScriptedClient:
         *,
         tools: Any = None,
         response_format: Any = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         self.calls.append({"messages": list(messages), "tools": tools, "format": response_format})
         result = self._responses.pop(0)
@@ -360,6 +364,64 @@ def test_openai_client_raises_on_empty_choices(monkeypatch: pytest.MonkeyPatch) 
 
 def test_default_llm_client_is_a_singleton() -> None:
     assert default_llm_client() is default_llm_client()
+
+
+def test_llm_timeout_seconds_env_var_overrides_default_timeout() -> None:
+    """`_TIMEOUT_SECONDS` (module constant) is read from `LLM_TIMEOUT_SECONDS`
+    at import time. Measured on the pure-compose stack: CPU-only Ollama
+    generates at ~7.4 tok/s, so a real /v1/ask costs ~70s minimum — the old
+    hardcoded 30s ceiling timed out on prefill alone, degrading every ask.
+
+    Checked in a fresh subprocess rather than via `importlib.reload` in this
+    process: reloading `homelib_rag.answer` here would mint a second
+    generation of `LLMUnreachableError` (and every other class this module
+    defines) that no longer `isinstance`-matches the one `apps/api/main.py`
+    already imported at collection time, silently breaking its
+    `except LLMUnreachableError` handlers for the rest of the test run.
+    """
+    default_run = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from homelib_rag.answer import _TIMEOUT_SECONDS; print(_TIMEOUT_SECONDS)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert default_run.stdout.strip() == "300.0"
+
+    overridden_run = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from homelib_rag.answer import _TIMEOUT_SECONDS; print(_TIMEOUT_SECONDS)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "LLM_TIMEOUT_SECONDS": "12.5"},
+    )
+    assert overridden_run.stdout.strip() == "12.5"
+
+
+def test_openai_client_chat_bounds_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bounds worst-case CPU generation time — a runaway completion should
+    not turn the (now much longer) timeout into the only backstop. Measured
+    answers run ~240 tokens; 400 leaves headroom."""
+    client = OpenAIClient(base_url="http://localhost:1", api_key="x", model="m")
+    captured: dict[str, Any] = {}
+
+    def _capture(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        raise TimeoutError("no route to host")
+
+    monkeypatch.setattr(client._client.chat.completions, "create", _capture)
+
+    with pytest.raises(LLMUnreachableError):
+        client.chat([])
+
+    assert captured["max_tokens"] == 400
 
 
 # ── Live-run regressions: measured against qwen2.5:7b-instruct, 2026-08-30 ──

@@ -66,7 +66,11 @@ class AskRequest(BaseModel):
     query: str
     k: int = 5
     arm: Arm | None = None
-    rewrite: bool = True
+    # ADR-001 (docs/adrs/ADR-001-retrieval-arm.md): query rewrite was
+    # measured against hybrid_rerank and rejected — no hit-rate gain, a
+    # small MRR loss, and an extra LLM call per query. Default off matches
+    # the recorded evidence.
+    rewrite: bool = False
 
 
 class RoadmapRequest(BaseModel):

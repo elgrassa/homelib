@@ -15,7 +15,7 @@ the reviewer-facing API documentation, and the README links it.
 | Endpoint | Request | Response |
 |---|---|---|
 | `GET /health` | — | `Health {status, db: bool, llm: {provider, model, reachable: bool}, books: int, chunks: int}` |
-| `POST /v1/ask` | `AskRequest {query: str, k: int = 5, arm: "lexical"\|"vector"\|"hybrid"\|"hybrid_rerank"\|None, rewrite: bool = true}` | `AskResponse {request_id, answer, citations: list[Citation], arm_used: str, degraded: bool, latency_ms: int, tokens: {prompt: int, completion: int}}` |
+| `POST /v1/ask` | `AskRequest {query: str, k: int = 5, arm: "lexical"\|"vector"\|"hybrid"\|"hybrid_rerank"\|None, rewrite: bool = false}` | `AskResponse {request_id, answer, citations: list[Citation], arm_used: str, degraded: bool, latency_ms: int, tokens: {prompt: int, completion: int}}` |
 | `POST /v1/roadmap` | `RoadmapRequest {interests: list[str], level: "beginner"\|"intermediate"\|"advanced", goal: str, max_steps: int = 8}` | `RoadmapResponse {request_id, steps: list[RoadmapStep], rationale: str}` |
 | `POST /v1/ingest` | `IngestRequest {path: str} \| {source: "snapshot"}` | `IngestResponse {book_id, blocks: int, chunks: int, extraction: ExtractionResult}` |
 | `POST /v1/feedback` | `FeedbackRequest {request_id: str, feedback: "up"\|"down", comment: str\|None}` | `{ok: true}` |

@@ -17,6 +17,13 @@ from pydantic import BaseModel
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
+# /v1/ask and /v1/roadmap are the LLM-touching endpoints: real latency is
+# 13s warm even on a GPU host, and far more on a CPU-only compose stack
+# (see homelib_rag.answer._TIMEOUT_SECONDS). The 10s default above is right
+# for every other call but would time out the UI's headline feature against
+# a working API, so these two calls opt into a much longer per-call timeout.
+LLM_CALL_TIMEOUT_SECONDS = 300.0
+
 
 class ApiClientError(Exception):
     """Raised for a 4xx/5xx response from the API.
@@ -133,10 +140,12 @@ class ApiClient:
         path: str,
         *,
         json: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         url = f"{self._base_url}{path}"
+        request_timeout = timeout if timeout is not None else self._timeout
         try:
-            response = httpx.request(method, url, json=json, timeout=self._timeout)
+            response = httpx.request(method, url, json=json, timeout=request_timeout)
         except httpx.TimeoutException as exc:
             raise ApiUnavailableError(f"Request to {url} timed out") from exc
         except httpx.TransportError as exc:
@@ -153,10 +162,14 @@ class ApiClient:
         *,
         k: int = 5,
         arm: Literal["lexical", "vector", "hybrid", "hybrid_rerank"] | None = None,
-        rewrite: bool = True,
+        # Matches AskRequest's server-side default (apps/api/schemas.py):
+        # ADR-001 measured query rewriting and rejected it. A caller here
+        # that omits `rewrite` must not silently re-enable it by sending
+        # `true` regardless of the server default.
+        rewrite: bool = False,
     ) -> AskResponse:
         payload = {"query": query, "k": k, "arm": arm, "rewrite": rewrite}
-        data = self._request("POST", "/v1/ask", json=payload)
+        data = self._request("POST", "/v1/ask", json=payload, timeout=LLM_CALL_TIMEOUT_SECONDS)
         return AskResponse.model_validate(data)
 
     def get_block(self, block_id: str) -> Block:
@@ -190,7 +203,7 @@ class ApiClient:
             "goal": goal,
             "max_steps": max_steps,
         }
-        data = self._request("POST", "/v1/roadmap", json=payload)
+        data = self._request("POST", "/v1/roadmap", json=payload, timeout=LLM_CALL_TIMEOUT_SECONDS)
         return RoadmapResponse.model_validate(data)
 
     def list_books(self) -> list[BookSummary]:

@@ -82,6 +82,10 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-ollama}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
       EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      # CPU-only Ollama in this compose stack measures ~7.4 tok/s generation
+      # and ~49 tok/s prefill, so a real /v1/ask costs ~70s minimum — well
+      # past a GPU-host-sized timeout. See homelib_rag.answer._TIMEOUT_SECONDS.
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-300}
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     depends_on:
       postgres: {condition: service_healthy}

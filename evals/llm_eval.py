@@ -265,6 +265,7 @@ class _VariantClient:
         *,
         tools: Sequence[dict[str, Any]] | None = None,
         response_format: Mapping[str, Any] | None = None,
+        max_tokens: int = 400,
     ) -> LLMResponse:
         swapped = [
             message.model_copy(update={"content": self._system_prompt})
@@ -272,7 +273,9 @@ class _VariantClient:
             else message
             for message in messages
         ]
-        return self._inner.chat(swapped, tools=tools, response_format=response_format)
+        return self._inner.chat(
+            swapped, tools=tools, response_format=response_format, max_tokens=max_tokens
+        )
 
 
 def _default_retrieve(query: str, k: int) -> list[Hit]:

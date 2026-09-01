@@ -200,7 +200,11 @@ def build_roadmap(
         ChatMessage(role="user", content=prompt),
     ]
 
-    response = client.chat(messages, response_format={"type": "json_object"})
+    # A full roadmap is max_steps x (title + authors + why + prerequisites)
+    # of JSON — far past the client's 400-token answer default, and a
+    # truncated JSON body fails parsing every time. Cap generously; the
+    # request timeout stays the backstop.
+    response = client.chat(messages, response_format={"type": "json_object"}, max_tokens=1600)
     raw = response.content or ""
     try:
         return _parse_and_validate(raw, candidates, max_steps)
@@ -213,7 +217,9 @@ def build_roadmap(
         ChatMessage(role="assistant", content=raw),
         ChatMessage(role="user", content=_repair_prompt(raw, first_error_message)),
     ]
-    repair_response = client.chat(repair_messages, response_format={"type": "json_object"})
+    repair_response = client.chat(
+        repair_messages, response_format={"type": "json_object"}, max_tokens=1600
+    )
     repair_raw = repair_response.content or ""
     try:
         return _parse_and_validate(repair_raw, candidates, max_steps)

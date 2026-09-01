@@ -1,6 +1,6 @@
 # spec: rewrite — `homelib_rag.rewrite`
 
-**Implemented by:** WP-13. **Consumed by:** `apps/api` `/v1/ask` (WP-14, `AskRequest.rewrite=true`), `evals/retrieval_eval.py` (rewrite on/off arms).
+**Implemented by:** WP-13. **Consumed by:** `apps/api` `/v1/ask` (WP-14, `AskRequest.rewrite`, default `false` per ADR-001), `evals/retrieval_eval.py` (rewrite on/off arms).
 
 ## Purpose
 

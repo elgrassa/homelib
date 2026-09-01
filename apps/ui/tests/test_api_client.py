@@ -14,6 +14,8 @@ import pytest
 import respx
 
 from apps.ui.api_client import (
+    DEFAULT_TIMEOUT_SECONDS,
+    LLM_CALL_TIMEOUT_SECONDS,
     ApiClient,
     ApiClientError,
     ApiUnavailableError,
@@ -174,6 +176,90 @@ def test_list_books_success(client: ApiClient) -> None:
 
     assert [book.book_id for book in books] == ["book-1", "book-2"]
     assert books[0].blocks == 100
+
+
+# --------------------------------------------------------------------------
+# Per-call timeout overrides.
+#
+# /v1/ask and /v1/roadmap are the LLM-touching endpoints: real latency is
+# 13s warm even on a GPU host, past DEFAULT_TIMEOUT_SECONDS (10s) — the UI's
+# headline feature must not time out against a working API. Every other call
+# keeps the short default. httpx stores a per-request timeout override on
+# `request.extensions["timeout"]`, which is what these assert against.
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_ask_uses_the_long_llm_call_timeout(client: ApiClient) -> None:
+    respx.post(f"{BASE_URL}/v1/ask").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req-1",
+                "answer": "42",
+                "citations": [],
+                "arm_used": "hybrid_rerank",
+                "degraded": False,
+                "latency_ms": 120,
+                "tokens": {"prompt": 10, "completion": 20},
+            },
+        )
+    )
+
+    client.ask("what is the meaning of life?")
+
+    sent = respx.calls.last.request
+    assert sent.extensions["timeout"]["read"] == LLM_CALL_TIMEOUT_SECONDS
+
+
+@respx.mock
+def test_build_roadmap_uses_the_long_llm_call_timeout(client: ApiClient) -> None:
+    respx.post(f"{BASE_URL}/v1/roadmap").mock(
+        return_value=httpx.Response(
+            200, json={"request_id": "req-2", "rationale": "r", "steps": []}
+        )
+    )
+
+    client.build_roadmap(["stoicism"], "beginner", "build discipline")
+
+    sent = respx.calls.last.request
+    assert sent.extensions["timeout"]["read"] == LLM_CALL_TIMEOUT_SECONDS
+
+
+@respx.mock
+def test_get_books_uses_the_default_timeout(client: ApiClient) -> None:
+    respx.get(f"{BASE_URL}/v1/books").mock(return_value=httpx.Response(200, json=[]))
+
+    client.list_books()
+
+    sent = respx.calls.last.request
+    assert sent.extensions["timeout"]["read"] == DEFAULT_TIMEOUT_SECONDS
+
+
+@respx.mock
+def test_ask_defaults_rewrite_to_false(client: ApiClient) -> None:
+    """Matches AskRequest's server-side default (apps/api/schemas.py):
+    ADR-001 measured query rewriting and rejected it, so a caller here that
+    omits `rewrite` must not silently re-enable it."""
+    route = respx.post(f"{BASE_URL}/v1/ask").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req-1",
+                "answer": "42",
+                "citations": [],
+                "arm_used": "hybrid_rerank",
+                "degraded": False,
+                "latency_ms": 120,
+                "tokens": {"prompt": 10, "completion": 20},
+            },
+        )
+    )
+
+    client.ask("what is the meaning of life?")
+
+    payload = route.calls.last.request.content
+    assert b'"rewrite":false' in payload
 
 
 # --------------------------------------------------------------------------
