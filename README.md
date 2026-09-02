@@ -190,6 +190,8 @@ and the tests it mandates. [`docs/evidence.md`](docs/evidence.md) is the build
 log — including the defects found along the way and one diagnosis I got wrong
 and had to retract.
 
+Developer architecture docs (v2 wiki): [`docs/wiki/README.md`](docs/wiki/README.md).
+
 ## Course map
 
 [`docs/course-map.md`](docs/course-map.md) maps every LLM Zoomcamp 2026 module to
