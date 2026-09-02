@@ -1,4 +1,11 @@
-"""WP04 scene-search red tests — see specs/scene-search.md."""
+"""WP04 scene-search red tests — see specs/scene-search.md.
+
+Cross-encoder rerank and rewrite/ask LLM calls are stubbed in every test below.
+These cases prove scope, offsets, and degradation — not model quality. A real
+`CrossEncoder` download on a cold CI runner and `_call_llm` timeouts (10s each
+when no endpoint is reachable) pushed the quick lane past its 20-minute budget
+after WP04 added SMART/ASK paths that call both.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +23,16 @@ from homelib_rag.scene_search import (
 )
 
 from apps.store.sqlite import bump_index_revision, connect, migrate, rebuild_chunks_fts
+
+
+@pytest.fixture(autouse=True)
+def _stub_scene_rerank(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scene_search_module, "rerank", lambda _q, hits: None)
+
+
+@pytest.fixture(autouse=True)
+def _stub_scene_rewrite(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scene_search_module, "rewrite_query", lambda q: q)
 
 
 @pytest.fixture(autouse=True)
@@ -192,6 +209,11 @@ def test_book_scope_survives_rewrite(
         scene_search_module,
         "rewrite_query",
         lambda _q: "machine learning unrelated topics",
+    )
+    monkeypatch.setattr(
+        scene_search_module,
+        "_synthesize_ask",
+        lambda _q, _h: "scoped answer",
     )
     response = scene_search(
         scene_db,
