@@ -18,7 +18,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: taylor-scientific-management
   title: The Principles of Scientific Management
@@ -28,7 +27,6 @@
   sha256: "1f504a9abe674ee616f13bf1db66ec25cbb1be0ff5fd9bfe70ab8593aa08a3b2"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: smith-wealth-of-nations
@@ -40,7 +38,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: machiavelli-the-prince
   title: The Prince
@@ -50,7 +47,6 @@
   sha256: "33496a305f7a4b933784fb5aec95f920fbc3d4687794817e4cc444aa6578d2e4"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: suntzu-art-of-war
@@ -62,7 +58,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: aurelius-meditations
   title: Meditations
@@ -72,7 +67,6 @@
   sha256: "6977474f82a39dd88a4af31a59504821658174d33c177732c54357e4d680b96c"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: allen-as-a-man-thinketh
@@ -84,7 +78,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: smiles-self-help
   title: "Self Help; with Illustrations of Conduct and Perseverance"
@@ -94,7 +87,6 @@
   sha256: "e7f4232f8880af072453521a95d72b3476d716e2485de08ab8e54c444f28802a"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: washington-up-from-slavery
@@ -106,7 +98,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: keller-story-of-my-life
   title: The Story of My Life
@@ -116,7 +107,6 @@
   sha256: "b323e81058c4e3b1ec136c6789a1490fc6ca37946ce0e12389f9bc14b829ee9f"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: conwell-acres-of-diamonds
@@ -128,7 +118,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: barnum-art-of-money-getting
   title: The Art of Money Getting
@@ -138,7 +127,6 @@
   sha256: "ccf68ee545e68995f88d4cd2f534ecae9bf731b8996118d34b5a10bfc4958061"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: mackay-extraordinary-popular-delusions
@@ -150,7 +138,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: strunk-elements-of-style
   title: The Elements of Style
@@ -160,7 +147,6 @@
   sha256: "fcc9a82788d649db7099424cd1c02e8c6457139478aefdaeb2a34809ae6a5e70"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: emerson-essays-second-series
@@ -172,7 +158,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: mill-on-liberty
   title: On Liberty
@@ -182,7 +167,6 @@
   sha256: "cfc8de9ac48709ef8e66922b32bac51335c883082e4da24251e1290816df904c"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
 
 - book_id: thoreau-walden
@@ -194,7 +178,6 @@
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
   rights_status: public_domain
-  rights_status: public_domain
 
 - book_id: ford-my-life-and-work
   title: My Life and Work
@@ -204,5 +187,4 @@
   sha256: "f01c925ba4a15ccc6a5aa706418cf94149ddd7d8f390c65d132b8675435b00cf"
   format: txt
   license_note: "Public domain (US) — Project Gutenberg, no cost/restriction"
-  rights_status: public_domain
   rights_status: public_domain
