@@ -32,23 +32,12 @@ _RIGHTS_STATUSES: Final = frozenset(
     }
 )
 
-PAID_TIER_TABLES: Final = frozenset(
-    {
-        "household_profile",
-        "household_profiles",
-        "licence_entitlement",
-        "license_entitlement",
-        "commercial_licence",
-        "silver_memory",
-        "audio_generation_job",
-        "obsidian_sync",
-        "apple_device",
-    }
-)
-
-
 class PrincipalRequired(Exception):
     """A private write was attempted without a principal."""
+
+
+class UnknownPrincipal(Exception):
+    """A private write referenced a principal that does not exist."""
 
 
 class DemoSessionExpired(Exception):
@@ -74,13 +63,11 @@ def _new_id() -> str:
     return uuid.uuid4().hex
 
 
-def _rights_status_from_manifest(entry: dict[str, Any]) -> str:
+def rights_status_from_manifest(entry: dict[str, Any]) -> str:
+    """Resolve manifest rights — explicit `rights_status` only; else fail closed."""
     explicit = entry.get("rights_status")
     if isinstance(explicit, str) and explicit in _RIGHTS_STATUSES:
         return explicit
-    license_note = str(entry.get("license_note") or "").lower()
-    if "public domain" in license_note:
-        return "public_domain"
     return "unknown"
 
 
@@ -171,7 +158,7 @@ CREATE TABLE query_log (
     query_sha256_prefix TEXT NOT NULL,
     degraded INTEGER NOT NULL DEFAULT 0,
     feedback TEXT,
-    principal_id TEXT REFERENCES principal(id) ON DELETE CASCADE
+    principal_id TEXT REFERENCES principal(id) ON DELETE SET NULL
 );
 
 CREATE TABLE conversation (
@@ -209,7 +196,7 @@ CREATE TABLE areas (
 
 CREATE TABLE wings (
     id TEXT PRIMARY KEY,
-    area_id TEXT NOT NULL REFERENCES areas(id),
+    area_id TEXT NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'topic',
     copy TEXT,
@@ -303,6 +290,9 @@ def _enforce_active_demo_session(conn: sqlite3.Connection, principal_id: str) ->
 
 def _require_write_principal(conn: sqlite3.Connection, principal_id: str | None) -> str:
     owner = _require_principal(principal_id)
+    row = conn.execute("SELECT 1 FROM principal WHERE id = ?", (owner,)).fetchone()
+    if row is None:
+        raise UnknownPrincipal(f"unknown principal: {owner}")
     _enforce_active_demo_session(conn, owner)
     return owner
 
@@ -325,7 +315,7 @@ def seed(conn: sqlite3.Connection, *, repo_root: Path) -> None:
         if not isinstance(raw_entry, dict):
             raise TypeError("manifest entries must be mappings")
         entry: dict[str, Any] = raw_entry
-        rights_status = _rights_status_from_manifest(entry)
+        rights_status = rights_status_from_manifest(entry)
         conn.execute(
             "INSERT OR IGNORE INTO books "
             "(book_id, title, authors, language, source_url, license_note, rights_status) "
@@ -432,22 +422,22 @@ def create_demo_session(conn: sqlite3.Connection) -> DemoSession:
     created = _now()
     expires = created + timedelta(hours=DEMO_SESSION_TTL_HOURS)
     generation = _current_reset_generation(conn)
-    conn.execute(
-        "INSERT INTO principal (id, kind, created_at) VALUES (?, 'demo_session', ?)",
-        (principal_id, created.isoformat()),
-    )
-    conn.execute(
-        "INSERT INTO demo_session (id, principal_id, created_at, expires_at, reset_generation) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (
-            session_id,
-            principal_id,
-            created.isoformat(),
-            expires.isoformat(),
-            generation,
-        ),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO principal (id, kind, created_at) VALUES (?, 'demo_session', ?)",
+            (principal_id, created.isoformat()),
+        )
+        conn.execute(
+            "INSERT INTO demo_session (id, principal_id, created_at, expires_at, reset_generation) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                session_id,
+                principal_id,
+                created.isoformat(),
+                expires.isoformat(),
+                generation,
+            ),
+        )
     return DemoSession(id=session_id, principal_id=principal_id, reset_generation=generation)
 
 
@@ -478,17 +468,17 @@ def insert_playlist(
         (playlist_id,),
     ).fetchone()
     ordinal = int(ordinal_row[0]) if ordinal_row is not None else 0
-    conn.execute(
-        "INSERT INTO playlist_item "
-        "(id, playlist_id, resource_id, book_id, ordinal, origin, status, accepted_at, manual) "
-        "VALUES (?, ?, ?, ?, ?, 'manual_shelf', 'queued', ?, 1)",
-        (item_id, playlist_id, resource_id, book_id, ordinal, _now_iso()),
-    )
-    conn.execute(
-        "UPDATE playlist SET updated_at = ? WHERE id = ?",
-        (_now_iso(), playlist_id),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO playlist_item "
+            "(id, playlist_id, resource_id, book_id, ordinal, origin, status, accepted_at, manual) "
+            "VALUES (?, ?, ?, ?, ?, 'manual_shelf', 'queued', ?, 1)",
+            (item_id, playlist_id, resource_id, book_id, ordinal, _now_iso()),
+        )
+        conn.execute(
+            "UPDATE playlist SET updated_at = ? WHERE id = ?",
+            (_now_iso(), playlist_id),
+        )
     return item_id
 
 
@@ -502,16 +492,16 @@ def insert_read_progress(
     book_id: str | None = None,
 ) -> None:
     owner = _require_write_principal(conn, principal_id)
-    conn.execute(
-        "INSERT INTO read_progress "
-        "(principal_id, resource_id, book_id, block_id, char_offset, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?) "
-        "ON CONFLICT (principal_id, resource_id) DO UPDATE SET "
-        "char_offset = excluded.char_offset, updated_at = excluded.updated_at, "
-        "block_id = excluded.block_id, book_id = excluded.book_id",
-        (owner, resource_id, book_id, block_id, char_offset, _now_iso()),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO read_progress "
+            "(principal_id, resource_id, book_id, block_id, char_offset, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT (principal_id, resource_id) DO UPDATE SET "
+            "char_offset = excluded.char_offset, updated_at = excluded.updated_at, "
+            "block_id = excluded.block_id, book_id = excluded.book_id",
+            (owner, resource_id, book_id, block_id, char_offset, _now_iso()),
+        )
 
 
 def insert_conversation(
@@ -522,11 +512,11 @@ def insert_conversation(
 ) -> str:
     owner = _require_write_principal(conn, principal_id)
     conversation_id = _new_id()
-    conn.execute(
-        "INSERT INTO conversation (id, principal_id, wing_id, created_at) VALUES (?, ?, ?, ?)",
-        (conversation_id, owner, wing_id, _now_iso()),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO conversation (id, principal_id, wing_id, created_at) VALUES (?, ?, ?, ?)",
+            (conversation_id, owner, wing_id, _now_iso()),
+        )
     return conversation_id
 
 
@@ -539,11 +529,11 @@ def insert_feedback(
     comment: str | None = None,
 ) -> None:
     owner = _require_write_principal(conn, principal_id)
-    conn.execute(
-        "INSERT INTO feedback (request_id, principal_id, vote, comment) VALUES (?, ?, ?, ?)",
-        (request_id, owner, vote, comment),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO feedback (request_id, principal_id, vote, comment) VALUES (?, ?, ?, ?)",
+            (request_id, owner, vote, comment),
+        )
 
 
 def insert_area(
@@ -555,12 +545,54 @@ def insert_area(
 ) -> str:
     owner = _require_write_principal(conn, principal_id)
     area_id = _new_id()
-    conn.execute(
-        "INSERT INTO areas (id, name, copy, principal_id) VALUES (?, ?, ?, ?)",
-        (area_id, name, copy, owner),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "INSERT INTO areas (id, name, copy, principal_id) VALUES (?, ?, ?, ?)",
+            (area_id, name, copy, owner),
+        )
     return area_id
+
+
+def insert_bookmark(
+    conn: sqlite3.Connection,
+    *,
+    principal_id: str | None,
+    resource_id: str,
+    block_id: str,
+    char_start: int,
+    char_end: int,
+    book_id: str | None = None,
+    note: str | None = None,
+) -> str:
+    owner = _require_write_principal(conn, principal_id)
+    bookmark_id = _new_id()
+    with conn:
+        conn.execute(
+            "INSERT INTO bookmarks "
+            "(id, principal_id, resource_id, book_id, block_id, char_start, char_end, note, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                bookmark_id,
+                owner,
+                resource_id,
+                book_id,
+                block_id,
+                char_start,
+                char_end,
+                note,
+                _now_iso(),
+            ),
+        )
+    return bookmark_id
+
+
+def list_bookmarks(conn: sqlite3.Connection, principal_id: str) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT id, resource_id, book_id, block_id, char_start, char_end, note "
+        "FROM bookmarks WHERE principal_id = ? ORDER BY created_at",
+        (principal_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def list_playlist_items(conn: sqlite3.Connection, principal_id: str) -> list[dict[str, Any]]:
@@ -593,18 +625,19 @@ def list_conversations(conn: sqlite3.Connection, principal_id: str) -> list[dict
 
 def list_areas(conn: sqlite3.Connection, principal_id: str) -> list[dict[str, Any]]:
     rows = conn.execute(
-        "SELECT id, name, copy, principal_id FROM areas WHERE principal_id = ?",
+        "SELECT id, name, copy, principal_id FROM areas "
+        "WHERE principal_id = ? OR principal_id IS NULL",
         (principal_id,),
     ).fetchall()
     return [dict(row) for row in rows]
 
 
 def reset_demo(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        "UPDATE demo_state SET reset_generation = reset_generation + 1 WHERE singleton = 1"
-    )
-    conn.execute("DELETE FROM principal WHERE kind = 'demo_session'")
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE demo_state SET reset_generation = reset_generation + 1 WHERE singleton = 1"
+        )
+        conn.execute("DELETE FROM principal WHERE kind = 'demo_session'")
 
 
 def books_default_rights_status(conn: sqlite3.Connection) -> str:

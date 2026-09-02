@@ -14,26 +14,43 @@ import pytest
 
 from apps.store.sqlite import (
     DEMO_SESSION_TTL_HOURS,
-    PAID_TIER_TABLES,
     DemoSessionExpired,
     PrincipalRequired,
+    UnknownPrincipal,
     books_default_rights_status,
     connect,
     create_demo_session,
     insert_area,
+    insert_bookmark,
     insert_conversation,
     insert_feedback,
     insert_playlist,
     insert_read_progress,
     list_areas,
+    list_bookmarks,
     list_conversations,
     list_playlist_items,
     list_read_progress,
     logical_checksum,
     migrate,
     reset_demo,
+    rights_status_from_manifest,
     row_counts,
     seed,
+)
+
+PAID_TIER_TABLES = frozenset(
+    {
+        "household_profile",
+        "household_profiles",
+        "licence_entitlement",
+        "license_entitlement",
+        "commercial_licence",
+        "silver_memory",
+        "audio_generation_job",
+        "obsidian_sync",
+        "apple_device",
+    }
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -183,15 +200,30 @@ def test_demo_sessions_cannot_read_each_other(tmp_path: Path) -> None:
     insert_read_progress(conn, principal_id=a.principal_id, resource_id=book_id, char_offset=11)
     insert_conversation(conn, principal_id=a.principal_id)
     insert_area(conn, principal_id=a.principal_id, name="Session A wing")
+    insert_bookmark(
+        conn,
+        principal_id=a.principal_id,
+        resource_id=book_id,
+        block_id=f"{book_id}-b0",
+        char_start=0,
+        char_end=5,
+        book_id=book_id,
+    )
     conn.commit()
+    a_areas = list_areas(conn, a.principal_id)
+    assert any(area["name"] == "Session A wing" for area in a_areas)
+    assert any(area["id"] == "area-seed" for area in a_areas)
     assert list_playlist_items(conn, a.principal_id)
     assert list_read_progress(conn, a.principal_id)
     assert list_conversations(conn, a.principal_id)
-    assert list_areas(conn, a.principal_id)
+    assert list_bookmarks(conn, a.principal_id)
     assert list_playlist_items(conn, b.principal_id) == []
     assert list_read_progress(conn, b.principal_id) == []
     assert list_conversations(conn, b.principal_id) == []
-    assert list_areas(conn, b.principal_id) == []
+    assert list_bookmarks(conn, b.principal_id) == []
+    b_areas = list_areas(conn, b.principal_id)
+    assert any(area["id"] == "area-seed" for area in b_areas)
+    assert not any(area["name"] == "Session A wing" for area in b_areas)
     conn.close()
 
 
@@ -291,19 +323,95 @@ def test_playlist_does_not_silently_copy_resource_id_to_book_id(tmp_path: Path) 
     conn.close()
 
 
-def test_migration_is_transactional_on_failure(tmp_path: Path) -> None:
+def test_rights_status_requires_explicit_manifest_field() -> None:
+    entry = {
+        "book_id": "note-only",
+        "license_note": "Public domain (US) — Project Gutenberg",
+    }
+    assert rights_status_from_manifest(entry) == "unknown"
+
+
+def test_unknown_principal_write_is_refused(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    with pytest.raises(UnknownPrincipal):
+        insert_playlist(conn, principal_id="no-such-principal", resource_id="x")
+    conn.close()
+
+
+def test_failed_write_leaves_no_partial_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apps.store.sqlite as sqlite_mod
+
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    seed(conn, repo_root=REPO_ROOT)
+    book_id = _first_book(conn)
+    before = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
+    real_now = sqlite_mod._now_iso
+    calls = {"count": 0}
+
+    def flaky_now_iso() -> str:
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise RuntimeError("simulated failure mid-write")
+        return real_now()
+
+    monkeypatch.setattr(sqlite_mod, "_now_iso", flaky_now_iso)
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        insert_playlist(conn, principal_id="local-user", resource_id=book_id, book_id=book_id)
+    after = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
+    assert after == before
+    conn.close()
+
+
+def test_migration_is_transactional_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apps.store.sqlite as sqlite_mod
+
     conn = connect(_fresh(tmp_path))
     migrate(conn)
     broken = ((3, "CREATE TABLE broken_v3 (id TEXT PRIMARY KEY); INVALID SQL;"),)
-    original = __import__("apps.store.sqlite", fromlist=["MIGRATIONS"]).MIGRATIONS
-    module = __import__("apps.store.sqlite", fromlist=["migrate"])
+    original = sqlite_mod.MIGRATIONS
     try:
-        module.MIGRATIONS = original + broken  # type: ignore[assignment]
+        monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original + broken)
         with pytest.raises(sqlite3.OperationalError):
-            module.migrate(conn, target_version=3)
+            sqlite_mod.migrate(conn, target_version=3)
         versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
         assert versions == {1, 2}
-        assert not module._table_exists(conn, "broken_v3")
+        assert not sqlite_mod._table_exists(conn, "broken_v3")
     finally:
-        module.MIGRATIONS = original  # type: ignore[assignment]
+        monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original)
+    conn.close()
+
+
+def test_query_log_principal_delete_sets_null(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO principal (id, kind, created_at) VALUES ('p-del', 'demo_session', 't')"
+    )
+    conn.execute(
+        "INSERT INTO query_log "
+        "(request_id, ts, latency_ms, arm, k, query_sha256_prefix, principal_id) "
+        "VALUES ('r1', 't', 1, 'hybrid', 5, 'abc', 'p-del')"
+    )
+    conn.commit()
+    conn.execute("DELETE FROM principal WHERE id = 'p-del'")
+    conn.commit()
+    row = conn.execute("SELECT principal_id FROM query_log WHERE request_id = 'r1'").fetchone()
+    assert row is not None and row[0] is None
+    conn.close()
+
+
+def test_wings_cascade_when_area_deleted(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    seed(conn, repo_root=REPO_ROOT)
+    conn.execute("DELETE FROM areas WHERE id = 'area-seed'")
+    conn.commit()
+    wing_count = int(conn.execute("SELECT COUNT(*) FROM wings").fetchone()[0])
+    assert wing_count == 0
     conn.close()
