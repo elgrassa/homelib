@@ -60,7 +60,7 @@ X-Demo-Session-Id   request header on mutating HTTP calls in APP_MODE=demo
 
 Shared seed (`books`, `chunks`, seed `wings`/`areas`, `catalog`) is read-only
 and has no owner. Private tables (`playlist`, `playlist_item`, `read_progress`,
-`listen_progress`, `conversation`, `message`, `feedback`, `bookmarks`,
+`listen_progress`, `conversation`, `message` (WP06), `feedback`, `bookmarks`,
 principal-owned `areas`) require `principal_id` NOT NULL on mutating rows.
 
 ## Error/degradation behavior

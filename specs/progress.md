@@ -35,8 +35,8 @@ read_progress     principal_id FK NOT NULL, resource_id, book_id,
                   block_id, char_offset, updated_at
                   PK (principal_id, resource_id)
 
-listen_progress   same columns; UNUSED this week (ADR-009)
-                  POST kind=listen persists a row but drives no player
+listen_progress   same columns as read_progress (ADR-009)
+                  POST kind=listen may persist a row; no player this week
 ```
 
 `char_offset` must satisfy `0 <= offset <= len(canonical_text)` when a local

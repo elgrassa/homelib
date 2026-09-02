@@ -115,7 +115,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | WP | Scope | Status |
 |---|---|---|
 | **WP00** | Plan freeze, `v1-fallback` tag, ADRs, mockups, CI `v2` trigger, demo-mode config skeleton, schema *draft* | ✅ done — PR #4 merged; `v2`=`main`=`e288f21` |
-| **WP01** | Specs + OpenAPI snapshot for §8 endpoints | ✅ done for review — PR #5 @ `2249836`; Opus blockers closed; Pavlo oldest queue item |
+| **WP01** | Specs + OpenAPI snapshot for §8 endpoints | ✅ done for review — PR #5 @ `adaa4d0`; Opus blockers closed; Pavlo oldest queue item |
 | **WP02** | SQLite, principals, isolation tests | 🟡 PR #6 WIP @ `c8e834e` — fix round pushed; blocked until #5 merges |
 | **WP03** | Ingest + rights; chunk ids match v1 | ⬜ |
 | **WP04** | FTS5 + matrix + evals | ⬜ |
@@ -127,7 +127,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP10** | Observatory ≥5 charts + feedback | ⬜ |
 | **WP11** | Docs, drill, owner publish + Cloud | ⬜ |
 
-**Progress (addendum 2026-09-01 ~22:00):** v1 fallback [Done] (`v1-fallback`=`535f58b`); WP00 [Done]; WP01 [Done] PR #5 @ `2249836` (blockers closed, awaiting Pavlo re-review); WP02 [Done for 90%] PR #6 @ `c8e834e` (WIP); WP03–WP11 not started; **v2 build ≈24%**; review queue **2/~10 open** (0 merged to `v2` post-WP00); 1 of 7 build days consumed. Worktree housekeeping resolved. Follow-up steps 1–3 complete.
+**Progress (addendum 2026-09-01 ~22:00):** v1 fallback [Done] (`v1-fallback`=`535f58b`); WP00 [Done]; WP01 [Done] PR #5 @ `adaa4d0` (blockers closed, awaiting Pavlo re-review); WP02 [Done for 90%] PR #6 @ `c8e834e` (WIP); WP03–WP11 not started; **v2 build ≈24%**; review queue **2/~10 open** (0 merged to `v2` post-WP00); 1 of 7 build days consumed. Worktree housekeeping resolved. Follow-up steps 1–3 complete.
 
 **GO/NO-GO** Sun Sep 6 18:00 (product §12.4; **local gate per addendum** — not live public URL). Pass requires local `APP_MODE=demo` rehearsal green (fresh session-isolated state, resettable seed, RSS within Community Cloud limits), cited answer resolves, both evals committed, ingest repeatable, feedback+≥5 charts, Compose healthy, drill plausible for Monday, no rights/secret/isolation blocker. Live logged-out URL check moves to **Mon Sep 7** after owner deploy. NO-GO ⇒ submit v1 Monday (`v1-fallback`). Never trade a scored 2-point row for polish / Home/Pro / rotunda / TTS.
 
