@@ -73,8 +73,7 @@ re-ran itself (subagent claims are never accepted as evidence).
 | WP01 review fixes | feat/wp01-specs | `just ci`; contradiction re-pass | Blockers: `areas.principal_id` on mutating rows; `bookmarks` table; `extra=forbid`/`raw_json` vs ingest `extra=allow` scoped in core-models; `LLM_MAX_OUTPUT_TOKENS=800` canonical + 1600 path ceiling. Majors: product §12.2 canary VOID cross-ref (addendum §2); `listen_progress` may persist rows but no player (ADR-009); ADR-006 calendar cross-ref; `read_progress`/`char_offset` aligned; `PathStepPreview` defined; deadline wording fixed (Mon Sep 7). OpenAPI snapshot unchanged. | 2026-09-01 |
 | WP01 review nits | feat/wp01-specs | `just ci` | PR #5 Pavlo review nits closed @ `6ac26b3`. | 2026-09-02 |
 | WP02 SQLite | feat/wp02-sqlite | `uv run pytest apps/store/tests/test_sqlite.py -q`; `just ci` | 28 tests green @ `c04d134`. LOW review: `_run_sql_script` semicolon note, partial-write test pins playlist + item counts. Stacked on wp01 `e728f31`. | 2026-09-02 |
-| WP03 ingest | feat/wp03-ingest | `uv run pytest apps/ingest/tests/test_sqlite_ingest.py -q`; `just ci` | Review fix round: rights downgrade purge, ground-truth guard, float32 BLOB, staging cleanup, ADR-008 grep. Stacked on wp02 `b9a16e8`. | 2026-09-02 |
-
+| WP03 ingest | feat/wp03-ingest | `uv run pytest apps/ingest/tests/test_sqlite_ingest.py -q`; `just ci` | Review fix round @ `efe1025`: rights downgrade purge, ground-truth guard, float32 BLOB, staging cleanup, ADR-008 grep. Stacked on wp02 `b9a16e8`. | 2026-09-02 |
 
 
 
