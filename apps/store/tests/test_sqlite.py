@@ -415,3 +415,127 @@ def test_wings_cascade_when_area_deleted(tmp_path: Path) -> None:
     wing_count = int(conn.execute("SELECT COUNT(*) FROM wings").fetchone()[0])
     assert wing_count == 0
     conn.close()
+
+
+def test_insert_feedback_persists_for_principal(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    seed(conn, repo_root=REPO_ROOT)
+    insert_feedback(
+        conn,
+        principal_id="local-user",
+        request_id="req-feedback-1",
+        vote="up",
+        comment="helpful",
+    )
+    row = conn.execute(
+        "SELECT vote, comment FROM feedback WHERE request_id = 'req-feedback-1'"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "up"
+    assert row[1] == "helpful"
+    conn.close()
+
+
+def test_seed_rejects_invalid_manifest_shape(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    bad_root = tmp_path / "bad-root"
+    (bad_root / "data").mkdir(parents=True)
+    (bad_root / "data" / "manifest.yaml").write_text("not_a_list: true\n")
+    (bad_root / "data" / "catalog.jsonl").write_text("")
+    with pytest.raises(TypeError, match=r"manifest.yaml must be a list"):
+        seed(conn, repo_root=bad_root)
+
+    (bad_root / "data" / "manifest.yaml").write_text("- plain string\n")
+    with pytest.raises(TypeError, match="manifest entries must be mappings"):
+        seed(conn, repo_root=bad_root)
+    conn.close()
+
+
+def test_row_counts_zero_before_v2_tables_exist(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=1)
+    counts = row_counts(conn)
+    assert counts["areas"] == 0
+    assert counts["wings"] == 0
+    assert counts["bookmarks"] == 0
+    conn.close()
+
+
+def test_rights_status_rejects_unknown_explicit_value() -> None:
+    entry = {"book_id": "bad-rights", "rights_status": "not-a-real-status"}
+    assert rights_status_from_manifest(entry) == "unknown"
+
+
+def test_second_playlist_item_reuses_playlist_row(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    seed(conn, repo_root=REPO_ROOT)
+    book_id = _first_book(conn)
+    insert_playlist(conn, principal_id="local-user", resource_id=book_id, book_id=book_id)
+    insert_playlist(conn, principal_id="local-user", resource_id="second-resource")
+    playlist_count = int(
+        conn.execute("SELECT COUNT(*) FROM playlist WHERE principal_id = 'local-user'").fetchone()[
+            0
+        ]
+    )
+    item_count = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
+    assert playlist_count == 1
+    assert item_count == 2
+    conn.close()
+
+
+def test_seed_skips_catalog_rows_without_ol_key(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    root = tmp_path / "seed-root"
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "manifest.yaml").write_text(
+        "- book_id: only-book\n  title: Only\n  rights_status: public_domain\n"
+    )
+    (root / "data" / "catalog.jsonl").write_text(
+        "\n"
+        '{"title": "missing ol_key"}\n'
+        '{"ol_key": "OL1", "title": "One", "authors": [], "subjects": []}\n'
+        '{"ol_key": "OL2", "title": "Two", "authors": [], "subjects": []}\n'
+        '{"ol_key": "OL3", "title": "Three", "authors": [], "subjects": []}\n'
+    )
+    seed(conn, repo_root=root)
+    assert int(conn.execute("SELECT COUNT(*) FROM catalog").fetchone()[0]) == 2
+    conn.close()
+
+
+def test_logical_checksum_ignores_tables_missing_at_v1(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=1)
+    seed(conn, repo_root=REPO_ROOT)
+    checksum = logical_checksum(conn)
+    assert isinstance(checksum, str)
+    assert len(checksum) == 64
+    conn.close()
+
+
+def test_missing_demo_state_raises_before_session_create(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=1)
+    conn.execute("DELETE FROM demo_state")
+    conn.commit()
+    with pytest.raises(RuntimeError, match="demo_state singleton missing"):
+        create_demo_session(conn)
+    conn.close()
+
+
+def test_seed_with_blank_catalog_file_loads_books_only(tmp_path: Path) -> None:
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    root = tmp_path / "blank-catalog"
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "manifest.yaml").write_text(
+        "- book_id: solo-book\n  title: Solo\n  rights_status: public_domain\n"
+    )
+    (root / "data" / "catalog.jsonl").write_text("\n\n")
+    seed(conn, repo_root=root)
+    assert int(conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]) == 1
+    assert int(conn.execute("SELECT COUNT(*) FROM catalog").fetchone()[0]) == 0
+    conn.close()
