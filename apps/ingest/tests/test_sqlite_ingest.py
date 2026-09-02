@@ -23,13 +23,11 @@ from apps.ingest.sqlite_pipeline import (
     run_sqlite_pipeline,
     staging_db_path,
 )
-from apps.store.sqlite import connect, migrate, row_counts
+from apps.store.sqlite import connect, migrate
 
 GROUND_TRUTH_PATH = REPO_ROOT / "evals" / "ground_truth.jsonl"
 INGEST_DIR = REPO_ROOT / "apps" / "ingest"
-V1_CHUNK_IDS_SHA256 = (
-    "cc16f926742bfa9d623349d33db50713204781bdfc78ba97c1074e7ac466d713"
-)
+V1_CHUNK_IDS_SHA256 = "cc16f926742bfa9d623349d33db50713204781bdfc78ba97c1074e7ac466d713"
 
 
 def _fake_embeddings(texts: list[str]) -> list[list[float]]:
@@ -170,7 +168,9 @@ def test_sync_chunk_embeddings_stores_float32_blob(tmp_path: Path) -> None:
     staging_path = staging_db_path(db_path)
     conn = connect(db_path)
     migrate(conn)
-    conn.execute("INSERT INTO books (book_id, title, rights_status) VALUES ('b1', 'T', 'public_domain')")
+    conn.execute(
+        "INSERT INTO books (book_id, title, rights_status) VALUES ('b1', 'T', 'public_domain')"
+    )
     conn.execute(
         "INSERT INTO chunks (chunk_id, book_id, block_ids, section_path, text, "
         "char_start, char_end) VALUES ('c1', 'b1', '[]', '[]', 'text', 0, 4)"
@@ -220,7 +220,8 @@ def test_chunk_ids_match_v1_snapshot(ingested_corpus_db: Path) -> None:
     loaded = {str(r[0]) for r in conn.execute("SELECT chunk_id FROM chunks")}
     gt = {
         json.loads(line)["chunk_id"]
-        for line in GROUND_TRUTH_PATH.read_text(encoding="utf-8").splitlines() if line.strip()
+        for line in GROUND_TRUTH_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
     }
     assert not gt - loaded
     assert loaded == set(expected_ids)
@@ -249,7 +250,10 @@ def test_metadata_only_never_indexed(tmp_path: Path) -> None:
     db_path = _fresh_db(tmp_path)
     run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "metadata_only"})
     conn = connect(db_path)
-    assert int(conn.execute("SELECT COUNT(*) FROM blocks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
+    assert (
+        int(conn.execute("SELECT COUNT(*) FROM blocks WHERE book_id=?", (book_id,)).fetchone()[0])
+        == 0
+    )
     conn.close()
 
 
@@ -261,7 +265,10 @@ def test_unknown_rights_fail_closed(tmp_path: Path) -> None:
     db_path = _fresh_db(tmp_path)
     run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "unknown"})
     conn = connect(db_path)
-    assert int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
+    assert (
+        int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0])
+        == 0
+    )
     conn.close()
 
 
@@ -274,7 +281,10 @@ def test_rights_downgrade_purges_indexed_text(tmp_path: Path) -> None:
     run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "public_domain"})
     run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "unknown"})
     conn = connect(db_path)
-    assert int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
+    assert (
+        int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0])
+        == 0
+    )
     conn.close()
 
 

@@ -119,6 +119,7 @@ ignore = ["S101"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["S"]
 "scripts/**/*.py" = ["S603", "S607"]
+"apps/ingest/sqlite_pipeline.py" = ["S608"]  # IN-clause placeholders are ?-only, not user strings
 
 # B008 exists because a mutable default is evaluated once at import time. That
 # is exactly what FastAPI's Depends()/Query()/etc. are FOR — the marker object

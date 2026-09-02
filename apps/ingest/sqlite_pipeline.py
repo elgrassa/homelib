@@ -210,9 +210,7 @@ def _book_id_in_clause(indexable_book_ids: set[str]) -> tuple[str, tuple[str, ..
     return placeholders, tuple(sorted(indexable_book_ids))
 
 
-def _purge_non_indexable_corpus(
-    conn: sqlite3.Connection, *, indexable_book_ids: set[str]
-) -> None:
+def _purge_non_indexable_corpus(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     placeholders, params = _book_id_in_clause(indexable_book_ids)
     if params:
         conn.execute(
@@ -282,7 +280,19 @@ def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
                 format = excluded.format, page = excluded.page,
                 spine_index = excluded.spine_index, anchor = excluded.anchor
             """,
-            (row[0], row[1], row[2], str(row[3]), row[4], row[5], row[6], row[7], row[8], row[9], row[10]),
+            (
+                row[0],
+                row[1],
+                row[2],
+                str(row[3]),
+                row[4],
+                row[5],
+                row[6],
+                row[7],
+                row[8],
+                row[9],
+                row[10],
+            ),
         )
 
 
