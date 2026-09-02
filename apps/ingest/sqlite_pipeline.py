@@ -1,11 +1,4 @@
-"""dlt ingestion into SQLite — WP03; see specs/ingestion.md and ADR-004.
-
-Mirrors the v1 Postgres ELT split: dlt owns a sibling staging database
-(`<stem>__homelib_staging.sqlite`), then `_sync_staging_to_canonical` upserts
-into the canonical tables created by `apps.store.sqlite` migrations. Rights are
-enforced at sync time: only `public_domain` and `licensed_bundle` books get
-blocks/chunks/embeddings.
-"""
+"""dlt ingestion into SQLite — WP03; see specs/ingestion.md and ADR-004."""
 
 from __future__ import annotations
 
@@ -15,6 +8,7 @@ import json
 import logging
 import os
 import sqlite3
+import struct
 import tempfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -42,7 +36,7 @@ from apps.ingest.pipeline import (
     chunks_resource,
     embed_texts,
 )
-from apps.store.sqlite import can_index_text, connect, migrate
+from apps.store.sqlite import can_index_text, connect, migrate, rights_status_from_manifest
 
 __all__ = [
     "CANONICAL_COUNTS",
@@ -113,7 +107,6 @@ def sqlite_chunks_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
     columns={"embedding": {"data_type": "text"}},
 )
 def sqlite_chunk_embeddings_resource(snapshot: Path) -> Iterator[dict[str, Any]]:
-    """Embeddings as JSON text — dlt sqlalchemy merge breaks on json-typed vectors."""
     ids: list[str] = []
     texts: list[str] = []
     for doc in _iter_books(snapshot):
@@ -154,14 +147,10 @@ def sqlite_homelib_source(snapshot: Path, catalog: Path) -> Iterable[DltResource
 
 
 def staging_db_path(canonical_db: Path) -> Path:
-    """Path to the dlt-owned staging SQLite file for `canonical_db`."""
     return canonical_db.parent / f"{canonical_db.stem}__{STAGING_DATASET}.sqlite"
 
 
 def manifest_rights_by_book_id(repo_root: Path = REPO_ROOT) -> dict[str, str]:
-    """Map manifest `book_id` → `rights_status` using the same rules as WP02 seed."""
-    from apps.store.sqlite import _rights_status_from_manifest
-
     manifest_path = repo_root / "data" / "manifest.yaml"
     entries = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(entries, list):
@@ -171,12 +160,11 @@ def manifest_rights_by_book_id(repo_root: Path = REPO_ROOT) -> dict[str, str]:
         if not isinstance(raw_entry, dict):
             continue
         book_id = str(raw_entry["book_id"])
-        rights[book_id] = _rights_status_from_manifest(raw_entry)
+        rights[book_id] = rights_status_from_manifest(raw_entry)
     return rights
 
 
 def expected_chunk_ids_from_snapshot(snapshot: Path = SNAPSHOT_PATH) -> list[str]:
-    """Deterministic v1 chunk ids from the committed snapshot (ground-truth guard)."""
     rights_by_book = manifest_rights_by_book_id()
     chunk_ids: list[str] = []
     with gzip.open(snapshot, "rt", encoding="utf-8") as handle:
@@ -203,49 +191,58 @@ def _make_pipeline(canonical_db: Path) -> dlt.Pipeline:
     )
 
 
-def _json_list(value: Any) -> list[str]:
-    if isinstance(value, str):
-        parsed = json.loads(value)
-        if isinstance(parsed, list):
-            return [str(item) for item in parsed]
-    if isinstance(value, list):
-        return [str(item) for item in value]
-    return []
+def _embedding_json_to_blob(embedding: Any) -> bytes:
+    if isinstance(embedding, (bytes, bytearray)):
+        return bytes(embedding)
+    if isinstance(embedding, str):
+        vector = json.loads(embedding)
+    elif isinstance(embedding, list):
+        vector = embedding
+    else:
+        raise TypeError(f"unsupported embedding type: {type(embedding)!r}")
+    return struct.pack(f"{len(vector)}f", *vector)
 
 
-def _load_indexable_book_ids_temp(conn: sqlite3.Connection, indexable_book_ids: set[str]) -> None:
-    """Stage indexable book ids in a temp table for static IN-subquery filters."""
-    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _indexable_book_ids (book_id TEXT PRIMARY KEY)")
-    conn.execute("DELETE FROM _indexable_book_ids")
-    conn.executemany(
-        "INSERT INTO _indexable_book_ids (book_id) VALUES (?)",
-        [(book_id,) for book_id in sorted(indexable_book_ids)],
-    )
+def _book_id_in_clause(indexable_book_ids: set[str]) -> tuple[str, tuple[str, ...]]:
+    if not indexable_book_ids:
+        return "NULL", ()
+    placeholders = ", ".join("?" for _ in indexable_book_ids)
+    return placeholders, tuple(sorted(indexable_book_ids))
 
 
-def _sync_books(
-    conn: sqlite3.Connection,
-    *,
-    rights_by_book: dict[str, str],
+def _purge_non_indexable_corpus(
+    conn: sqlite3.Connection, *, indexable_book_ids: set[str]
 ) -> None:
+    placeholders, params = _book_id_in_clause(indexable_book_ids)
+    if params:
+        conn.execute(
+            f"DELETE FROM chunk_embeddings WHERE chunk_id IN "
+            f"(SELECT chunk_id FROM chunks WHERE book_id NOT IN ({placeholders}))",
+            params,
+        )
+        conn.execute(f"DELETE FROM chunks WHERE book_id NOT IN ({placeholders})", params)
+        conn.execute(f"DELETE FROM blocks WHERE book_id NOT IN ({placeholders})", params)
+        return
+    conn.execute("DELETE FROM chunk_embeddings")
+    conn.execute("DELETE FROM chunks")
+    conn.execute("DELETE FROM blocks")
+
+
+def _sync_books(conn: sqlite3.Connection, *, rights_by_book: dict[str, str]) -> None:
     rows = conn.execute(
         "SELECT book_id, title, authors, language, source_url, license_note FROM staging.books"
     ).fetchall()
     for row in rows:
         book_id = str(row[0])
-        rights_status = rights_by_book.get(book_id, "unknown")
         conn.execute(
             """
             INSERT INTO books (
                 book_id, title, authors, language, source_url, license_note, rights_status
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (book_id) DO UPDATE SET
-                title = excluded.title,
-                authors = excluded.authors,
-                language = excluded.language,
-                source_url = excluded.source_url,
-                license_note = excluded.license_note,
-                rights_status = excluded.rights_status
+                title = excluded.title, authors = excluded.authors,
+                language = excluded.language, source_url = excluded.source_url,
+                license_note = excluded.license_note, rights_status = excluded.rights_status
             """,
             (
                 book_id,
@@ -254,7 +251,7 @@ def _sync_books(
                 row[3],
                 row[4],
                 row[5],
-                rights_status,
+                rights_by_book.get(book_id, "unknown"),
             ),
         )
 
@@ -262,17 +259,16 @@ def _sync_books(
 def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    _load_indexable_book_ids_temp(conn, indexable_book_ids)
+    placeholders, params = _book_id_in_clause(indexable_book_ids)
     rows = conn.execute(
-        """
+        f"""
         SELECT block_id, book_id, ordinal, section_path, text,
                char_start, char_end, format, page, spine_index, anchor
-        FROM staging.blocks
-        WHERE book_id IN (SELECT book_id FROM _indexable_book_ids)
-        """
+        FROM staging.blocks WHERE book_id IN ({placeholders})
+        """,
+        params,
     ).fetchall()
     for row in rows:
-        section_path = str(row[3])
         conn.execute(
             """
             INSERT INTO blocks (
@@ -280,88 +276,64 @@ def _sync_blocks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> N
                 char_start, char_end, format, page, spine_index, anchor
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (block_id) DO UPDATE SET
-                book_id = excluded.book_id,
-                ordinal = excluded.ordinal,
-                section_path = excluded.section_path,
-                text = excluded.text,
-                char_start = excluded.char_start,
-                char_end = excluded.char_end,
-                format = excluded.format,
-                page = excluded.page,
-                spine_index = excluded.spine_index,
-                anchor = excluded.anchor
+                book_id = excluded.book_id, ordinal = excluded.ordinal,
+                section_path = excluded.section_path, text = excluded.text,
+                char_start = excluded.char_start, char_end = excluded.char_end,
+                format = excluded.format, page = excluded.page,
+                spine_index = excluded.spine_index, anchor = excluded.anchor
             """,
-            (
-                row[0],
-                row[1],
-                row[2],
-                section_path,
-                row[4],
-                row[5],
-                row[6],
-                row[7],
-                row[8],
-                row[9],
-                row[10],
-            ),
+            (row[0], row[1], row[2], str(row[3]), row[4], row[5], row[6], row[7], row[8], row[9], row[10]),
         )
 
 
 def _sync_chunks(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    _load_indexable_book_ids_temp(conn, indexable_book_ids)
+    placeholders, params = _book_id_in_clause(indexable_book_ids)
     rows = conn.execute(
-        """
+        f"""
         SELECT chunk_id, book_id, block_ids, section_path, text, char_start, char_end
-        FROM staging.chunks
-        WHERE book_id IN (SELECT book_id FROM _indexable_book_ids)
-        """
+        FROM staging.chunks WHERE book_id IN ({placeholders})
+        """,
+        params,
     ).fetchall()
     for row in rows:
-        block_ids = str(row[2])
-        section_path = str(row[3])
         conn.execute(
             """
             INSERT INTO chunks (
                 chunk_id, book_id, block_ids, section_path, text, char_start, char_end
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (chunk_id) DO UPDATE SET
-                book_id = excluded.book_id,
-                block_ids = excluded.block_ids,
-                section_path = excluded.section_path,
-                text = excluded.text,
-                char_start = excluded.char_start,
-                char_end = excluded.char_end
+                book_id = excluded.book_id, block_ids = excluded.block_ids,
+                section_path = excluded.section_path, text = excluded.text,
+                char_start = excluded.char_start, char_end = excluded.char_end
             """,
-            (row[0], row[1], block_ids, section_path, row[4], row[5], row[6]),
+            (row[0], row[1], str(row[2]), str(row[3]), row[4], row[5], row[6]),
         )
 
 
 def _sync_chunk_embeddings(conn: sqlite3.Connection, *, indexable_book_ids: set[str]) -> None:
     if not indexable_book_ids:
         return
-    _load_indexable_book_ids_temp(conn, indexable_book_ids)
+    placeholders, params = _book_id_in_clause(indexable_book_ids)
     rows = conn.execute(
-        """
+        f"""
         SELECT e.chunk_id, e.embedding
         FROM staging.chunk_embeddings e
         JOIN staging.chunks c ON c.chunk_id = e.chunk_id
-        WHERE c.book_id IN (SELECT book_id FROM _indexable_book_ids)
-        """
+        WHERE c.book_id IN ({placeholders})
+        """,
+        params,
     ).fetchall()
     for chunk_id, embedding in rows:
-        embedding_json = str(embedding)
         conn.execute(
             """
             INSERT INTO chunk_embeddings (chunk_id, embedding, model, dim)
             VALUES (?, ?, ?, ?)
             ON CONFLICT (chunk_id) DO UPDATE SET
-                embedding = excluded.embedding,
-                model = excluded.model,
-                dim = excluded.dim
+                embedding = excluded.embedding, model = excluded.model, dim = excluded.dim
             """,
-            (chunk_id, embedding_json, DEFAULT_EMBED_MODEL, EMBED_DIM),
+            (chunk_id, _embedding_json_to_blob(embedding), DEFAULT_EMBED_MODEL, EMBED_DIM),
         )
 
 
@@ -373,22 +345,17 @@ def _sync_catalog(conn: sqlite3.Connection) -> None:
         """
     ).fetchall()
     for row in rows:
-        authors = str(row[2])
-        subjects = str(row[3])
         conn.execute(
             """
             INSERT INTO catalog (
                 ol_key, title, authors, subjects, first_publish_year, description, provenance_note
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (ol_key) DO UPDATE SET
-                title = excluded.title,
-                authors = excluded.authors,
-                subjects = excluded.subjects,
-                first_publish_year = excluded.first_publish_year,
-                description = excluded.description,
-                provenance_note = excluded.provenance_note
+                title = excluded.title, authors = excluded.authors,
+                subjects = excluded.subjects, first_publish_year = excluded.first_publish_year,
+                description = excluded.description, provenance_note = excluded.provenance_note
             """,
-            (row[0], row[1], authors, subjects, row[4], row[5], row[6]),
+            (row[0], row[1], str(row[2]), str(row[3]), row[4], row[5], row[6]),
         )
 
 
@@ -408,21 +375,20 @@ def _sync_staging_to_canonical(
     conn = connect(canonical_db)
     try:
         conn.execute("ATTACH DATABASE ? AS staging", (str(staging_path),))
-        conn.execute("BEGIN")
-        _sync_books(conn, rights_by_book=rights_by_book)
-        _sync_blocks(conn, indexable_book_ids=indexable_book_ids)
-        _sync_chunks(conn, indexable_book_ids=indexable_book_ids)
-        _sync_chunk_embeddings(conn, indexable_book_ids=indexable_book_ids)
-        _sync_catalog(conn)
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+        with conn:
+            _sync_books(conn, rights_by_book=rights_by_book)
+            _purge_non_indexable_corpus(conn, indexable_book_ids=indexable_book_ids)
+            _sync_blocks(conn, indexable_book_ids=indexable_book_ids)
+            _sync_chunks(conn, indexable_book_ids=indexable_book_ids)
+            _sync_chunk_embeddings(conn, indexable_book_ids=indexable_book_ids)
+            _sync_catalog(conn)
     finally:
         try:
             conn.execute("DETACH DATABASE staging")
         finally:
             conn.close()
+
+    staging_path.unlink(missing_ok=True)
 
 
 def run_sqlite_pipeline(
@@ -433,7 +399,6 @@ def run_sqlite_pipeline(
     repo_root: Path = REPO_ROOT,
     rights_by_book: dict[str, str] | None = None,
 ) -> LoadInfo:
-    """Load the corpus snapshot into `db_path` via dlt → SQLite staging → canonical."""
     conn = connect(db_path)
     migrate(conn)
     conn.close()

@@ -211,7 +211,7 @@ CREATE INDEX ix_chunks_book ON chunks (book_id);
 
 CREATE TABLE chunk_embeddings (
     chunk_id TEXT PRIMARY KEY REFERENCES chunks(chunk_id) ON DELETE CASCADE,
-    embedding TEXT NOT NULL,
+    embedding BLOB NOT NULL,
     model TEXT NOT NULL DEFAULT 'sentence-transformers/all-MiniLM-L6-v2',
     dim INTEGER NOT NULL DEFAULT 384
 );

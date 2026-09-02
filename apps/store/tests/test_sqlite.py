@@ -80,7 +80,7 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2}
+    assert versions == {1, 2, 3}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -386,15 +386,15 @@ def test_migration_is_transactional_on_failure(
 
     conn = connect(_fresh(tmp_path))
     migrate(conn)
-    broken = ((3, "CREATE TABLE broken_v3 (id TEXT PRIMARY KEY); INVALID SQL;"),)
+    broken = ((4, "CREATE TABLE broken_v4 (id TEXT PRIMARY KEY); INVALID SQL;"),)
     original = sqlite_mod.MIGRATIONS
     try:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original + broken)
         with pytest.raises(sqlite3.OperationalError):
-            sqlite_mod.migrate(conn, target_version=3)
+            sqlite_mod.migrate(conn, target_version=4)
         versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-        assert versions == {1, 2}
-        assert not sqlite_mod._table_exists(conn, "broken_v3")
+        assert versions == {1, 2, 3}
+        assert not sqlite_mod._table_exists(conn, "broken_v4")
     finally:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original)
     conn.close()

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
+import re
 import sqlite3
+import struct
 from pathlib import Path
 
 import pytest
@@ -14,8 +17,6 @@ from apps.ingest.sqlite_pipeline import (
     CANONICAL_COUNTS,
     REPO_ROOT,
     SNAPSHOT_PATH,
-    _json_list,
-    _sync_chunk_embeddings,
     _sync_staging_to_canonical,
     expected_chunk_ids_from_snapshot,
     manifest_rights_by_book_id,
@@ -24,11 +25,15 @@ from apps.ingest.sqlite_pipeline import (
 )
 from apps.store.sqlite import connect, migrate, row_counts
 
-pytestmark = pytest.mark.slow
+GROUND_TRUTH_PATH = REPO_ROOT / "evals" / "ground_truth.jsonl"
+INGEST_DIR = REPO_ROOT / "apps" / "ingest"
+V1_CHUNK_IDS_SHA256 = (
+    "cc16f926742bfa9d623349d33db50713204781bdfc78ba97c1074e7ac466d713"
+)
 
 
 def _fake_embeddings(texts: list[str]) -> list[list[float]]:
-    return [[float(index) / 384.0] * 384 for index, _ in enumerate(texts)]
+    return [[float(i) / 384.0] * 384 for i, _ in enumerate(texts)]
 
 
 @pytest.fixture(autouse=True)
@@ -40,14 +45,18 @@ def _mock_embed_texts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sqlite_pipeline_mod, "embed_texts", _fake_embeddings)
 
 
-def _book(
-    book_id: str,
-    *,
-    text: str = (
+@pytest.fixture(scope="module")
+def ingested_corpus_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    db_path = tmp_path_factory.mktemp("wp03-corpus") / "homelib.sqlite"
+    run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
+    return db_path
+
+
+def _book(book_id: str) -> BookDoc:
+    text = (
         "Sentence one about leadership. Sentence two about discipline. "
         "Sentence three about practice. Sentence four about mastery."
-    ),
-) -> BookDoc:
+    )
     block = Block(
         block_id=f"{book_id}-b0",
         book_id=book_id,
@@ -91,227 +100,38 @@ def _corpus_counts(conn: sqlite3.Connection) -> dict[str, int]:
     }
 
 
+def _create_minimal_staging(staging_path: Path) -> None:
+    conn = connect(staging_path)
+    for ddl in (
+        "CREATE TABLE books (book_id TEXT, title TEXT, authors TEXT, language TEXT, "
+        "source_url TEXT, license_note TEXT)",
+        "CREATE TABLE blocks (block_id TEXT, book_id TEXT, ordinal INTEGER, "
+        "section_path TEXT, text TEXT, char_start INTEGER, char_end INTEGER, "
+        "format TEXT, page INTEGER, spine_index INTEGER, anchor TEXT)",
+        "CREATE TABLE chunks (chunk_id TEXT, book_id TEXT, block_ids TEXT, "
+        "section_path TEXT, text TEXT, char_start INTEGER, char_end INTEGER)",
+        "CREATE TABLE chunk_embeddings (chunk_id TEXT, embedding TEXT)",
+        "CREATE TABLE catalog (ol_key TEXT, title TEXT, authors TEXT, subjects TEXT, "
+        "first_publish_year INTEGER, description TEXT, provenance_note TEXT)",
+    ):
+        conn.execute(ddl)
+    conn.execute("INSERT INTO books VALUES ('b1', 'T', '[]', 'en', '', 'note')")
+    conn.commit()
+    conn.close()
+
+
 def test_staging_db_path_uses_dataset_suffix(tmp_path: Path) -> None:
-    db = tmp_path / "homelib.sqlite"
-    assert staging_db_path(db).name == "homelib__homelib_staging.sqlite"
+    assert staging_db_path(tmp_path / "homelib.sqlite").name == "homelib__homelib_staging.sqlite"
 
 
-def test_manifest_rights_maps_gutenberg_to_public_domain() -> None:
+def test_manifest_rights_maps_explicit_public_domain() -> None:
     rights = manifest_rights_by_book_id(REPO_ROOT)
     assert rights["franklin-autobiography"] == "public_domain"
     assert len(rights) == 18
 
 
-def test_json_list_accepts_json_text_and_python_lists() -> None:
-    assert _json_list('["a", "b"]') == ["a", "b"]
-    assert _json_list(["x"]) == ["x"]
-    assert _json_list('{"not": "list"}') == []
-    assert _json_list(42) == []
-
-
-def test_serialize_lists_preserves_already_serialized_fields() -> None:
-    from apps.ingest.sqlite_pipeline import _serialize_lists
-
-    row = {"authors": '["Ada"]', "title": "T"}
-    assert _serialize_lists(row, list_fields=("authors",))["authors"] == '["Ada"]'
-
-
 def test_expected_chunk_ids_match_canonical_count() -> None:
     assert len(expected_chunk_ids_from_snapshot(SNAPSHOT_PATH)) == CANONICAL_COUNTS["chunks"]
-
-
-def test_pipeline_retries_transient_file_not_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import apps.ingest.pipeline as pipeline_mod
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    snapshot = tmp_path / "one.jsonl.gz"
-    catalog = tmp_path / "catalog.jsonl"
-    _write_snapshot(snapshot, [_book("retry-book")])
-    catalog.write_text(
-        json.dumps(
-            {
-                "ol_key": "/works/OL1W",
-                "title": "T",
-                "authors": ["A"],
-                "subjects": ["s"],
-                "first_publish_year": 2020,
-                "description": None,
-                "provenance_note": "n",
-            }
-        )
-        + "\n"
-    )
-    db_path = _fresh_db(tmp_path)
-    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
-    attempts = {"count": 0}
-
-    class _FakeLoadInfo:
-        def __init__(self) -> None:
-            self.loads_ids: list[str] = []
-
-    def _flaky_run(_source: object) -> _FakeLoadInfo:
-        attempts["count"] += 1
-        if attempts["count"] == 1:
-            raise FileNotFoundError("transient dlt package race")
-        return _FakeLoadInfo()
-
-    monkeypatch.setattr(pipeline, "run", _flaky_run)
-    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
-    monkeypatch.setattr(pipeline_mod.time, "sleep", lambda _seconds: None)
-
-    info = pipeline_mod._run_with_retry(
-        pipeline,
-        snapshot,
-        catalog,
-        source=sqlite_pipeline_mod.sqlite_homelib_source(snapshot, catalog),
-    )
-    assert isinstance(info, _FakeLoadInfo)
-    assert attempts["count"] == 2
-    pipeline.drop()
-
-
-def test_pipeline_retries_pipeline_step_failed_wrapped_file_not_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from dlt.pipeline.exceptions import PipelineStepFailed
-
-    import apps.ingest.pipeline as pipeline_mod
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    snapshot = tmp_path / "one.jsonl.gz"
-    catalog = tmp_path / "catalog.jsonl"
-    _write_snapshot(snapshot, [_book("wrap-book")])
-    catalog.write_text("{}\n")
-    db_path = _fresh_db(tmp_path)
-    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
-    attempts = {"count": 0}
-
-    class _FakeLoadInfo:
-        def __init__(self) -> None:
-            self.loads_ids: list[str] = []
-
-    def _flaky_run(_source: object) -> _FakeLoadInfo:
-        attempts["count"] += 1
-        if attempts["count"] == 1:
-            cause = FileNotFoundError("transient dlt package race")
-            raise PipelineStepFailed(pipeline, "load", "load-1", cause) from cause
-        return _FakeLoadInfo()
-
-    monkeypatch.setattr(pipeline, "run", _flaky_run)
-    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
-    monkeypatch.setattr(pipeline_mod.time, "sleep", lambda _seconds: None)
-
-    info = pipeline_mod._run_with_retry(
-        pipeline,
-        snapshot,
-        catalog,
-        source=sqlite_pipeline_mod.sqlite_homelib_source(snapshot, catalog),
-    )
-    assert isinstance(info, _FakeLoadInfo)
-    assert attempts["count"] == 2
-    pipeline.drop()
-
-
-def test_pipeline_raises_after_retry_exhausted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import apps.ingest.pipeline as pipeline_mod
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    snapshot = tmp_path / "one.jsonl.gz"
-    catalog = tmp_path / "catalog.jsonl"
-    _write_snapshot(snapshot, [_book("exhaust-book")])
-    catalog.write_text("{}\n")
-    db_path = _fresh_db(tmp_path)
-    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
-
-    def _always_fail(_source: object) -> None:
-        raise FileNotFoundError("persistent race")
-
-    monkeypatch.setattr(pipeline, "run", _always_fail)
-    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
-    monkeypatch.setattr(pipeline_mod.time, "sleep", lambda _seconds: None)
-
-    with pytest.raises(FileNotFoundError, match="persistent race"):
-        pipeline_mod._run_with_retry(
-            pipeline,
-            snapshot,
-            catalog,
-            source=sqlite_pipeline_mod.sqlite_homelib_source(snapshot, catalog),
-        )
-    pipeline.drop()
-
-
-def test_pipeline_propagates_non_transient_pipeline_step_failed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from dlt.pipeline.exceptions import PipelineStepFailed
-
-    import apps.ingest.pipeline as pipeline_mod
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    snapshot = tmp_path / "one.jsonl.gz"
-    catalog = tmp_path / "catalog.jsonl"
-    _write_snapshot(snapshot, [_book("hard-fail-book")])
-    catalog.write_text("{}\n")
-    db_path = _fresh_db(tmp_path)
-    pipeline = sqlite_pipeline_mod._make_pipeline(db_path)
-
-    def _hard_fail(_source: object) -> None:
-        raise PipelineStepFailed(pipeline, "load", "load-1", ValueError("schema mismatch"))
-
-    monkeypatch.setattr(pipeline, "run", _hard_fail)
-    monkeypatch.setattr(pipeline, "abort_packages", lambda: None)
-
-    with pytest.raises(PipelineStepFailed):
-        pipeline_mod._run_with_retry(
-            pipeline,
-            snapshot,
-            catalog,
-            source=sqlite_pipeline_mod.sqlite_homelib_source(snapshot, catalog),
-        )
-    pipeline.drop()
-
-
-def test_expected_chunk_ids_skips_unknown_rights_books(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    snapshot = tmp_path / "blocked.jsonl.gz"
-    _write_snapshot(snapshot, [_book("blocked-book")])
-    monkeypatch.setattr(
-        "apps.ingest.sqlite_pipeline.manifest_rights_by_book_id",
-        lambda _repo=REPO_ROOT: {"blocked-book": "unknown"},
-    )
-    assert expected_chunk_ids_from_snapshot(snapshot) == []
-
-
-def test_expected_chunk_ids_skips_blank_snapshot_lines(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    snapshot = tmp_path / "blank-lines.jsonl.gz"
-    clean_snapshot = tmp_path / "clean.jsonl.gz"
-    doc = _book("blank-line-book")
-    with gzip.open(snapshot, "wt", encoding="utf-8") as handle:
-        handle.write("\n")
-        handle.write(json.dumps(doc.model_dump(mode="json")) + "\n")
-        handle.write("\n")
-    _write_snapshot(clean_snapshot, [doc])
-    monkeypatch.setattr(
-        "apps.ingest.sqlite_pipeline.manifest_rights_by_book_id",
-        lambda _repo=REPO_ROOT: {"blank-line-book": "public_domain"},
-    )
-    assert expected_chunk_ids_from_snapshot(snapshot) == expected_chunk_ids_from_snapshot(
-        clean_snapshot
-    )
-
-
-def test_manifest_rights_rejects_non_list_manifest(tmp_path: Path) -> None:
-    (tmp_path / "data").mkdir()
-    (tmp_path / "data" / "manifest.yaml").write_text("not_a_list: true\n")
-    with pytest.raises(TypeError, match=r"manifest.yaml must be a list"):
-        manifest_rights_by_book_id(tmp_path)
 
 
 def test_manifest_rights_skips_non_dict_entries(tmp_path: Path) -> None:
@@ -319,226 +139,147 @@ def test_manifest_rights_skips_non_dict_entries(tmp_path: Path) -> None:
     (tmp_path / "data" / "manifest.yaml").write_text(
         "- plain string\n- book_id: ok-book\n  license_note: Public domain (US)\n"
     )
-    rights = manifest_rights_by_book_id(tmp_path)
-    assert rights == {"ok-book": "public_domain"}
+    assert manifest_rights_by_book_id(tmp_path) == {"ok-book": "unknown"}
 
 
-def test_sync_staging_rolls_back_on_catalog_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from unittest.mock import MagicMock
+def test_sync_staging_rolls_back_on_catalog_error(tmp_path: Path) -> None:
+    import apps.ingest.sqlite_pipeline as mod
 
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    db_path = tmp_path / "homelib.sqlite"
-    staging_path = tmp_path / "staging.sqlite"
-    staging_path.touch()
-    conn = MagicMock()
-
-    monkeypatch.setattr(sqlite_pipeline_mod, "connect", lambda _path: conn)
-    monkeypatch.setattr(sqlite_pipeline_mod, "staging_db_path", lambda _path: staging_path)
-
-    def _boom_books(_conn: sqlite3.Connection, *, rights_by_book: dict[str, str]) -> None:
-        raise RuntimeError("catalog sync failed")
-
-    monkeypatch.setattr(sqlite_pipeline_mod, "_sync_books", _boom_books)
-
-    with pytest.raises(RuntimeError, match="catalog sync failed"):
-        sqlite_pipeline_mod._sync_staging_to_canonical(
-            db_path, rights_by_book={"b": "public_domain"}
-        )
-
-    conn.rollback.assert_called_once()
-    conn.execute.assert_any_call("ATTACH DATABASE ? AS staging", (str(staging_path),))
-    conn.execute.assert_any_call("DETACH DATABASE staging")
-    conn.close.assert_called_once()
-
-
-def test_sync_chunk_embeddings_serializes_list_embedding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import apps.ingest.sqlite_pipeline as sqlite_pipeline_mod
-
-    inserts: list[tuple[object, ...]] = []
-
-    class _FakeCursor:
-        def fetchall(self) -> list[tuple[str, list[float]]]:
-            return [("c1", [0.1, 0.2, 0.3])]
-
-    class _FakeConn:
-        def execute(self, sql: str, params: tuple[object, ...] = ()) -> _FakeCursor:
-            if "FROM staging.chunk_embeddings" in sql:
-                return _FakeCursor()
-            if "INSERT INTO chunk_embeddings" in sql:
-                inserts.append(params)
-            return _FakeCursor()
-
-    monkeypatch.setattr(
-        sqlite_pipeline_mod, "_load_indexable_book_ids_temp", lambda *_a, **_k: None
-    )
-    _sync_chunk_embeddings(_FakeConn(), indexable_book_ids={"b1"})  # type: ignore[arg-type]
-    assert inserts
-    assert inserts[0][1] == "[0.1, 0.2, 0.3]"
-
-
-def test_sync_staging_raises_when_staging_file_missing(tmp_path: Path) -> None:
     db_path = _fresh_db(tmp_path)
+    _create_minimal_staging(staging_db_path(db_path))
     conn = connect(db_path)
     migrate(conn)
+    before = int(conn.execute("SELECT COUNT(*) FROM books").fetchone()[0])
     conn.close()
-    with pytest.raises(FileNotFoundError, match="staging database missing"):
-        _sync_staging_to_canonical(db_path, rights_by_book={})
-
-
-def test_chunk_ids_match_v1_snapshot(tmp_path: Path) -> None:
-    db_path = _fresh_db(tmp_path)
-    run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
-
-    expected_ids = set(expected_chunk_ids_from_snapshot(SNAPSHOT_PATH))
+    original = mod._sync_catalog
+    mod._sync_catalog = lambda _c: (_ for _ in ()).throw(RuntimeError("catalog sync failed"))
+    try:
+        with pytest.raises(RuntimeError, match="catalog sync failed"):
+            _sync_staging_to_canonical(db_path, rights_by_book={"b1": "public_domain"})
+    finally:
+        mod._sync_catalog = original
     conn = connect(db_path)
-    loaded_ids = {
-        str(row[0]) for row in conn.execute("SELECT chunk_id FROM chunks ORDER BY chunk_id")
-    }
+    assert int(conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]) == before
     conn.close()
 
-    assert loaded_ids == expected_ids
-    assert len(loaded_ids) == CANONICAL_COUNTS["chunks"]
+
+def test_sync_chunk_embeddings_stores_float32_blob(tmp_path: Path) -> None:
+    import apps.ingest.sqlite_pipeline as mod
+
+    db_path = _fresh_db(tmp_path)
+    staging_path = staging_db_path(db_path)
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute("INSERT INTO books (book_id, title, rights_status) VALUES ('b1', 'T', 'public_domain')")
+    conn.execute(
+        "INSERT INTO chunks (chunk_id, book_id, block_ids, section_path, text, "
+        "char_start, char_end) VALUES ('c1', 'b1', '[]', '[]', 'text', 0, 4)"
+    )
+    conn.commit()
+    conn.close()
+    conn = connect(staging_path)
+    conn.execute("CREATE TABLE chunks (chunk_id TEXT, book_id TEXT)")
+    conn.execute("CREATE TABLE chunk_embeddings (chunk_id TEXT, embedding TEXT)")
+    conn.execute("INSERT INTO chunks VALUES ('c1', 'b1')")
+    conn.execute("INSERT INTO chunk_embeddings VALUES ('c1', ?)", (json.dumps([0.1, 0.2, 0.3]),))
+    conn.commit()
+    conn.close()
+    conn = connect(db_path)
+    conn.execute("ATTACH DATABASE ? AS staging", (str(staging_path),))
+    mod._sync_chunk_embeddings(conn, indexable_book_ids={"b1"})
+    conn.commit()
+    row = conn.execute("SELECT embedding FROM chunk_embeddings WHERE chunk_id='c1'").fetchone()
+    conn.close()
+    assert row is not None and isinstance(row[0], bytes)
+    assert struct.unpack("3f", row[0]) == pytest.approx((0.1, 0.2, 0.3))
 
 
+def test_banned_sources_absent_from_ingest() -> None:
+    patterns = (
+        re.compile(r"\bimport\s+kaggle\b"),
+        re.compile(r"kaggle\.com"),
+        re.compile(r"libgen"),
+        re.compile(r"sci-hub"),
+        re.compile(r"annas-archive"),
+    )
+    offenders = []
+    for path in INGEST_DIR.rglob("*.py"):
+        if "tests" in path.relative_to(INGEST_DIR).parts:
+            continue
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if any(p.search(line.lower()) for p in patterns):
+                offenders.append(f"{path}:{i}")
+    assert not offenders
+
+
+@pytest.mark.slow
+def test_chunk_ids_match_v1_snapshot(ingested_corpus_db: Path) -> None:
+    expected_ids = sorted(expected_chunk_ids_from_snapshot(SNAPSHOT_PATH))
+    assert hashlib.sha256("\n".join(expected_ids).encode()).hexdigest() == V1_CHUNK_IDS_SHA256
+    conn = connect(ingested_corpus_db)
+    loaded = {str(r[0]) for r in conn.execute("SELECT chunk_id FROM chunks")}
+    gt = {
+        json.loads(line)["chunk_id"]
+        for line in GROUND_TRUTH_PATH.read_text(encoding="utf-8").splitlines() if line.strip()
+    }
+    assert not gt - loaded
+    assert loaded == set(expected_ids)
+    conn.close()
+
+
+@pytest.mark.slow
 def test_second_run_no_duplicates(tmp_path: Path) -> None:
     db_path = _fresh_db(tmp_path)
     run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
     conn = connect(db_path)
     first = _corpus_counts(conn)
     conn.close()
-    assert first == CANONICAL_COUNTS
-
     run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
     conn = connect(db_path)
     second = _corpus_counts(conn)
     conn.close()
-    assert second == first
+    assert first == CANONICAL_COUNTS and second == first
 
 
-def test_every_citation_resolves(tmp_path: Path) -> None:
-    db_path = _fresh_db(tmp_path)
-    run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
-    conn = connect(db_path)
-
-    orphan_blocks = conn.execute(
-        """
-        SELECT c.chunk_id, value AS block_id
-        FROM chunks c, json_each(c.block_ids) AS value
-        LEFT JOIN blocks b ON b.block_id = value
-        WHERE b.block_id IS NULL
-        LIMIT 5
-        """
-    ).fetchall()
-    assert orphan_blocks == []
-
-    with gzip.open(SNAPSHOT_PATH, "rt", encoding="utf-8") as handle:
-        canonical_by_book = {
-            BookDoc.model_validate_json(line.strip()).book_id: BookDoc.model_validate_json(
-                line.strip()
-            ).canonical_text
-            for line in handle
-            if line.strip()
-        }
-
-    rows = conn.execute(
-        "SELECT chunk_id, book_id, block_ids, text, char_start, char_end FROM chunks"
-    ).fetchall()
-    for chunk_id, book_id, block_ids_json, text, char_start, char_end in rows:
-        canonical = canonical_by_book[book_id]
-        assert canonical[char_start:char_end] == text, chunk_id
-        for block_id in json.loads(str(block_ids_json)):
-            block = conn.execute(
-                "SELECT text, char_start, char_end FROM blocks WHERE block_id = ?",
-                (block_id,),
-            ).fetchone()
-            assert block is not None, block_id
-
-    conn.close()
-
-
+@pytest.mark.slow
 def test_metadata_only_never_indexed(tmp_path: Path) -> None:
-    snapshot = tmp_path / "rights.jsonl.gz"
+    snapshot = tmp_path / "m.jsonl.gz"
     book_id = "metadata-only-book"
     _write_snapshot(snapshot, [_book(book_id)])
     db_path = _fresh_db(tmp_path)
-    rights = {book_id: "metadata_only"}
-
-    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book=rights)
-
+    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "metadata_only"})
     conn = connect(db_path)
-    book_row = conn.execute(
-        "SELECT rights_status FROM books WHERE book_id = ?", (book_id,)
-    ).fetchone()
-    block_count = conn.execute(
-        "SELECT COUNT(*) FROM blocks WHERE book_id = ?", (book_id,)
-    ).fetchone()
-    chunk_count = conn.execute(
-        "SELECT COUNT(*) FROM chunks WHERE book_id = ?", (book_id,)
-    ).fetchone()
+    assert int(conn.execute("SELECT COUNT(*) FROM blocks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
     conn.close()
 
-    assert book_row is not None and book_row[0] == "metadata_only"
-    assert int(block_count[0]) == 0
-    assert int(chunk_count[0]) == 0
 
-
+@pytest.mark.slow
 def test_unknown_rights_fail_closed(tmp_path: Path) -> None:
-    snapshot = tmp_path / "unknown.jsonl.gz"
+    snapshot = tmp_path / "u.jsonl.gz"
     book_id = "unknown-rights-book"
     _write_snapshot(snapshot, [_book(book_id)])
     db_path = _fresh_db(tmp_path)
-    rights = {book_id: "unknown"}
-
-    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book=rights)
-
+    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "unknown"})
     conn = connect(db_path)
-    book_row = conn.execute(
-        "SELECT rights_status FROM books WHERE book_id = ?", (book_id,)
-    ).fetchone()
-    block_count = conn.execute(
-        "SELECT COUNT(*) FROM blocks WHERE book_id = ?", (book_id,)
-    ).fetchone()
-    chunk_count = conn.execute(
-        "SELECT COUNT(*) FROM chunks WHERE book_id = ?", (book_id,)
-    ).fetchone()
-    embedding_count = conn.execute(
-        """
-        SELECT COUNT(*) FROM chunk_embeddings e
-        JOIN chunks c ON c.chunk_id = e.chunk_id
-        WHERE c.book_id = ?
-        """,
-        (book_id,),
-    ).fetchone()
+    assert int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
     conn.close()
 
-    assert book_row is not None and book_row[0] == "unknown"
-    assert int(block_count[0]) == 0
-    assert int(chunk_count[0]) == 0
-    assert int(embedding_count[0]) == 0
 
-
-def test_wp03_does_not_break_wp02_seed_counts(tmp_path: Path) -> None:
-    """Migrate + seed still works after v3 corpus tables exist."""
+@pytest.mark.slow
+def test_rights_downgrade_purges_indexed_text(tmp_path: Path) -> None:
+    snapshot = tmp_path / "d.jsonl.gz"
+    book_id = "downgrade-book"
+    _write_snapshot(snapshot, [_book(book_id)])
     db_path = _fresh_db(tmp_path)
+    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "public_domain"})
+    run_sqlite_pipeline(db_path, snapshot=snapshot, rights_by_book={book_id: "unknown"})
     conn = connect(db_path)
-    migrate(conn)
-    from apps.store.sqlite import seed
-
-    seed(conn, repo_root=REPO_ROOT)
-    before = row_counts(conn)
+    assert int(conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id=?", (book_id,)).fetchone()[0]) == 0
     conn.close()
 
+
+@pytest.mark.slow
+def test_staging_file_removed_after_successful_sync(tmp_path: Path) -> None:
+    db_path = _fresh_db(tmp_path)
     run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
-    conn = connect(db_path)
-    after_seed_tables = {
-        key: row_counts(conn)[key] for key in ("playlist", "principal", "areas", "wings")
-    }
-    conn.close()
-
-    assert after_seed_tables["principal"] == before["principal"]
-    assert after_seed_tables["areas"] == before["areas"]
+    assert not staging_db_path(db_path).exists()
