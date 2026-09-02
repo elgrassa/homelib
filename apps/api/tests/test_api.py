@@ -14,7 +14,11 @@ import json
 from dataclasses import replace
 from typing import Any
 
+import httpx
+import psycopg
 import pytest
+import respx
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from homelib_core.models import Block, ExtractionResult, Provenance
 from homelib_rag import answer as answer_module
@@ -574,3 +578,235 @@ def test_default_retrieve_keeps_hybrid_order_when_rerank_unavailable(
 
     assert arm_used == "hybrid"
     assert degraded is False  # rerank unavailability is never a degradation
+
+
+class _FakeCursor:
+    """Scripted cursor for exercising `main._connect()` production helpers."""
+
+    def __init__(
+        self,
+        *,
+        fetchone_results: list[Any] | None = None,
+        fetchall_results: list[Any] | None = None,
+        fail_execute: bool = False,
+    ) -> None:
+        self._fetchone_results = list(fetchone_results or [])
+        self._fetchall_results = list(fetchall_results or [])
+        self.fail_execute = fail_execute
+        self.queries: list[tuple[str, tuple[Any, ...] | None]] = []
+
+    def execute(self, query: str, params: tuple[Any, ...] | None = None) -> None:
+        if self.fail_execute:
+            raise psycopg.OperationalError("simulated write failure")
+        self.queries.append((query, params))
+
+    def fetchone(self) -> Any:
+        return self._fetchone_results.pop(0) if self._fetchone_results else None
+
+    def fetchall(self) -> list[Any]:
+        result = self._fetchall_results.pop(0) if self._fetchall_results else []
+        return result if isinstance(result, list) else [result]
+
+    def __enter__(self) -> _FakeCursor:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        return None
+
+
+class _FakeConnection:
+    def __init__(self, cursor: _FakeCursor) -> None:
+        self._cursor = cursor
+
+    def cursor(self) -> _FakeCursor:
+        return self._cursor
+
+    def __enter__(self) -> _FakeConnection:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        return None
+
+
+def _patch_connect(monkeypatch: pytest.MonkeyPatch, cursor: _FakeCursor) -> _FakeCursor:
+    monkeypatch.setattr(main, "_connect", lambda: _FakeConnection(cursor))
+    return cursor
+
+
+def test_infer_provider_returns_hostname_for_unknown_provider() -> None:
+    assert main._infer_provider("https://api.example.com/v1") == "api.example.com"
+
+
+@pytest.mark.parametrize(
+    ("arm", "expected_mode"),
+    [("lexical", "lexical"), ("vector", "vector")],
+)
+def test_default_retrieve_single_arms(
+    monkeypatch: pytest.MonkeyPatch, arm: str, expected_mode: str
+) -> None:
+    hit = _hit()
+    monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], expected_mode))
+
+    hits, arm_used, degraded = main._default_retrieve("q", 5, arm)
+
+    assert hits == [hit]
+    assert arm_used == expected_mode
+    assert degraded is False
+
+
+def test_default_retrieve_marks_degraded_when_search_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hit = _hit()
+    monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], "lexical"))
+
+    _hits, arm_used, degraded = main._default_retrieve("q", 5, "hybrid")
+
+    assert arm_used == "lexical"
+    assert degraded is True
+
+
+@respx.mock
+def test_default_llm_reachable_true_when_models_endpoint_responds() -> None:
+    respx.get("http://localhost:11434/v1/models").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
+
+    assert main._default_llm_reachable("http://localhost:11434/v1") is True
+
+
+def test_default_llm_reachable_false_on_connection_error() -> None:
+    assert main._default_llm_reachable("http://127.0.0.1:1") is False
+
+
+def test_default_db_reachable_true_when_select_one_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_connect(monkeypatch, _FakeCursor(fetchone_results=[(1,)]))
+
+    assert main._default_db_reachable() is True
+
+
+def test_default_db_reachable_false_when_connect_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fail() -> _FakeConnection:
+        raise psycopg.OperationalError("db down")
+
+    monkeypatch.setattr(main, "_connect", _fail)
+
+    assert main._default_db_reachable() is False
+
+
+def test_default_counts_returns_table_totals(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_connect(monkeypatch, _FakeCursor(fetchone_results=[(3,), (42,)]))
+
+    assert main._default_counts() == (3, 42)
+
+
+def test_default_counts_returns_zero_when_db_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fail() -> _FakeConnection:
+        raise psycopg.OperationalError("db down")
+
+    monkeypatch.setattr(main, "_connect", _fail)
+
+    assert main._default_counts() == (0, 0)
+
+
+def test_default_list_books_maps_rows_to_summaries(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        ("bk1", "Title One", ["Author A"], 2, 5, "txt"),
+        ("bk2", "Title Two", ["Author B"], 0, 0, ""),
+    ]
+    _patch_connect(monkeypatch, _FakeCursor(fetchall_results=[rows]))
+
+    summaries = main._default_list_books()
+
+    assert summaries == [
+        BookSummary(
+            book_id="bk1", title="Title One", authors=["Author A"], blocks=2, chunks=5, format="txt"
+        ),
+        BookSummary(
+            book_id="bk2", title="Title Two", authors=["Author B"], blocks=0, chunks=0, format=""
+        ),
+    ]
+
+
+def test_default_log_query_inserts_monitoring_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    cursor = _patch_connect(monkeypatch, _FakeCursor())
+    row = QueryLogRow(
+        request_id="req-1",
+        latency_ms=12,
+        arm="hybrid",
+        k=5,
+        rerank=True,
+        rewrite=False,
+        model="fake-model",
+        tokens_prompt=10,
+        tokens_completion=5,
+        query_sha256_prefix="abc123",
+        degraded=False,
+    )
+
+    main._default_log_query(row)
+
+    assert len(cursor.queries) == 1
+    query, params = cursor.queries[0]
+    assert "INSERT INTO query_log" in query
+    assert params[0] == "req-1"
+
+
+def test_default_log_query_swallows_db_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_connect(monkeypatch, _FakeCursor(fail_execute=True))
+    row = QueryLogRow(
+        request_id="req-2",
+        latency_ms=1,
+        arm="lexical",
+        k=3,
+        rerank=False,
+        rewrite=False,
+        model="fake-model",
+        tokens_prompt=0,
+        tokens_completion=0,
+        query_sha256_prefix="deadbeef",
+        degraded=True,
+    )
+
+    main._default_log_query(row)
+
+
+def test_default_record_feedback_returns_true_when_row_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_connect(monkeypatch, _FakeCursor(fetchone_results=[("req-1",)]))
+
+    assert main._default_record_feedback("req-1", "up", "nice") is True
+
+
+def test_default_record_feedback_returns_false_for_unknown_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_connect(monkeypatch, _FakeCursor(fetchone_results=[None]))
+
+    assert main._default_record_feedback("missing", "down", None) is False
+
+
+def test_get_deps_returns_same_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
+    main._deps_singleton = None
+    built = _base_deps()
+    monkeypatch.setattr(main, "_build_default_deps", lambda: built)
+    try:
+        assert main.get_deps() is main.get_deps()
+    finally:
+        main._deps_singleton = None
+
+
+def test_post_ingest_reraises_http_exception_unchanged() -> None:
+    def _raise(req: Any) -> IngestResponse:
+        raise HTTPException(status_code=418, detail="teapot")
+
+    deps = _make_deps(ingest=_raise)
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ingest", json={"path": "x.txt"})
+
+    assert resp.status_code == 418
+    assert resp.json()["detail"] == "teapot"

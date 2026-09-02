@@ -405,6 +405,50 @@ def test_llm_timeout_seconds_env_var_overrides_default_timeout() -> None:
     assert overridden_run.stdout.strip() == "12.5"
 
 
+def test_openai_client_forwards_tools_and_response_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAIClient(base_url="http://localhost:1", api_key="x", model="m")
+    captured: dict[str, Any] = {}
+
+    class _Function:
+        name = "lookup"
+        arguments = "{}"
+
+    class _ToolCall:
+        id = "tc-1"
+        type = "function"
+        function = _Function()
+
+    class _Message:
+        content = "ok"
+        tool_calls: ClassVar[list[_ToolCall]] = [_ToolCall()]
+
+    class _Choice:
+        message = _Message()
+
+    class _Usage:
+        prompt_tokens = 3
+        completion_tokens = 4
+
+    class _Response:
+        choices: ClassVar[list[_Choice]] = [_Choice()]
+        usage = _Usage()
+
+    def _capture(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        return _Response()
+
+    monkeypatch.setattr(client._client.chat.completions, "create", _capture)
+
+    tools = [{"type": "function", "function": {"name": "lookup"}}]
+    response_format = {"type": "json_object"}
+    response = client.chat([], tools=tools, response_format=response_format)
+
+    assert captured["tools"] == tools
+    assert captured["response_format"] == response_format
+    assert response.tool_calls is not None
+    assert response.tool_calls[0]["function"]["name"] == "lookup"
+
+
 def test_openai_client_chat_bounds_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
     """Bounds worst-case CPU generation time — a runaway completion should
     not turn the (now much longer) timeout into the only backstop. Measured

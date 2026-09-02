@@ -296,6 +296,56 @@ def test_search_vector_propagates_connection_failure(monkeypatch: pytest.MonkeyP
         search_vector("q", 5)
 
 
+def test_dsn_reads_database_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://custom/db")
+    assert index_module._dsn() == "postgresql://custom/db"
+
+
+def test_load_embedder_is_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeModel:
+        def encode(self, q: str) -> list[float]:
+            return [0.1, 0.2, 0.3]
+
+    monkeypatch.setattr(index_module, "SentenceTransformer", lambda _name: _FakeModel())
+    index_module._reset_embedder_for_tests()
+
+    first = index_module._load_embedder()
+    second = index_module._load_embedder()
+
+    assert first is second
+
+
+def test_embed_query_returns_float_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeModel:
+        def encode(self, q: str) -> list[float]:
+            return [0.5, 0.25]
+
+    monkeypatch.setattr(index_module, "SentenceTransformer", lambda _name: _FakeModel())
+    index_module._reset_embedder_for_tests()
+
+    assert index_module._embed_query("hello") == [0.5, 0.25]
+
+
+def test_reset_embedder_for_tests_clears_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeModel:
+        pass
+
+    created: list[_FakeModel] = []
+
+    def _factory(_name: str) -> _FakeModel:
+        model = _FakeModel()
+        created.append(model)
+        return model
+
+    monkeypatch.setattr(index_module, "SentenceTransformer", _factory)
+    index_module._reset_embedder_for_tests()
+    index_module._load_embedder()
+    index_module._reset_embedder_for_tests()
+    index_module._load_embedder()
+
+    assert len(created) == 2
+
+
 # ── integration tests: real Postgres, real embedding model ─────────────────
 
 _FIXTURE_BOOK_ID = "book-fixture"
