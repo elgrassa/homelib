@@ -32,6 +32,7 @@ _RIGHTS_STATUSES: Final = frozenset(
     }
 )
 
+
 class PrincipalRequired(Exception):
     """A private write was attempted without a principal."""
 
@@ -569,7 +570,8 @@ def insert_bookmark(
     with conn:
         conn.execute(
             "INSERT INTO bookmarks "
-            "(id, principal_id, resource_id, book_id, block_id, char_start, char_end, note, created_at) "
+            "(id, principal_id, resource_id, book_id, block_id, "
+            "char_start, char_end, note, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 bookmark_id,
