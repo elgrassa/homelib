@@ -231,6 +231,8 @@ def connect(path: Path) -> sqlite3.Connection:
 
 
 def _run_sql_script(conn: sqlite3.Connection, sql: str) -> None:
+    # Splits on ';' only — migration SQL must not embed semicolons inside string
+    # literals or trigger bodies (fine for current DDL).
     statements = [part.strip() for part in sql.split(";") if part.strip()]
     for statement in statements:
         conn.execute(statement)

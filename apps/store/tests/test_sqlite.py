@@ -348,7 +348,8 @@ def test_failed_write_leaves_no_partial_rows(
     migrate(conn)
     seed(conn, repo_root=REPO_ROOT)
     book_id = _first_book(conn)
-    before = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
+    before_playlist = int(conn.execute("SELECT COUNT(*) FROM playlist").fetchone()[0])
+    before_items = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
     real_now = sqlite_mod._now_iso
     calls = {"count": 0}
 
@@ -361,8 +362,10 @@ def test_failed_write_leaves_no_partial_rows(
     monkeypatch.setattr(sqlite_mod, "_now_iso", flaky_now_iso)
     with pytest.raises(RuntimeError, match="simulated failure"):
         insert_playlist(conn, principal_id="local-user", resource_id=book_id, book_id=book_id)
-    after = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
-    assert after == before
+    after_playlist = int(conn.execute("SELECT COUNT(*) FROM playlist").fetchone()[0])
+    after_items = int(conn.execute("SELECT COUNT(*) FROM playlist_item").fetchone()[0])
+    assert after_playlist == before_playlist
+    assert after_items == before_items
     conn.close()
 
 
