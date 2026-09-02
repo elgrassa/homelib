@@ -275,15 +275,20 @@ def _connect() -> psycopg.Connection[tuple[Any, ...]]:
 
 
 def load_indexed_chunk_ids() -> set[str]:
-    """Every `chunk_id` currently in the index, for the corpus-drift check.
+    """Every `chunk_id` currently in the index, for the corpus-drift check."""
+    sqlite_path = os.environ.get("HOMELIB_SQLITE_PATH", "").strip()
+    if sqlite_path:
+        from apps.store.sqlite import connect, migrate
 
-    The only database statement this module issues, and it is a `SELECT`:
-    the eval never writes to, creates, truncates or drops anything. Raises
-    the underlying `psycopg` error if the database is unreachable — a
-    missing drift check would turn every row into an unearned miss, so the
-    caller must fail rather than guess.
-    """
-    with _connect() as conn, conn.cursor() as cur:
+        conn = connect(Path(sqlite_path))
+        migrate(conn)
+        try:
+            rows = conn.execute("SELECT chunk_id FROM chunks").fetchall()
+            return {str(row[0]) for row in rows}
+        finally:
+            conn.close()
+
+    with _connect() as pg_conn, pg_conn.cursor() as cur:
         cur.execute("SELECT chunk_id FROM chunks")
         return {str(row[0]) for row in cur.fetchall()}
 

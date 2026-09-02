@@ -1,7 +1,8 @@
 """SQLite store: migrations, minimal seed, principal isolation (WP02+).
 
-Additive to v1 Postgres compose. No FTS5, no paid-tier tables. Corpus ingest
-(WP03) loads blocks/chunks/embeddings via `apps.ingest.sqlite_pipeline`.
+Additive to v1 Postgres compose. No paid-tier tables. Corpus ingest (WP03)
+loads blocks/chunks/embeddings via `apps.ingest.sqlite_pipeline`. WP04 adds
+FTS5 (`chunks_fts`) and `index_revision` for retrieval.
 """
 
 from __future__ import annotations
@@ -257,10 +258,27 @@ CREATE TABLE bookmarks (
 );
 """
 
+_SQL_V4 = """
+CREATE VIRTUAL TABLE chunks_fts USING fts5(
+    chunk_id UNINDEXED,
+    book_id UNINDEXED,
+    text,
+    tokenize='porter unicode61'
+);
+
+CREATE TABLE index_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    index_revision TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO index_state (singleton, index_revision, updated_at) VALUES (1, '', '');
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
     (3, _SQL_V3),
+    (4, _SQL_V4),
 )
 
 
@@ -695,4 +713,44 @@ def books_default_rights_status(conn: sqlite3.Connection) -> str:
     row = conn.execute(
         "SELECT dflt_value FROM pragma_table_info('books') WHERE name = 'rights_status'"
     ).fetchone()
+    return str(row[0]) if row is not None else ""
+
+
+def rebuild_chunks_fts(conn: sqlite3.Connection) -> None:
+    """Rebuild the FTS5 mirror from canonical `chunks` rows (WP04)."""
+    if not _table_exists(conn, "chunks_fts"):
+        return
+    conn.execute("DELETE FROM chunks_fts")
+    conn.execute(
+        "INSERT INTO chunks_fts (chunk_id, book_id, text) "
+        "SELECT chunk_id, book_id, text FROM chunks"
+    )
+
+
+def compute_index_revision(conn: sqlite3.Connection) -> str:
+    """Stable revision id for the cached embedding matrix (product §7.5)."""
+    digest = hashlib.sha256()
+    rows = conn.execute("SELECT chunk_id FROM chunks ORDER BY chunk_id").fetchall()
+    for row in rows:
+        digest.update(str(row[0]).encode())
+    digest.update(str(len(rows)).encode())
+    return digest.hexdigest()[:16]
+
+
+def bump_index_revision(conn: sqlite3.Connection) -> str:
+    """Recompute and persist `index_revision` after ingest or FTS rebuild."""
+    if not _table_exists(conn, "index_state"):
+        return ""
+    revision = compute_index_revision(conn)
+    conn.execute(
+        "UPDATE index_state SET index_revision = ?, updated_at = ? WHERE singleton = 1",
+        (revision, _now_iso()),
+    )
+    return revision
+
+
+def current_index_revision(conn: sqlite3.Connection) -> str:
+    if not _table_exists(conn, "index_state"):
+        return ""
+    row = conn.execute("SELECT index_revision FROM index_state WHERE singleton = 1").fetchone()
     return str(row[0]) if row is not None else ""

@@ -26,6 +26,7 @@ from evals.retrieval_eval import (
     BookMetrics,
     QueryOutcome,
     hit_rate_at_k,
+    load_indexed_chunk_ids,
     load_questions,
     mrr_at_k,
     run_all_arms,
@@ -553,3 +554,29 @@ def test_models_allow_extra_fields() -> None:
         {"hit_rate_at_5": 1.0, "mrr_at_5": 1.0, "n": 1, "future_field": True}
     )
     assert book.future_field is True  # type: ignore[attr-defined]
+
+
+def test_load_indexed_chunk_ids_reads_sqlite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.store.sqlite import connect, migrate
+
+    db_path = tmp_path / "eval.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, authors, rights_status) VALUES (?, ?, ?, ?)",
+        ("book-e", "Eval", "[]", "public_domain"),
+    )
+    conn.execute(
+        """
+        INSERT INTO chunks (
+            chunk_id, book_id, block_ids, section_path, text, char_start, char_end
+        ) VALUES ('ce-1', 'book-e', '[]', '[]', 'text', 0, 4)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    assert load_indexed_chunk_ids() == {"ce-1"}

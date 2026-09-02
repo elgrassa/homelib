@@ -126,13 +126,16 @@ def _first_page(cur: psycopg.Cursor[tuple[Any, ...]], block_ids: Sequence[str]) 
     return None
 
 
-def search_lexical(q: str, k: int) -> list[Hit]:
-    """Full-text search `chunks.tsv` for `q`, ranked by `ts_rank_cd`.
+def _use_sqlite() -> bool:
+    return bool(os.environ.get("HOMELIB_SQLITE_PATH", "").strip())
 
-    Returns at most `k` hits, best-first, `rank` 1-based dense. Raises
-    `ValueError` for an empty (post-strip) `q` or non-positive `k`; raises the
-    underlying `psycopg` error on a connection failure.
-    """
+
+def search_lexical(q: str, k: int) -> list[Hit]:
+    """Full-text search for `q`, ranked best-first."""
+    if _use_sqlite():
+        from homelib_rag.sqlite_index import search_lexical as sqlite_search_lexical
+
+        return sqlite_search_lexical(q, k)
     _validate(q, k)
     with _connect() as conn, conn.cursor() as cur:
         cur.execute(
@@ -166,13 +169,11 @@ def search_lexical(q: str, k: int) -> list[Hit]:
 
 
 def search_vector(q: str, k: int) -> list[Hit]:
-    """Cosine-similarity search over `chunk_embeddings`, `q` embedded in-process.
+    """Cosine-similarity search over chunk embeddings."""
+    if _use_sqlite():
+        from homelib_rag.sqlite_index import search_vector as sqlite_search_vector
 
-    Returns at most `k` hits, best-first, `rank` 1-based dense, `score = 1 -
-    cosine_distance`. Raises `ValueError` for an empty (post-strip) `q` or
-    non-positive `k`; raises on an embedding-model load failure or a
-    `psycopg` connection failure.
-    """
+        return sqlite_search_vector(q, k)
     _validate(q, k)
     vector_literal = _vector_literal(_embed_query(q))
     with _connect() as conn, conn.cursor() as cur:

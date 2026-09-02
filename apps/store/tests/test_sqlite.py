@@ -80,13 +80,18 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2, 3}
+    assert versions == {1, 2, 3, 4}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "listen_progress" in tables
     assert "areas" in tables
     assert "bookmarks" in tables
+    assert "blocks" in tables
+    assert "chunks" in tables
+    assert "chunk_embeddings" in tables
+    assert "chunks_fts" in tables
+    assert "index_state" in tables
     assert tables.isdisjoint(PAID_TIER_TABLES)
     with pytest.raises(ValueError, match="target_version"):
         migrate(conn, target_version=0)
@@ -386,15 +391,15 @@ def test_migration_is_transactional_on_failure(
 
     conn = connect(_fresh(tmp_path))
     migrate(conn)
-    broken = ((4, "CREATE TABLE broken_v4 (id TEXT PRIMARY KEY); INVALID SQL;"),)
+    broken = ((5, "CREATE TABLE broken_v5 (id TEXT PRIMARY KEY); INVALID SQL;"),)
     original = sqlite_mod.MIGRATIONS
     try:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original + broken)
         with pytest.raises(sqlite3.OperationalError):
-            sqlite_mod.migrate(conn, target_version=4)
+            sqlite_mod.migrate(conn, target_version=5)
         versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-        assert versions == {1, 2, 3}
-        assert not sqlite_mod._table_exists(conn, "broken_v4")
+        assert versions == {1, 2, 3, 4}
+        assert not sqlite_mod._table_exists(conn, "broken_v5")
     finally:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original)
     conn.close()
@@ -551,4 +556,70 @@ def test_seed_with_blank_catalog_file_loads_books_only(tmp_path: Path) -> None:
     seed(conn, repo_root=root)
     assert int(conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]) == 1
     assert int(conn.execute("SELECT COUNT(*) FROM catalog").fetchone()[0]) == 0
+    conn.close()
+
+
+def test_index_revision_bumps_after_fts_rebuild(tmp_path: Path) -> None:
+    from apps.store.sqlite import (
+        bump_index_revision,
+        current_index_revision,
+        rebuild_chunks_fts,
+    )
+
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, authors, rights_status) VALUES (?, ?, ?, ?)",
+        ("b1", "T", "[]", "public_domain"),
+    )
+    conn.execute(
+        """
+        INSERT INTO chunks (chunk_id, book_id, block_ids, section_path, text, char_start, char_end)
+        VALUES ('c1', 'b1', '[]', '[]', 'hello', 0, 5)
+        """,
+    )
+    rebuild_chunks_fts(conn)
+    before = current_index_revision(conn)
+    bump_index_revision(conn)
+    after = current_index_revision(conn)
+    assert after
+    assert after == before or before == ""
+    conn.close()
+
+
+def test_rebuild_chunks_fts_noop_before_v4(tmp_path: Path) -> None:
+    from apps.store.sqlite import rebuild_chunks_fts
+
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=3)
+    rebuild_chunks_fts(conn)
+    conn.close()
+
+
+def test_bump_index_revision_noop_before_v4(tmp_path: Path) -> None:
+    from apps.store.sqlite import bump_index_revision, current_index_revision
+
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=3)
+    assert bump_index_revision(conn) == ""
+    assert current_index_revision(conn) == ""
+    conn.close()
+
+
+def test_compute_index_revision_stable(tmp_path: Path) -> None:
+    from apps.store.sqlite import compute_index_revision
+
+    conn = connect(_fresh(tmp_path))
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, authors, rights_status) VALUES (?, ?, ?, ?)",
+        ("b1", "T", "[]", "public_domain"),
+    )
+    conn.execute(
+        """
+        INSERT INTO chunks (chunk_id, book_id, block_ids, section_path, text, char_start, char_end)
+        VALUES ('c1', 'b1', '[]', '[]', 'hello', 0, 5)
+        """,
+    )
+    assert compute_index_revision(conn) == compute_index_revision(conn)
     conn.close()

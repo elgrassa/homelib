@@ -134,6 +134,17 @@ def test_rerank_singleton_loads_once_under_concurrency(monkeypatch: pytest.Monke
 # ── remaining named red tests from specs/rerank.md ──────────────────────────
 
 
+def test_rerank_failure_preserves_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rerank_module, "CrossEncoder", _RaisingCrossEncoder)
+    original = [_hit("c1", "first", rank=1), _hit("c2", "second", rank=2)]
+
+    result = rerank("some query", original)
+    used = result if result is not None else original
+
+    assert used == original
+    assert [h.chunk_id for h in used] == ["c1", "c2"]
+
+
 def test_rerank_preserves_original_ranking_signal_on_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

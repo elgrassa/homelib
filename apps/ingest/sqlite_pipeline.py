@@ -392,6 +392,10 @@ def _sync_staging_to_canonical(
             _sync_chunks(conn, indexable_book_ids=indexable_book_ids)
             _sync_chunk_embeddings(conn, indexable_book_ids=indexable_book_ids)
             _sync_catalog(conn)
+            from apps.store.sqlite import bump_index_revision, rebuild_chunks_fts
+
+            rebuild_chunks_fts(conn)
+            bump_index_revision(conn)
     finally:
         try:
             conn.execute("DETACH DATABASE staging")
