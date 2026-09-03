@@ -73,7 +73,7 @@ re-ran itself (subagent claims are never accepted as evidence).
 | WP01 review fixes | feat/wp01-specs | `just ci`; contradiction re-pass | Blockers: `areas.principal_id` on mutating rows; `bookmarks` table; `extra=forbid`/`raw_json` vs ingest `extra=allow` scoped in core-models; `LLM_MAX_OUTPUT_TOKENS=800` canonical + 1600 path ceiling. Majors: product §12.2 canary VOID cross-ref (addendum §2); `listen_progress` may persist rows but no player (ADR-009); ADR-006 calendar cross-ref; `read_progress`/`char_offset` aligned; `PathStepPreview` defined; deadline wording fixed (Mon Sep 7). OpenAPI snapshot unchanged. | 2026-09-01 |
 | WP01 review nits | feat/wp01-specs | `just ci` | PR #5 Pavlo review nits closed @ `6ac26b3`. | 2026-09-02 |
 | WP02 SQLite | v2 (merged PR #6) | `uv run pytest apps/store/tests/test_sqlite.py -q`; `just ci` | Merged to `forgejo/v2` @ `675995d`. 28 tests green; LOW review: `_run_sql_script` semicolon note, partial-write test pins playlist + item counts. | 2026-09-03 |
-| WP03 ingest | feat/wp03-ingest | `uv run pytest apps/store/tests/test_sqlite.py apps/ingest/tests/test_sqlite_ingest.py -q`; `just ci` | Rebased onto `forgejo/v2` @ `675995d` (WP03-only stack; WP02 canonical from v2). Rights purge, ground-truth guard, float32 BLOB, staging cleanup, ADR-008. 42 targeted tests + `just ci` green (516 passed, 91.84% cov) @ `0d78e67`. | 2026-09-03 |
+| WP03 ingest | feat/wp03-ingest | `uv run pytest apps/store/tests/test_sqlite.py apps/ingest/tests/test_sqlite_ingest.py -q`; `just ci` | Rebased onto `forgejo/v2` @ `675995d` (WP03-only stack; WP02 canonical from v2). Rights purge, ground-truth guard, float32 BLOB, staging cleanup, ADR-008. 42 targeted tests + `just ci` green (516 passed, 91.84% cov) @ `1016b89`. | 2026-09-03 |
 
 
 
