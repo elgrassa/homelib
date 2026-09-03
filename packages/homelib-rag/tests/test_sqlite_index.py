@@ -308,3 +308,71 @@ def test_search_vector_without_conn(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     hits = search_vector("vector path", 3)
     assert hits
     assert hits[0].chunk_id == "c0"
+
+
+def test_fts_query_drops_english_stopwords_like_plainto_tsquery() -> None:
+    """Questions must not AND-require 'what'/'is' — that zeroed lexical@5 on SQLite."""
+    from homelib_rag.sqlite_index import _fts_query
+
+    assert _fts_query("What is compound interest?") == '"compound" "interest"'
+    assert _fts_query("How does compound interest work?") == '"compound" "interest" "work"'
+
+
+def test_load_matrix_accepts_float32_blob_embeddings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ingest stores embeddings as float32 BLOBs; JSON-only decode fully degraded vector."""
+    db_path = tmp_path / "blob.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, authors, rights_status) VALUES (?, ?, ?, ?)",
+        ("book-1", "Book", "[]", "public_domain"),
+    )
+    text = "Compound interest grows wealth over time."
+    conn.execute(
+        """
+        INSERT INTO blocks (
+            block_id, book_id, ordinal, section_path, text, char_start, char_end, format
+        ) VALUES ('b0', 'book-1', 0, '["Ch"]', ?, 0, ?, 'txt')
+        """,
+        (text, len(text)),
+    )
+    conn.execute(
+        """
+        INSERT INTO chunks (
+            chunk_id, book_id, block_ids, section_path, text, char_start, char_end
+        ) VALUES ('c-blob', 'book-1', '["b0"]', '["Ch"]', ?, 0, ?)
+        """,
+        (text, len(text)),
+    )
+    vec = np.zeros(384, dtype=np.float32)
+    vec[3] = 1.0
+    conn.execute(
+        """
+        INSERT INTO chunk_embeddings (chunk_id, embedding, model, dim)
+        VALUES ('c-blob', ?, 'test-model', 384)
+        """,
+        (vec.tobytes(),),
+    )
+    rebuild_chunks_fts(conn)
+    bump_index_revision(conn)
+    conn.commit()
+    _reset_caches_for_tests()
+
+    cache = _load_matrix(conn)
+    assert cache.chunk_ids == ["c-blob"]
+    assert cache.matrix.shape == (1, 384)
+
+    monkeypatch.setattr(
+        "homelib_rag.sqlite_index._embed_query",
+        lambda _q: vec,
+    )
+    hits = search_vector("wealth grows", 3, conn=conn)
+    assert hits
+    assert hits[0].chunk_id == "c-blob"
+    lexical = search_lexical("What is compound interest?", 3, conn=conn)
+    assert lexical
+    assert lexical[0].chunk_id == "c-blob"
+    conn.close()

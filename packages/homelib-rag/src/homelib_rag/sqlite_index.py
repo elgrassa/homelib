@@ -59,11 +59,88 @@ def _validate(q: str, k: int) -> None:
         raise ValueError("k must be positive")
 
 
+# Align with Postgres `plainto_tsquery('english', …)`: drop function words so
+# a question like "What is compound interest?" becomes compound & interest,
+# not a mandatory AND over "What"/"is" that matches almost nothing in FTS5.
+_FTS_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "has",
+        "he",
+        "in",
+        "is",
+        "it",
+        "its",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "to",
+        "was",
+        "were",
+        "will",
+        "with",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "why",
+        "how",
+        "does",
+        "did",
+        "do",
+        "can",
+        "could",
+        "would",
+        "should",
+        "about",
+    }
+)
+
+
 def _fts_query(q: str) -> str:
-    tokens = re.findall(r"\w+", q, flags=re.UNICODE)
+    tokens = [
+        token
+        for token in re.findall(r"\w+", q, flags=re.UNICODE)
+        if token.lower() not in _FTS_STOPWORDS and len(token) > 1
+    ]
+    if not tokens:
+        # Fall back to raw tokens so a stopword-only query still errors clearly
+        # only when nothing alphanumeric remains at all.
+        tokens = re.findall(r"\w+", q, flags=re.UNICODE)
     if not tokens:
         raise ValueError("q must not be empty")
     return " ".join(f'"{token}"' for token in tokens)
+
+
+def _decode_embedding(raw: object) -> NDArray[np.float32]:
+    """Decode a stored embedding: float32 BLOB (ingest) or JSON list (unit fixtures)."""
+    if isinstance(raw, memoryview):
+        raw = raw.tobytes()
+    if isinstance(raw, (bytes, bytearray)):
+        arr = np.frombuffer(bytes(raw), dtype=np.float32).copy()
+    elif isinstance(raw, str):
+        parsed = json.loads(raw)
+        arr = np.asarray(parsed, dtype=np.float32)
+    elif isinstance(raw, list):
+        arr = np.asarray(raw, dtype=np.float32)
+    else:
+        raise TypeError(f"unsupported embedding type: {type(raw)!r}")
+    if arr.ndim != 1:
+        raise ValueError(f"embedding must be 1-D, got shape {arr.shape}")
+    return arr
 
 
 def _json_list(raw: str) -> list[str]:
@@ -190,9 +267,12 @@ def _load_matrix(conn: sqlite3.Connection) -> _MatrixCache:
         ).fetchall()
         chunk_ids: list[str] = []
         vectors: list[NDArray[np.float32]] = []
-        for chunk_id, embedding_json in rows:
-            raw = json.loads(str(embedding_json))
-            arr = np.asarray(raw, dtype=np.float32)
+        for chunk_id, embedding_raw in rows:
+            arr = _decode_embedding(embedding_raw)
+            if arr.shape[0] != _EMBED_DIM:
+                raise ValueError(
+                    f"embedding dim {arr.shape[0]} != {_EMBED_DIM} for chunk {chunk_id}"
+                )
             norm = float(np.linalg.norm(arr))
             if norm > 0.0:
                 arr = arr / norm

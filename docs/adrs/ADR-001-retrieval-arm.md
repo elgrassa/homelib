@@ -129,9 +129,43 @@ it; setting them silently at 0.174 would quietly ratify a weak result as the
 standard. Recording the number *and* the reason is the only version that
 stays honest.
 
+## v2 SQLite re-measurement (2026-09-03)
+
+**Status:** Accepted (store migration). Does **not** retract the v1 Postgres
+table above — that remains the historical evidence for ADR-001 on `main`.
+
+Re-ran `just eval-retrieval` against a WP03-seeded SQLite corpus
+(`HOMELIB_SQLITE_PATH=data/homelib.sqlite`, counts 18/729/9168/9168, FTS5 +
+float32 BLOB matrix, k=5, rewrite off, 0 degraded, 0 corpus-drift skips):
+
+| arm | hit-rate@5 | MRR@5 | mean latency |
+|---|---:|---:|---:|
+| `lexical` | 0.064 | 0.055 | 12 ms |
+| `vector` | 0.630 | 0.473 | 45 ms |
+| `hybrid` | 0.638 | 0.483 | 11 ms |
+| **`hybrid_rerank`** | **0.638** | **0.572** | 68 ms |
+
+**Decision unchanged: ship `hybrid_rerank`; rewrite stays off.**
+
+Two bugs found and fixed before this table was trustworthy (same PR):
+
+1. `_load_matrix` JSON-decoded embeddings; ingest stores **float32 BLOBs** →
+   vector arm 100% degraded. Fixed with dual BLOB/JSON decode + regression
+   `test_load_matrix_accepts_float32_blob_embeddings`.
+2. `_fts_query` AND-required every token including `What`/`is`, unlike
+   Postgres `plainto_tsquery('english', …)` → near-zero lexical. Fixed with
+   stopword drop + `test_fts_query_drops_english_stopwords_like_plainto_tsquery`.
+
+Vector@5 jumped vs Postgres (0.106 → 0.630) under the same ground truth and
+embedder — contiguous float32 matrix / no ivfflat approximation is the likely
+cause; do not treat the absolute lift as a chunker win without a matched
+re-run on both stores. Gate floors in `evals/eval-baseline.json` updated to
+the SQLite measurement (notes record the supersession).
+
 ## Verification
 
 ```bash
+export HOMELIB_SQLITE_PATH=$PWD/data/homelib.sqlite   # after WP03 seed
 just eval-retrieval                      # all four arms, 235 questions
 cat evals/results/retrieval.md
 

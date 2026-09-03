@@ -27,3 +27,7 @@ data/private/
 .dlt/
 evals/results/*.json
 !evals/results/.gitkeep
+
+# v2 local SQLite seed (regenerate via run_sqlite_pipeline)
+data/homelib.sqlite
+data/*.sqlite
