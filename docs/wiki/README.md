@@ -32,17 +32,19 @@ Architecture and operations documentation for the HomeLib capstone project. This
 
 ## Implementation status (v2 branch stack)
 
-Honest snapshot as of evidence through **WP04** (see [`docs/evidence.md`](../evidence.md)):
+Honest snapshot as of evidence through **WP06** (see [`docs/evidence.md`](../evidence.md)
+and [`docs/reviewer-handoff-v2.md`](../reviewer-handoff-v2.md)):
 
 | Work package | Branch (typical) | Status |
 |---|---|---|
 | WP00 config skeleton | `v2` | Done |
-| WP01 specs | `feat/wp01-specs` | Done |
-| WP02 SQLite schema | `feat/wp02-sqlite` | Done (14 tests) |
-| WP03 SQLite ingest (dlt) | `feat/wp03-ingest` | Done (22 tests) |
-| WP04 FTS5 + vector matrix | `feat/wp04-retrieval` | Done |
-| WP05+ catalog connectors | `feat/wp05-catalog` | In progress |
-| WP06–WP11 API, UI, Observatory | — | Spec-only / not merged |
+| WP01 specs | `feat/wp01-specs` | Done (merged) |
+| WP02 SQLite schema | `feat/wp02-sqlite` | Done (merged) |
+| WP03 SQLite ingest (dlt) | `feat/wp03-ingest` | Done (merged) |
+| WP04 FTS5 + vector matrix + eval | `feat/wp04-retrieval` / eval branch | Done (merged + SQLite eval) |
+| WP05 catalog connectors + wiki | `feat/wp05-catalog` | Done (merged) |
+| WP06 mentor library | `feat/wp06-mentor` | Done (merged; API/UI pending) |
+| WP07–WP11 API/UI/Observatory/publish | — | Not started |
 | v1 fallback | `main` / tag `v1-fallback` | Complete (Postgres + Grafana) |
 
 When a page marks something **implemented** vs **spec-only**, trust [`docs/evidence.md`](../evidence.md) over this table if they diverge.
