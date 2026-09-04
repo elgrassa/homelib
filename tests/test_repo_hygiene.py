@@ -232,3 +232,26 @@ def test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve() -> None:
         "ui.Dockerfile must set PYTHONPATH=/app so `import apps` works when "
         "Streamlit executes apps/ui/app.py as a script"
     )
+
+
+def test_compose_api_wires_homelib_sqlite_path_for_v2_doors() -> None:
+    """Coffee Table / playlists 503 when the API container lacks the SQLite path.
+
+    v2 routes call `_require_sqlite()`; health can still look green on Postgres
+    while Crossroads doors return 503 HOMELIB_SQLITE_PATH. Compose must set the
+    env and mount host `data/` so the seeded `homelib.sqlite` is reachable
+    inside the container (and writable for progress / demo sessions).
+    """
+    compose = yaml.safe_load((REPO_ROOT / "docker/docker-compose.yml").read_text())
+    api = compose["services"]["api"]
+    env = api.get("environment") or {}
+    volumes = api.get("volumes") or []
+
+    assert "HOMELIB_SQLITE_PATH" in env, (
+        "api service omits HOMELIB_SQLITE_PATH — Coffee Table and other v2 "
+        "doors return 503 even when Postgres health is green"
+    )
+    assert any("data" in str(v) for v in volumes), (
+        "api service must mount host data/ so HOMELIB_SQLITE_PATH resolves "
+        f"inside the container; volumes={volumes!r}"
+    )

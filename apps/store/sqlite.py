@@ -324,6 +324,13 @@ def migrate(conn: sqlite3.Connection, target_version: int | None = None) -> None
         except Exception:
             conn.rollback()
             raise
+    # Selfhosted Coffee Table / playlists use LOCAL_USER_ID. Pipeline and API
+    # open paths only migrate (seed is optional); without this, GET
+    # /v1/playlists/current raises UnknownPrincipal after HOMELIB_SQLITE_PATH
+    # is wired.
+    if target >= 1:
+        _ensure_local_user(conn)
+        conn.commit()
 
 
 def _require_principal(principal_id: str | None) -> str:

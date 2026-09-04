@@ -148,6 +148,31 @@ def test_observatory_without_sqlite_503(monkeypatch: pytest.MonkeyPatch) -> None
         assert client.get("/v1/observatory").status_code == 503
 
 
+def test_playlist_current_ok_on_migrate_only_sqlite_without_seed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Compose mounts a pipeline-seeded DB that never ran store.seed().
+
+    After HOMELIB_SQLITE_PATH is set, Coffee Table must not 500 on missing
+    local-user — migrate ensures the well-known selfhosted principal.
+    """
+    db = tmp_path / "pipeline_shaped.sqlite"
+    conn = connect(db)
+    migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db))
+    monkeypatch.setenv("APP_MODE", "selfhosted")
+    import apps.api.main as api_main
+
+    api_main._deps_singleton = None
+    with TestClient(app) as client:
+        resp = client.get("/v1/playlists/current")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["principal_id"] == "local-user"
+        assert body["items"] == []
+
+
 def test_feedback_ui_to_db_roundtrip(sqlite_env: Path) -> None:
     """WP10 live feedback path: POST /v1/feedback updates query_log (UI→API→DB)."""
     with TestClient(app) as client:
