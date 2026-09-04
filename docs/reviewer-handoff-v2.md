@@ -3,9 +3,9 @@
 Cold-start pack for a separate review session. Prefer this file +
 [`docs/wiki/README.md`](wiki/README.md) over chat history.
 
-**Git snapshot this handoff describes:** `forgejo/v2` tip **`39b9146`**
-(WP00–WP06 merged). WP04 eval fix/metrics branch: `feat/wp04-eval-sqlite`
-(open PR — do not assume it is on `v2` until merged).
+**Git snapshot this handoff describes:** branch `feat/v2-wp08-wp11-surface`
+(targets `forgejo/v2`). Tip before this work: `39913df`. WP00–WP10 thin
+product surface implemented; WP11 drill/publish/Cloud remain owner Mon.
 
 Forgejo: http://localhost:3000/elgrassa/homelib · remote
 `ssh://git@localhost:2222/elgrassa/homelib.git`
@@ -51,7 +51,7 @@ live in [`docs/evidence.md`](evidence.md) addendum + CHECKLIST §I). Editions:
 | Scene search | `homelib_rag.scene_search` | Exact/Keyword/Semantic/Smart/Ask + anchors |
 | Catalog | `homelib_rag.connectors` | Fixture-first OL / Gutenberg / Standard Ebooks |
 | Mentor | `homelib_rag.mentor` | Intake proposals only — **no DB writes** |
-| API / UI | `apps/api`, `apps/ui` | Still **v1 Postgres** contract until WP07–08 |
+| API / UI | `apps/api`, `apps/ui` | SQLite when `HOMELIB_SQLITE_PATH` set; Crossroads + Coffee Table + Observatory + Projection |
 | Runtime | `apps/runtime_settings.py` | `APP_MODE` skeleton |
 
 Canonical seed counts after `run_sqlite_pipeline`: **18 / 729 / 9168 / 9168**.
@@ -104,14 +104,14 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
 | 1 | Problem description | done (v1) | README |
-| 2 | Retrieval KB + LLM | done (v1); **partial v2** | v1 API ask; v2 hybrid/SQLite green, API not SQLite-wired |
+| 2 | Retrieval KB + LLM | done (v1); **v2 wired** when `HOMELIB_SQLITE_PATH` | health/books/ask/feedback + mentor/scene/playlists/observatory |
 | 3 | Retrieval evaluation | done | v1 ADR-001; **v2 SQLite re-measure** `evals/results/retrieval.md` + ADR-001 §v2 |
 | 4 | LLM evaluation | done (v1) | ADR-003 null result |
-| 5 | Interface UI or API | done (v1) | FastAPI + Streamlit; v2 §8 endpoints not shipped |
+| 5 | Interface UI or API | done (v1); **v2 thin surface** | Crossroads Streamlit + FastAPI §8 subset |
 | 6 | Ingestion dlt | done | v1 Postgres; v2 SQLite pipeline tests + seed |
-| 7 | Monitoring ≥5 charts + feedback | done (v1) | Grafana; Observatory = WP10 |
+| 7 | Monitoring ≥5 charts + feedback | done (v1 Grafana); **v2 Observatory** | `GET /v1/observatory` + feedback UI→DB |
 | 8 | Containerization | done (v1) | `docker/` compose |
-| 9 | Reproducibility | partial | pins yes; `just drill` not green on quiet box |
+| 9 | Reproducibility | partial | pins yes; **`just drill` not yet green on quiet box** |
 | 10 | Hybrid + rerank + rewrite | done | rewrite rejected on evidence |
 | 11–12 | Bonus cloud / extras | optional / partial | late owner deploy |
 
@@ -124,8 +124,12 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | WP03 | done | PR #7 @ `16269a9` |
 | WP04 | done | PR #8 @ `8653148` + eval branch (BLOB/FTS fixes, metrics, ADR) |
 | WP05 | done | PR #9 @ `bda328a`; `docs/wiki/` |
-| WP06 | done (library) | PR #10 @ `39b9146`; API/UI pending |
-| WP07–WP11 | missing | Coffee Table, Streamlit e2e, projection, Observatory, publish |
+| WP06 | done | PR #10 @ `39b9146`; API `POST /v1/mentor/intake` |
+| WP07 | done | Coffee Table store + `/v1/playlists/*` + progress |
+| WP08 | done | Crossroads doors + HomelibClient conformance + AST |
+| WP09 | done | One-page projection; static doors (rotunda cut) |
+| WP10 | done | Observatory ≥5 + `demo_traffic.py` + feedback DB |
+| WP11 | prep only | Docs/evidence/OpenAPI updated; **drill / Compose e2e / Cloud / publish = owner Mon** |
 
 ### Named WP04 eval numbers (SQLite, 2026-09-03)
 
@@ -172,25 +176,24 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 4. **Rights / GDPR:** unknown fail-closed; metadata_only not in FTS; queries
    hashed by default; local-first LLM.
 5. **Coverage floor:** `just ci` ≥ 90%.
-6. **Honest gap:** HTTP API/UI still Postgres — do not claim v2 demo UI e2e
-   until WP08.
+6. **Honest residual (WP11):** quiet-box `just drill`, Compose all-healthy
+   e2e proof, `just publish`, Streamlit Cloud, peer×3 — **owner Mon**. Do not
+   claim a live public URL from this branch tip.
 7. **Compose:** if Docker healthy, `just up` + `/health` + one `/v1/ask`.
+   For SQLite demo path also set `HOMELIB_SQLITE_PATH` + seed.
 
 ---
 
 ## 7. Known gaps / improvements (priority)
 
-1. **P0 — Wire v2 store into FastAPI/Streamlit** (WP07–08): mentor, scene
-   search, SQLite deps; regenerate OpenAPI snapshot.
-2. **P0 — Runnable demo without Docker hang** — document host Docker failure;
-   optional pure-SQLite InProcess client.
-3. **P1 — Observatory** (WP10) replaces Grafana for demo charts + feedback.
-4. **P1 — Cold-clone drill** on quiet machine; `just drill` green before
-   `v2`→`main`.
-5. **P2 — Matched Postgres vs SQLite vector bake-off** to explain 0.106→0.630
-   lift (do not over-claim).
-6. **P2 — Live OL smoke** outside CI (fixtures-only in CI by design).
-7. **P3 — UX polish** (rotunda, sphere, audio) — cut-order last.
+1. **P0 — Quiet-box `just drill`** green before `v2`→`main` (criterion 9).
+2. **P0 — Regenerate OpenAPI snapshot** for new v2 routes.
+3. **P1 — Compose all-healthy e2e** with SQLite profile documented.
+4. **P1 — Matched Postgres vs SQLite vector bake-off** (do not over-claim
+   0.106→0.630 lift).
+5. **P2 — Live OL smoke** outside CI (fixtures-only in CI by design).
+6. **P3 — UX polish** (rotunda, sphere, audio) — cut-order last.
+7. **Mon owner:** Cloud deploy, `just publish`, peer ×3 schedule.
 
 ---
 
@@ -198,13 +201,8 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 
 | Ref | SHA / note |
 |---|---|
-| `forgejo/v2` | `39b9146` — WP06 evidence tip |
-| PR #8 WP04 | merged @ `8653148` |
-| PR #9 WP05 | merged @ `bda328a` |
-| PR #10 WP06 | merged @ `39b9146` |
-| `feat/wp04-eval-sqlite` | eval metrics + BLOB/FTS fixes + this handoff (open) |
+| `forgejo/v2` | was `39913df` handoff tip — WP07–10 land as follow-up commit |
 | `main` / `v1-fallback` | `535f58b` |
-| Open PRs targeting `v2` | none after #10 except eval/handoff branch |
+| Open PRs | none required for this surface; open PR after local `just ci` |
 
-Merge style for leftover work: `tea pulls merge <n> --style rebase`. Restack
-downstream onto `forgejo/v2` after each merge. No force-push to `v2`/`main`.
+Merge style: `tea pulls merge <n> --style rebase`. No force-push to `v2`/`main`.

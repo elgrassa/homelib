@@ -6,11 +6,17 @@
     "/v1/ask": [
       "post"
     ],
+    "/v1/audio/capabilities": [
+      "get"
+    ],
     "/v1/blocks/{block_id}": [
       "get"
     ],
     "/v1/books": [
       "get"
+    ],
+    "/v1/demo/session": [
+      "post"
     ],
     "/v1/feedback": [
       "post"
@@ -18,11 +24,43 @@
     "/v1/ingest": [
       "post"
     ],
+    "/v1/mentor/intake": [
+      "post"
+    ],
+    "/v1/observatory": [
+      "get"
+    ],
+    "/v1/paths": [
+      "post"
+    ],
+    "/v1/playlists/current": [
+      "get",
+      "post"
+    ],
+    "/v1/playlists/current/items": [
+      "patch",
+      "post"
+    ],
+    "/v1/playlists/current/items/{item_id}": [
+      "delete"
+    ],
+    "/v1/progress": [
+      "post"
+    ],
+    "/v1/resources": [
+      "get"
+    ],
+    "/v1/resources/{resource_id}/search": [
+      "post"
+    ],
     "/v1/roadmap": [
       "post"
     ]
   },
   "schemas": {
+    "AddPlaylistItemRequest": [
+      "resource_id"
+    ],
     "AskRequest": [
       "query"
     ],
@@ -35,6 +73,7 @@
       "request_id",
       "tokens"
     ],
+    "AudioCapabilities": [],
     "Block": [
       "block_id",
       "book_id",
@@ -61,6 +100,11 @@
       "page",
       "quote",
       "section_path"
+    ],
+    "CreatePathRequest": [
+      "kind",
+      "steps",
+      "title"
     ],
     "ExtractionResult": [
       "extraction_sha256",
@@ -92,10 +136,90 @@
       "provider",
       "reachable"
     ],
-    "OkResponse": [],
+    "MentorIntakeRequest": [
+      "goal"
+    ],
+    "MentorIntakeResponse": [
+      "rationale",
+      "request_id"
+    ],
+    "ObservatoryChart": [
+      "id",
+      "title"
+    ],
+    "ObservatoryPoint": [
+      "bucket",
+      "value"
+    ],
+    "ObservatoryResponse": [
+      "app_mode",
+      "charts",
+      "generated_at"
+    ],
+    "PatchPlaylistItem": [
+      "id"
+    ],
+    "PatchPlaylistItemsRequest": [
+      "items"
+    ],
+    "PathResponse": [
+      "kind",
+      "path_id",
+      "steps",
+      "title"
+    ],
+    "PathStepPreview": [
+      "order",
+      "title",
+      "why"
+    ],
+    "Playlist": [
+      "id",
+      "principal_id",
+      "updated_at"
+    ],
+    "PlaylistAcceptRequest": [],
+    "PlaylistItem": [
+      "id",
+      "ordinal",
+      "origin",
+      "resource_id",
+      "status"
+    ],
+    "PlaylistOrigin": [],
+    "PlaylistStatus": [],
+    "ProgressEvent": [
+      "kind",
+      "resource_id"
+    ],
+    "ProgressKind": [],
+    "ProposedArea": [
+      "name"
+    ],
+    "ProposedPath": [
+      "kind",
+      "steps",
+      "title"
+    ],
+    "ProposedWing": [
+      "name"
+    ],
     "Provenance": [
       "format",
       "source_sha256"
+    ],
+    "ResourceList": [
+      "items",
+      "unique_count"
+    ],
+    "ResourceSummary": [
+      "authors",
+      "book_id",
+      "can_index_text",
+      "full_text_available",
+      "id",
+      "rights_status",
+      "title"
     ],
     "RoadmapRequest": [
       "goal",
@@ -117,6 +241,29 @@
       "title",
       "why"
     ],
+    "SceneHit": [
+      "block_id",
+      "chapter_id",
+      "char_end",
+      "char_start",
+      "chunk_id",
+      "next_context",
+      "open_anchor",
+      "prev_context",
+      "quote",
+      "resource_id"
+    ],
+    "SceneSearchRequest": [
+      "query"
+    ],
+    "SceneSearchResponse": [
+      "degraded",
+      "hits",
+      "latency_ms",
+      "mode_used",
+      "request_id",
+      "resource_id"
+    ],
     "TokenUsage": [
       "completion",
       "prompt"
@@ -125,6 +272,8 @@
       "loc",
       "msg",
       "type"
-    ]
+    ],
+    "apps__api__schemas__OkResponse": [],
+    "apps__api__v2_routes__OkResponse": []
   }
 }

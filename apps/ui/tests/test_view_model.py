@@ -21,6 +21,7 @@ from apps.ui.api_client import (
     TokenUsage,
 )
 from apps.ui.view_model import (
+    CROSSROADS_DOORS,
     DEFAULT_API_URL,
     block_id_for_citation,
     format_api_error_message,
@@ -29,14 +30,25 @@ from apps.ui.view_model import (
     get_api_url,
     has_voted,
     library_summary,
+    normalize_door,
     normalize_level,
+    observatory_chart_titles,
     parse_interests,
+    playlist_visible_items,
     record_vote,
     resolve_prerequisite_titles,
     steps_in_order,
 )
 
-FORBIDDEN_MODULES = ("psycopg", "homelib_core", "homelib_rag", "sqlalchemy", "dlt")
+FORBIDDEN_MODULES = (
+    "psycopg",
+    "homelib_core",
+    "homelib_rag",
+    "sqlalchemy",
+    "dlt",
+    "sqlite3",
+)
+FORBIDDEN_MODULE_PREFIXES = ("apps.store",)
 
 
 # --------------------------------------------------------------------------
@@ -108,26 +120,54 @@ def _make_book(*, blocks: int, chunks: int) -> BookSummary:
 # --------------------------------------------------------------------------
 
 
-def _imported_root_modules(tree: ast.AST) -> set[str]:
-    roots: set[str] = set()
+def _imported_modules(tree: ast.AST) -> set[str]:
+    modules: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                roots.add(alias.name.split(".")[0])
+                modules.add(alias.name)
         elif isinstance(node, ast.ImportFrom) and node.module:
-            roots.add(node.module.split(".")[0])
-    return roots
+            modules.add(node.module)
+    return modules
 
 
 def test_ui_never_imports_database_or_internal_packages() -> None:
     ui_dir = Path(__file__).resolve().parent.parent
     offending: dict[str, set[str]] = {}
     for path in sorted(ui_dir.rglob("*.py")):
+        if path.name.startswith("test_"):
+            continue
         tree = ast.parse(path.read_text(), filename=str(path))
-        hits = _imported_root_modules(tree) & set(FORBIDDEN_MODULES)
+        imported = _imported_modules(tree)
+        hits: set[str] = set()
+        for mod in imported:
+            root = mod.split(".")[0]
+            if root in FORBIDDEN_MODULES or mod in FORBIDDEN_MODULES:
+                hits.add(mod)
+            if any(mod == p or mod.startswith(p + ".") for p in FORBIDDEN_MODULE_PREFIXES):
+                hits.add(mod)
         if hits:
             offending[str(path)] = hits
     assert not offending, f"forbidden imports found under apps/ui: {offending}"
+
+
+def test_ui_boundary_forbids_store_and_provider_imports() -> None:
+    """Named red from specs/client.md — alias of the AST walk above."""
+    test_ui_never_imports_database_or_internal_packages()
+
+
+def test_crossroads_doors_cover_thin_e2e_journey() -> None:
+    """Crossroads → Ask (Wing) → Mentor → Coffee Table → Projection reader."""
+    assert "Ask" in CROSSROADS_DOORS
+    assert "Mentor" in CROSSROADS_DOORS
+    assert "Coffee Table" in CROSSROADS_DOORS
+    assert "Projection" in CROSSROADS_DOORS
+    assert "Rotunda" not in CROSSROADS_DOORS
+    app_src = (Path(__file__).resolve().parent.parent / "app.py").read_text()
+    for door in CROSSROADS_DOORS:
+        assert f'door == "{door}"' in app_src
+    assert "render_projection_tab" in app_src
+    assert "Enter projector mode" in app_src
 
 
 # --------------------------------------------------------------------------
@@ -325,3 +365,36 @@ def test_get_api_url_honours_the_environment(monkeypatch) -> None:  # type: igno
     monkeypatch.setenv("API_URL", "http://api:8000")
 
     assert get_api_url() == "http://api:8000"
+
+
+def test_normalize_door_accepts_crossroads_labels() -> None:
+    for door in CROSSROADS_DOORS:
+        assert normalize_door(door) == door
+
+
+def test_normalize_door_rejects_unknown() -> None:
+    try:
+        normalize_door("Rotunda")
+    except ValueError as exc:
+        assert "Rotunda" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("normalize_door accepted an unknown door")
+
+
+def test_playlist_visible_items_skips_removed() -> None:
+    visible = playlist_visible_items(
+        {
+            "items": [
+                {"id": "a", "status": "queued"},
+                {"id": "b", "status": "removed"},
+            ]
+        }
+    )
+    assert [i["id"] for i in visible] == ["a"]
+
+
+def test_observatory_chart_titles_preserve_order() -> None:
+    titles = observatory_chart_titles(
+        {"charts": [{"title": "A", "id": "a"}, {"id": "b"}, {"title": "C"}]}
+    )
+    assert titles == ["A", "b", "C"]

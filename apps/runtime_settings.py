@@ -1,7 +1,7 @@
 """Edition / runtime flags from the environment.
 
-Skeleton only: makes `APP_MODE` and the documented timeout defaults readable.
-Does not switch retrieval onto SQLite/FTS5.
+`APP_MODE` and timeout defaults. When `HOMELIB_SQLITE_PATH` is set, the API
+wires health/books/ask logging onto the SQLite store (see apps/api/sqlite_deps).
 """
 
 from __future__ import annotations

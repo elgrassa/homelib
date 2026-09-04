@@ -362,6 +362,7 @@ def test_reset_embedder_for_tests_clears_singleton(monkeypatch: pytest.MonkeyPat
     index_module._load_embedder()
 
     assert len(created) == 2
+    index_module._reset_embedder_for_tests()
 
 
 def test_unit_fakes_do_not_leak_into_the_embedder_singleton() -> None:
@@ -439,6 +440,7 @@ def _seed(dsn: str) -> None:
     """Seed the fixture book/blocks/chunks/embeddings using the SAME embedder
     `search_vector` uses at query time, so vector similarity is meaningful.
     """
+    index_module._reset_embedder_for_tests()
     model = index_module._load_embedder()  # test setup, same-package seam
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(

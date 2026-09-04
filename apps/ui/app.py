@@ -1,19 +1,8 @@
 """Streamlit UI. Talks only to the public API, never to the database.
 
-This module is a *rendering shell* and nothing else: every function here calls
-the pure helpers in ``apps.ui.view_model`` and issues ``st.*`` calls, but makes
-no decisions of its own. All the logic — formatting, aggregation, state
-transitions — lives in ``view_model.py``, which is fully unit-tested.
-
-That separation is why this file is the one module excluded from the coverage
-floor (see ``[tool.coverage.run] omit`` in pyproject.toml): it cannot be
-exercised without a live Streamlit runtime, and pretending otherwise would mean
-writing tests that assert nothing. Anything worth asserting belongs in
-``view_model.py``, where the floor does apply.
-
-``main()`` is only invoked when the file is executed via
-``streamlit run apps/ui/app.py`` (guarded by ``if __name__ == "__main__"``),
-so importing this module in tests never touches the Streamlit runtime.
+Rendering shell only — decisions live in ``view_model.py``.
+WP08 thin e2e: Crossroads doors → Ask / Mentor / Coffee Table / Shelf /
+Observatory / Projection.
 """
 
 from __future__ import annotations
@@ -29,6 +18,7 @@ from apps.ui.api_client import (
     AskResponse,
 )
 from apps.ui.view_model import (
+    CROSSROADS_DOORS,
     LEVELS,
     block_id_for_citation,
     format_api_error_message,
@@ -37,8 +27,11 @@ from apps.ui.view_model import (
     get_api_url,
     has_voted,
     library_summary,
+    normalize_door,
     normalize_level,
+    observatory_chart_titles,
     parse_interests,
+    playlist_visible_items,
     record_vote,
     resolve_prerequisite_titles,
     steps_in_order,
@@ -102,8 +95,194 @@ def _cast_vote(client: ApiClient, request_id: str, feedback: Literal["up", "down
         st.session_state["feedback_sent"] = record_vote(feedback_sent, request_id)
 
 
+def render_mentor_tab(client: ApiClient) -> None:
+    st.header("Mentor")
+    with st.form("mentor_form"):
+        goal = st.text_input("Goal", key="mentor_goal")
+        interests_raw = st.text_input("Interests (comma-separated)", key="mentor_interests")
+        level = st.selectbox("Level", LEVELS, key="mentor_level")
+        submitted = st.form_submit_button("Propose path")
+    if submitted and goal.strip():
+        try:
+            response = client.mentor_intake(
+                goal.strip(), parse_interests(interests_raw), normalize_level(level)
+            )
+        except (ApiClientError, ApiUnavailableError) as exc:
+            st.error(format_api_error_message(exc))
+        else:
+            st.session_state["last_mentor"] = response
+
+    last = st.session_state.get("last_mentor")
+    if last is None:
+        return
+    if last.get("degraded"):
+        st.warning("Mentor returned a degraded proposal.")
+    if last.get("high_stakes_notice"):
+        st.info(last["high_stakes_notice"])
+    st.write(last.get("rationale") or "")
+    path = last.get("proposed_path")
+    if path:
+        st.subheader(path.get("title") or "Proposed path")
+        for step in path.get("steps") or []:
+            st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+
+
+def render_coffee_table_tab(client: ApiClient) -> None:
+    st.header("Coffee Table")
+    try:
+        resources = client.list_resources()
+        playlist = client.get_playlist()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+
+    items = playlist_visible_items(playlist)
+    if items:
+        for item in items:
+            cols = st.columns([4, 1, 1])
+            cols[0].write(
+                f"`{item.get('ordinal')}` {item.get('resource_id')} · {item.get('status')}"
+            )
+            if cols[1].button(
+                "Accept", key=f"acc_{item['id']}", disabled=item.get("status") != "proposed"
+            ):
+                try:
+                    client.accept_playlist([item["id"]])
+                    st.rerun()
+                except (ApiClientError, ApiUnavailableError) as exc:
+                    st.error(format_api_error_message(exc))
+            if cols[2].button("Remove", key=f"rm_{item['id']}"):
+                try:
+                    client.remove_playlist_item(item["id"])
+                    st.rerun()
+                except (ApiClientError, ApiUnavailableError) as exc:
+                    st.error(format_api_error_message(exc))
+    else:
+        st.write("Coffee Table is empty.")
+
+    shelf = resources.get("items") or []
+    if shelf:
+        choice = st.selectbox(
+            "Add from shelf",
+            options=[r["id"] for r in shelf],
+            format_func=lambda rid: next(
+                (f"{r['title']} ({rid})" for r in shelf if r["id"] == rid), rid
+            ),
+            key="coffee_add_select",
+        )
+        if st.button("Add to Coffee Table", key="coffee_add"):
+            try:
+                client.add_playlist_item(choice)
+                st.rerun()
+            except (ApiClientError, ApiUnavailableError) as exc:
+                st.error(format_api_error_message(exc))
+
+
+def render_library_tab(client: ApiClient) -> None:
+    st.header("Shelf")
+    try:
+        books = client.list_books()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+
+    summary = library_summary(books)
+    st.write(
+        f"{summary.book_count} books · {summary.total_blocks} blocks · "
+        f"{summary.total_chunks} chunks"
+    )
+    st.table(
+        [
+            {
+                "title": book.title,
+                "authors": ", ".join(book.authors),
+                "blocks": book.blocks,
+                "chunks": book.chunks,
+                "format": book.format,
+            }
+            for book in books
+        ]
+    )
+
+    st.subheader("Scene search")
+    if not books:
+        return
+    book_id = st.selectbox("Book", options=[b.book_id for b in books], key="scene_book")
+    scene_q = st.text_input("Open the scene where…", key="scene_q")
+    if st.button("Search scenes", key="scene_go") and scene_q.strip():
+        try:
+            result = client.scene_search(book_id, scene_q.strip())
+        except (ApiClientError, ApiUnavailableError) as exc:
+            st.error(format_api_error_message(exc))
+        else:
+            for hit in result.get("hits") or []:
+                st.write(f"**{hit.get('open_anchor')}** — {hit.get('quote', '')[:200]}")
+
+
+def render_observatory_tab(client: ApiClient) -> None:
+    st.header("Observatory")
+    try:
+        payload = client.get_observatory()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        st.caption("Requires HOMELIB_SQLITE_PATH on the API.")
+        return
+    titles = observatory_chart_titles(payload)
+    st.write(f"App mode: {payload.get('app_mode')} · {len(titles)} charts")
+    for chart in payload.get("charts") or []:
+        st.subheader(chart.get("title") or chart.get("id"))
+        points = chart.get("points") or []
+        if not points:
+            st.write("(no data yet — run `uv run python scripts/demo_traffic.py --n 40`)")
+            continue
+        st.bar_chart(
+            {
+                "bucket": [p.get("bucket") for p in points],
+                "value": [p.get("value") for p in points],
+            },
+            x="bucket",
+            y="value",
+        )
+
+
+def render_projection_tab(client: ApiClient) -> None:
+    """WP09 one-page projection mode — large type, chrome-light reader stage."""
+    st.header("Projection")
+    projector = st.toggle("Enter projector mode", key="projector_mode")
+    try:
+        books = client.list_books()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+    if not books:
+        st.write("No books on the shelf.")
+        return
+    book = st.selectbox(
+        "Book",
+        options=books,
+        format_func=lambda b: b.title,
+        key="proj_book",
+    )
+    offset = st.number_input("Character offset", min_value=0, value=0, key="proj_offset")
+    if st.button("Save progress", key="proj_save"):
+        try:
+            client.save_progress(book.book_id, char_offset=int(offset))
+            st.success("Progress saved.")
+        except (ApiClientError, ApiUnavailableError) as exc:
+            st.error(format_api_error_message(exc))
+    font = "2.2rem" if projector else "1.1rem"
+    st.markdown(
+        f"<div style='font-size:{font}; line-height:1.6; max-width:48rem;'>"
+        f"<p><strong>{book.title}</strong></p>"
+        f"<p>Projection stage (16:9). Open a citation from Ask or Scene search "
+        f"to fill this page. Offset {int(offset)}.</p>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def render_roadmap_tab(client: ApiClient) -> None:
-    st.header("Roadmap")
+    st.header("Roadmap (v1)")
     with st.form("roadmap_form"):
         interests_raw = st.text_input("Interests (comma-separated)", key="roadmap_interests")
         level = st.selectbox("Level", LEVELS, key="roadmap_level")
@@ -139,45 +318,34 @@ def render_roadmap_tab(client: ApiClient) -> None:
             st.write(f"Estimated effort: {step.est_effort}")
 
 
-def render_library_tab(client: ApiClient) -> None:
-    st.header("Library")
-    try:
-        books = client.list_books()
-    except (ApiClientError, ApiUnavailableError) as exc:
-        st.error(format_api_error_message(exc))
-        return
-
-    summary = library_summary(books)
-    st.write(
-        f"{summary.book_count} books · {summary.total_blocks} blocks · "
-        f"{summary.total_chunks} chunks"
-    )
-    st.table(
-        [
-            {
-                "title": book.title,
-                "authors": ", ".join(book.authors),
-                "blocks": book.blocks,
-                "chunks": book.chunks,
-                "format": book.format,
-            }
-            for book in books
-        ]
-    )
-
-
 def main() -> None:
     st.set_page_config(page_title="homelib", page_icon="📚", layout="wide")
-    st.title("homelib")
+    st.title("HomeLib")
     client = ApiClient(get_api_url())
 
-    ask_tab, roadmap_tab, library_tab = st.tabs(["Ask", "Roadmap", "Library"])
-    with ask_tab:
+    if "door" not in st.session_state:
+        st.session_state["door"] = CROSSROADS_DOORS[0]
+
+    st.caption("Library Crossroads")
+    cols = st.columns(len(CROSSROADS_DOORS))
+    for col, door in zip(cols, CROSSROADS_DOORS, strict=True):
+        if col.button(door, key=f"door_{door}"):
+            st.session_state["door"] = normalize_door(door)
+
+    door = normalize_door(st.session_state["door"])
+    st.divider()
+    if door == "Ask":
         render_ask_tab(client)
-    with roadmap_tab:
-        render_roadmap_tab(client)
-    with library_tab:
+    elif door == "Mentor":
+        render_mentor_tab(client)
+    elif door == "Coffee Table":
+        render_coffee_table_tab(client)
+    elif door == "Shelf":
         render_library_tab(client)
+    elif door == "Observatory":
+        render_observatory_tab(client)
+    elif door == "Projection":
+        render_projection_tab(client)
 
 
 if __name__ == "__main__":

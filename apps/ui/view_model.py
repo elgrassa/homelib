@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from apps.ui.api_client import (
     ApiClientError,
@@ -135,3 +135,34 @@ def library_summary(books: list[BookSummary]) -> LibrarySummary:
         total_blocks=sum(book.blocks for book in books),
         total_chunks=sum(book.chunks for book in books),
     )
+
+
+# Crossroads static doors (WP08) — labels only; navigation is a pure choice.
+CROSSROADS_DOORS: tuple[str, ...] = (
+    "Ask",
+    "Mentor",
+    "Coffee Table",
+    "Shelf",
+    "Observatory",
+    "Projection",
+)
+
+
+def normalize_door(value: str) -> str:
+    """Validate a Crossroads door selection against the static door grid."""
+    for door in CROSSROADS_DOORS:
+        if value == door:
+            return door
+    raise ValueError(f"unknown door: {value!r}")
+
+
+def playlist_visible_items(playlist: dict[str, Any]) -> list[dict[str, Any]]:
+    """Items shown on the Coffee Table (exclude removed)."""
+    items = playlist.get("items") or []
+    return [item for item in items if item.get("status") != "removed"]
+
+
+def observatory_chart_titles(payload: dict[str, Any]) -> list[str]:
+    """Titles for Observatory charts, in API order."""
+    charts = payload.get("charts") or []
+    return [str(chart.get("title") or chart.get("id") or "") for chart in charts]

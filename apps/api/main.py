@@ -478,20 +478,34 @@ _deps_singleton: Deps | None = None
 
 
 def _build_default_deps() -> Deps:
+    from apps.api import sqlite_deps
+
     client = answer_module.default_llm_client()
+    use_sqlite = sqlite_deps.sqlite_path() is not None
+
+    def _get_block(block_id: str) -> Block:
+        if use_sqlite:
+            try:
+                return sqlite_deps.sqlite_get_block(block_id)
+            except LookupError as exc:
+                raise KeyError(block_id) from exc
+        return agent_module.get_block(block_id)
+
     return Deps(
         llm_client=client,
         llm_provider=_infer_provider(client.base_url),
         llm_reachable=lambda: _default_llm_reachable(client.base_url),
-        db_reachable=_default_db_reachable,
-        counts=_default_counts,
+        db_reachable=sqlite_deps.sqlite_db_reachable if use_sqlite else _default_db_reachable,
+        counts=sqlite_deps.sqlite_counts if use_sqlite else _default_counts,
         retrieve=_default_retrieve,
         rewrite_query=rewrite_query,
         catalog_search=agent_module.search_catalog,
-        list_books=_default_list_books,
-        get_block=agent_module.get_block,
-        log_query=_default_log_query,
-        record_feedback=_default_record_feedback,
+        list_books=sqlite_deps.sqlite_list_books if use_sqlite else _default_list_books,
+        get_block=_get_block,
+        log_query=sqlite_deps.sqlite_log_query if use_sqlite else _default_log_query,
+        record_feedback=(
+            sqlite_deps.sqlite_record_feedback if use_sqlite else _default_record_feedback
+        ),
         ingest=_default_ingest,
     )
 
@@ -612,5 +626,11 @@ def get_books(deps: Deps = Depends(get_deps)) -> list[BookSummary]:
 def get_block_endpoint(block_id: str, deps: Deps = Depends(get_deps)) -> Block:
     try:
         return deps.get_block(block_id)
-    except KeyError as exc:
+    except (KeyError, LookupError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# v2 product surface (mentor / scene / Coffee Table / Observatory)
+from apps.api.v2_routes import router as v2_router  # noqa: E402
+
+app.include_router(v2_router)

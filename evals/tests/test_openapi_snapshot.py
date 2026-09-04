@@ -53,6 +53,7 @@ def test_snapshot_covers_every_endpoint_in_api_md() -> None:
     """A cheap independent check that the snapshot itself is not stale: every
     endpoint named in specs/api.md's table is present."""
     committed = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    # v1 live surface (always required) plus v2 section 8 routes shipped in WP07-10.
     expected_paths = {
         "/health",
         "/v1/ask",
@@ -61,6 +62,17 @@ def test_snapshot_covers_every_endpoint_in_api_md() -> None:
         "/v1/feedback",
         "/v1/books",
         "/v1/blocks/{block_id}",
+        "/v1/mentor/intake",
+        "/v1/paths",
+        "/v1/resources",
+        "/v1/resources/{resource_id}/search",
+        "/v1/playlists/current",
+        "/v1/playlists/current/items",
+        "/v1/playlists/current/items/{item_id}",
+        "/v1/progress",
+        "/v1/observatory",
+        "/v1/audio/capabilities",
+        "/v1/demo/session",
     }
     assert expected_paths == set(committed["paths"])
 

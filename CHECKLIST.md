@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-09-03 (WP00–WP06 on `v2` @ `39b9146`; WP04 SQLite eval closed).
+Last updated: 2026-09-04 (WP07–WP10 thin surface + HomelibClient conformance; WP11 drill/publish still owner Mon).
 
 ---
 
@@ -120,14 +120,14 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP03** | Ingest + rights; chunk ids match v1 | ✅ done — PR #7 → `v2` @ `16269a9` |
 | **WP04** | FTS5 + matrix + evals | ✅ done — PR #8 → `v2` @ `8653148`; SQLite eval + ADR-001 §v2 on `feat/wp04-eval-sqlite` |
 | **WP05** | Lawful connectors | ✅ done — PR #9 → `v2` @ `bda328a` |
-| **WP06** | Mentor + cited answer (library) | ✅ done — PR #10 → `v2` @ `39b9146` (API/UI wiring still WP07–08) |
-| **WP07** | Coffee Table + progress | ⬜ |
-| **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ⬜ |
-| **WP09** | Projection; static doors before rotunda | ⬜ |
-| **WP10** | Observatory ≥5 charts + feedback | ⬜ |
-| **WP11** | Docs, drill, owner publish + Cloud | ⬜ |
+| **WP06** | Mentor + cited answer (library) | ✅ done — PR #10 → `v2` @ `39b9146`; API route `POST /v1/mentor/intake` wired |
+| **WP07** | Coffee Table + progress | ✅ done — store ops + §5.6 reds + `/v1/playlists/*` + `/v1/progress` |
+| **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Coffee Table/Shelf/Observatory/Projection |
+| **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save (rotunda cut) |
+| **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 prep — evidence/handoff/OpenAPI/CHECKLIST updated; **residual owner Mon:** quiet-box `just drill`, Compose all-healthy e2e, `just publish`, Cloud, submit, peer×3 |
 
-**Progress (2026-09-03):** `forgejo/v2` tip `39b9146` includes WP00–WP06. WP04 eval verify closed on SQLite (4 arms × 235 Q, winner `hybrid_rerank` 0.638/0.572). **v2 build ≈50%** of WP00–WP11. Remaining for GO/NO-GO: WP07–WP10 product surface, Compose/API still Postgres until wired, cold-clone drill, owner Cloud deploy Mon Sep 7.
+**Progress (2026-09-04):** WP00–WP10 thin product surface on `feat/v2-wp08-wp11-surface` (PR → `v2`). P0 SQLite API wire when `HOMELIB_SQLITE_PATH` set. **v2 build ≈85%** of WP00–WP11. Remaining for GO/NO-GO: quiet-box `just drill`, Compose all-healthy e2e proof, Mon owner Cloud publish. Criterion 9 still partial until drill green.
 
 **GO/NO-GO** Sun Sep 6 18:00 (product §12.4; **local gate per addendum** — not live public URL). Pass requires local `APP_MODE=demo` rehearsal green (fresh session-isolated state, resettable seed, RSS within Community Cloud limits), cited answer resolves, both evals committed, ingest repeatable, feedback+≥5 charts, Compose healthy, drill plausible for Monday, no rights/secret/isolation blocker. Live logged-out URL check moves to **Mon Sep 7** after owner deploy. NO-GO ⇒ submit v1 Monday (`v1-fallback`). Never trade a scored 2-point row for polish / Home/Pro / rotunda / TTS.
 

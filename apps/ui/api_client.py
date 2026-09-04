@@ -10,7 +10,8 @@ data is ``pydantic`` + ``httpx``.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from collections.abc import Callable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 import httpx
 from pydantic import BaseModel
@@ -156,6 +157,19 @@ class ApiClient:
             return None
         return response.json()
 
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        data = self._request(method, path, json=json, timeout=timeout)
+        if not isinstance(data, dict):
+            raise ApiClientError("expected JSON object", status_code=502)
+        return data
+
     def ask(
         self,
         query: str,
@@ -209,3 +223,135 @@ class ApiClient:
     def list_books(self) -> list[BookSummary]:
         data = self._request("GET", "/v1/books")
         return [BookSummary.model_validate(item) for item in data]
+
+    def list_resources(self, *, q: str | None = None) -> dict[str, Any]:
+        path = "/v1/resources" if not q else f"/v1/resources?q={q}"
+        return self._request_json("GET", path)
+
+    def mentor_intake(
+        self,
+        goal: str,
+        interests: list[str] | None = None,
+        level: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "goal": goal,
+            "interests": interests or [],
+            "level": level,
+        }
+        return self._request_json(
+            "POST", "/v1/mentor/intake", json=payload, timeout=LLM_CALL_TIMEOUT_SECONDS
+        )
+
+    def get_playlist(self) -> dict[str, Any]:
+        return self._request_json("GET", "/v1/playlists/current")
+
+    def add_playlist_item(self, resource_id: str, origin: str = "manual_shelf") -> dict[str, Any]:
+        return self._request_json(
+            "POST",
+            "/v1/playlists/current/items",
+            json={"resource_id": resource_id, "origin": origin},
+        )
+
+    def accept_playlist(self, accept_item_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._request_json(
+            "POST",
+            "/v1/playlists/current",
+            json={"accept_item_ids": accept_item_ids},
+        )
+
+    def remove_playlist_item(self, item_id: str) -> dict[str, Any]:
+        return self._request_json("DELETE", f"/v1/playlists/current/items/{item_id}")
+
+    def save_progress(
+        self,
+        resource_id: str,
+        *,
+        kind: str = "read",
+        char_offset: int | None = None,
+        block_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self._request_json(
+            "POST",
+            "/v1/progress",
+            json={
+                "resource_id": resource_id,
+                "kind": kind,
+                "char_offset": char_offset,
+                "block_id": block_id,
+            },
+        )
+
+    def scene_search(
+        self,
+        resource_id: str,
+        query: str,
+        *,
+        mode: str = "smart",
+        k: int = 5,
+    ) -> dict[str, Any]:
+        return self._request_json(
+            "POST",
+            f"/v1/resources/{resource_id}/search",
+            json={"query": query, "mode": mode, "k": k},
+            timeout=LLM_CALL_TIMEOUT_SECONDS,
+        )
+
+    def get_observatory(self) -> dict[str, Any]:
+        return self._request_json("GET", "/v1/observatory")
+
+    def health(self) -> dict[str, Any]:
+        return self._request_json("GET", "/health")
+
+
+# WP08 HomelibClient seam — HttpClient is the live path; InProcessClient is
+# for APP_MODE=demo / Community Cloud (injected service callables, no store
+# imports under apps/ui).
+
+
+@runtime_checkable
+class HomelibClient(Protocol):
+    def health(self) -> dict[str, Any]: ...
+
+    def ask(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        arm: Literal["lexical", "vector", "hybrid", "hybrid_rerank"] | None = None,
+        rewrite: bool = False,
+    ) -> AskResponse: ...
+
+
+class HttpClient(ApiClient):
+    """Selfhosted edition — FastAPI over HTTP with per-call timeouts."""
+
+
+class InProcessClient:
+    """Demo edition — same shapes as HttpClient, no network hop.
+
+    Callables are injected so this module never imports SQLite, RAG, or
+    provider SDKs (AST boundary in apps/ui/tests).
+    """
+
+    def __init__(
+        self,
+        *,
+        health: Callable[[], dict[str, Any]],
+        ask: Callable[..., AskResponse],
+    ) -> None:
+        self._health = health
+        self._ask = ask
+
+    def health(self) -> dict[str, Any]:
+        return self._health()
+
+    def ask(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        arm: Literal["lexical", "vector", "hybrid", "hybrid_rerank"] | None = None,
+        rewrite: bool = False,
+    ) -> AskResponse:
+        return self._ask(query, k=k, arm=arm, rewrite=rewrite)

@@ -514,6 +514,9 @@ def _current_playlist_id(conn: sqlite3.Connection, principal_id: str) -> str:
     if row is not None:
         return str(row[0])
     playlist_id = _new_id()
+    # Stay in the caller's open transaction — do not commit here. Callers
+    # (insert_playlist / coffee_table.add_item) wrap create+item in one `with
+    # conn:` so a mid-write failure rolls the empty playlist row back too.
     conn.execute(
         "INSERT INTO playlist (id, principal_id, updated_at) VALUES (?, ?, ?)",
         (playlist_id, principal_id, _now_iso()),
