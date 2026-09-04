@@ -32,3 +32,5 @@ evals/results/*.json
 # v2 local SQLite seed (regenerate via run_sqlite_pipeline)
 data/homelib.sqlite
 data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
