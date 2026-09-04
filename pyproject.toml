@@ -81,6 +81,10 @@ members = ["packages/*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
+# Drop each test's tmp_path at session end. Passed-test artefacts are noise, and
+# a *killed* session leaves its basetemp locked for 3h, so keep sessions small.
+# (2026-09-04: 2,951 killed-session basetemps = 108GB on the internal disk.)
+tmp_path_retention_policy = "none"
 testpaths = ["packages", "apps", "evals", "tests"]
 pythonpath = ["."]
 filterwarnings = ["error", "ignore::DeprecationWarning"]

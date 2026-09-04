@@ -293,3 +293,26 @@ def test_staging_file_removed_after_successful_sync(tmp_path: Path) -> None:
     db_path = _fresh_db(tmp_path)
     run_sqlite_pipeline(db_path, snapshot=SNAPSHOT_PATH)
     assert not staging_db_path(db_path).exists()
+
+
+@pytest.mark.slow
+def test_run_sqlite_pipeline_cleans_up_dlt_tmpdir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: every run left a ``homelib_sqlite_dlt_<pid>`` dir in the OS
+    temp directory (41 of them, ~8GB, found 2026-09-04). The dlt working dir is
+    per-run scratch and must not outlive the run."""
+    import tempfile
+
+    scratch = tmp_path / "os-tmp"
+    scratch.mkdir()
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(scratch))
+    snapshot = tmp_path / "c.jsonl.gz"
+    book_id = "cleanup-book"
+    _write_snapshot(snapshot, [_book(book_id)])
+
+    run_sqlite_pipeline(
+        _fresh_db(tmp_path), snapshot=snapshot, rights_by_book={book_id: "public_domain"}
+    )
+
+    assert not list(scratch.glob("homelib_sqlite_dlt_*")), sorted(scratch.iterdir())

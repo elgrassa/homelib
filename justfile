@@ -29,12 +29,20 @@ secrets:
     fi
     gitleaks git --config .gitleaks.toml --redact --no-banner .
 
+# pytest basetemps go to a repo-local, gitignored dir instead of the OS temp
+# dir: a killed session (agent loop, CI SIGKILL) leaves its basetemp locked and
+# pytest never reclaims it. Repo-local means `just clean` and the CI teardown
+# can. The dir MUST exist first or tempfile silently falls back to /tmp.
 test:
-    uv run pytest -q --cov --cov-report=term-missing
+    mkdir -p .pytest-tmp && TMPDIR="$PWD/.pytest-tmp" uv run pytest -q --cov --cov-report=term-missing
+
+# Wipe local pytest scratch (killed-session basetemps accumulate here by design).
+clean:
+    rm -rf .pytest-tmp .pytest_cache
 
 # Fast loop: no coverage gate.
 test-fast:
-    uv run pytest -q --no-cov -x
+    mkdir -p .pytest-tmp && TMPDIR="$PWD/.pytest-tmp" uv run pytest -q --no-cov -x
 
 # What the pre-push hook runs. Everything cheap, nothing slow: the integration
 # tests, the embedding-model loads and the coverage floor are the PR's job.

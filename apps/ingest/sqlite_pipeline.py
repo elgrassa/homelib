@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import struct
 import tempfile
@@ -421,11 +422,16 @@ def run_sqlite_pipeline(
         rights_by_book if rights_by_book is not None else manifest_rights_by_book_id(repo_root)
     )
     pipeline = _make_pipeline(db_path)
-    info = _run_with_retry(
-        pipeline,
-        snapshot,
-        catalog,
-        source=sqlite_homelib_source(snapshot, catalog),
-    )
-    _sync_staging_to_canonical(db_path, rights_by_book=resolved_rights)
+    try:
+        info = _run_with_retry(
+            pipeline,
+            snapshot,
+            catalog,
+            source=sqlite_homelib_source(snapshot, catalog),
+        )
+        _sync_staging_to_canonical(db_path, rights_by_book=resolved_rights)
+    finally:
+        # The dlt working dir is per-run scratch under the OS temp dir. Left in
+        # place it never goes away (41 dirs / ~8GB found on 2026-09-04).
+        shutil.rmtree(pipeline.pipelines_dir, ignore_errors=True)
     return info

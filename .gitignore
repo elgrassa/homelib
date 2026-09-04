@@ -25,6 +25,7 @@ data/private/
 
 # working dirs
 .dlt/
+.pytest-tmp/
 evals/results/*.json
 !evals/results/.gitkeep
 
