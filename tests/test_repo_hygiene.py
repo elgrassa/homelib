@@ -215,3 +215,20 @@ def test_compose_pins_the_ollama_context_window() -> None:
         "the ollama service does not pin OLLAMA_CONTEXT_LENGTH, so a reviewer "
         "gets the image default and silent prompt truncation"
     )
+
+
+def test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve() -> None:
+    """Streamlit runs `apps/ui/app.py` as a script, not as `python -m`.
+
+    Without PYTHONPATH=/app, `from apps.ui.api_client import …` raises
+    ModuleNotFoundError while `_stcore/health` still returns 200 — a
+    false-healthy container that looks up but cannot render Crossroads.
+    Pytest hides this via pyproject.toml `pythonpath = ["."]`; the image
+    must pin the same root explicitly.
+    """
+    dockerfile = (REPO_ROOT / "docker/ui.Dockerfile").read_text()
+
+    assert "PYTHONPATH=/app" in dockerfile, (
+        "ui.Dockerfile must set PYTHONPATH=/app so `import apps` works when "
+        "Streamlit executes apps/ui/app.py as a script"
+    )

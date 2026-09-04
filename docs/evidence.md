@@ -82,6 +82,7 @@ re-ran itself (subagent claims are never accepted as evidence).
 | WP11 drill status | feat/v2-wp08-wp11-surface | host `uptime` load ~2.7–9.7; `just ci` green (609 passed, 90.64%) | Pre-drill note (superseded by row below). | 2026-09-04 |
 | WP11 `just drill` PASSED | `v2` @ `d6f9946` | `just drill` → `/tmp/homelib-drill-run.log`; exit 0 in ~9 min | Cold clone @ `d6f9946`; snapshot sha256 `4148f50b…`; seed books/blocks/chunks/embeddings 18/729/9168/9168; grounded ask attempt **1/5**, arm=`hybrid_rerank`, citation resolves (Wealth of Nations · OF THE DIVISION OF LABOUR); Grafana **6** panels. Compose fleet `homelib-{api,ui,grafana,postgres,ollama}-1` healthy; `:8010/health` 200. Residual Mon: `just publish` / Cloud / submit / peer×3. | 2026-09-04 |
 | Compose smoke after Docker recovery | v2 @ `39913df` | `just down && just up && just seed`; curl `:8010/health`, ask, feedback, `:8501` | Docker recovered (logout + restart Desktop). Health/ask/feedback/UI PASS on Postgres path (API port **8010**). First LLM call cold-start can exceed 150s. | 2026-09-03 |
+| UI PYTHONPATH false-healthy | v2 @ `3933aa4` (local uncommitted) | rebuild `ui`; curl `_stcore/health`; playwright Crossroads; `pytest tests/test_repo_hygiene.py` | **Root cause:** `streamlit run apps/ui/app.py` without `PYTHONPATH=/app` → `ModuleNotFoundError: apps` while health stayed 200. Fix: `ENV PYTHONPATH=/app` in `docker/ui.Dockerfile` + hygiene pin test. Live: all 6 Crossroads doors render; API `/health` ok (18/9168); seed exit 0. | 2026-09-04 |
 
 ---
 

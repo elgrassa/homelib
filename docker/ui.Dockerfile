@@ -6,13 +6,16 @@ FROM python:3.13-slim-bookworm
 # layer and is never read again at runtime. Layers are immutable, so
 # deleting it in a later step would not shrink the image — it must never
 # be written in the first place.
+# PYTHONPATH=/app: Streamlit runs apps/ui/app.py as a script, so `import apps`
+# fails unless /app is on sys.path. Pytest gets the same via pythonpath=["."].
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_NO_CACHE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
