@@ -255,3 +255,22 @@ def test_compose_api_wires_homelib_sqlite_path_for_v2_doors() -> None:
         "api service must mount host data/ so HOMELIB_SQLITE_PATH resolves "
         f"inside the container; volumes={volumes!r}"
     )
+
+
+def test_ci_pytest_forces_workspace_basetemp() -> None:
+    """Hostexecutor lane TMPDIR is shared and can vanish mid-job.
+
+    PR #18 run 87 failed hundreds of tests with FileNotFoundError under
+    /Volumes/.../CI/tmp/quick/pytest-of-* even though job-level TMPDIR pointed
+    at the workspace. The test steps must re-export TMPDIR from
+    GITHUB_WORKSPACE and pass --basetemp so pytest never uses the shared dir.
+    """
+    workflow = CI_WORKFLOW.read_text()
+
+    assert 'TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"' in workflow, (
+        "CI test steps must force TMPDIR under GITHUB_WORKSPACE; job-level env "
+        "alone does not override the hostexecutor lane TMPDIR"
+    )
+    assert "--basetemp=" in workflow, (
+        "CI pytest invocations must pin --basetemp under the workspace TMPDIR"
+    )

@@ -96,13 +96,23 @@ jobs:
       - name: Test (fast subset)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
+          # Hostexecutor runners also inject a lane-shared TMPDIR
+          # (/Volumes/.../CI/tmp/quick). Job-level env does not always win, and
+          # when that shared parent is missing mid-run pytest dies with
+          # FileNotFoundError on pytest-of-* (PR #18 run 87). Force the
+          # workspace path in-step and pin --basetemp so basetemps never land
+          # on the shared lane dir.
+          export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
           mkdir -p "$TMPDIR"
-          uv run pytest -q --no-cov -m "not integration and not slow and not llm"
+          uv run pytest -q --no-cov -m "not integration and not slow and not llm" \
+            --basetemp="$TMPDIR/basetemp"
 
       # `always()` so a red or timed-out test step still leaves no scratch behind.
       - name: Teardown pytest scratch
         if: always()
-        run: rm -rf "$TMPDIR"
+        run: |
+          export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
+          rm -rf "$TMPDIR"
 
   # Everything expensive, on the heavy lane (daemon cap 2h). This is the
   # authoritative run: the whole suite, integration tests included, with the
@@ -140,9 +150,14 @@ jobs:
       - name: Test (full suite + coverage floor)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
+          # Same hostexecutor TMPDIR override as the gate job — see comment there.
+          export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
           mkdir -p "$TMPDIR"
-          uv run pytest -q --cov --cov-report=term-missing
+          uv run pytest -q --cov --cov-report=term-missing \
+            --basetemp="$TMPDIR/basetemp"
 
       - name: Teardown pytest scratch
         if: always()
-        run: rm -rf "$TMPDIR"
+        run: |
+          export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
+          rm -rf "$TMPDIR"
