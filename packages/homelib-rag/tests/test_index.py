@@ -28,6 +28,24 @@ from homelib_rag import index as index_module
 from homelib_rag.index import search_lexical, search_vector
 from psycopg import sql
 
+
+@pytest.fixture(autouse=True)
+def _restore_embedder_singleton() -> Iterator[None]:
+    """Undo whatever a test left in the lazy embedder singleton.
+
+    The unit tests above the integration block install `_FakeModel`s via
+    `_load_embedder()` and never reset; the session-scoped Postgres seeding
+    then called `.encode` on a fake and every integration test errored
+    (CI runs 74-76 on PR #14; reproducible serially on v2). Restoring the
+    previous value, rather than clearing, keeps the real model cached across
+    the integration tests.
+    """
+    before = index_module._embedder
+    yield
+    with index_module._embed_lock:
+        index_module._embedder = before
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = _REPO_ROOT / "docker" / "initdb" / "01-schema.sql"
 _ADMIN_DSN = "postgresql://homelib:homelib_local_dev@localhost:5432/postgres"
@@ -344,6 +362,13 @@ def test_reset_embedder_for_tests_clears_singleton(monkeypatch: pytest.MonkeyPat
     index_module._load_embedder()
 
     assert len(created) == 2
+
+
+def test_unit_fakes_do_not_leak_into_the_embedder_singleton() -> None:
+    """Runs right after the three tests that install fakes; red without the
+    autouse restore fixture, because the last fake had no `encode` at all."""
+    leaked = index_module._embedder
+    assert leaked is None or hasattr(leaked, "encode"), type(leaked).__name__
 
 
 # ── integration tests: real Postgres, real embedding model ─────────────────
