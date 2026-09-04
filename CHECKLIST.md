@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-09-04 (WP07–WP10 thin surface + HomelibClient conformance; WP11 drill/publish still owner Mon).
+Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual = Mon publish/Cloud/submit/peer×3).
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 2026-09-04 (WP07–WP10 thin surface + HomelibClient conformance; 
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | ✅ done | 6 panels + feedback loop **verified live end to end**: ask → request_id → 👍 → persisted in `query_log` |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
-| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 partial | Exact pins ✅, snapshot ✅, digests ✅, context window now pinned ✅. **Remaining core work: run `just drill`** — no longer blocked, the API is up |
+| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | ✅ done | Exact pins ✅, snapshot ✅, digests ✅, context window pinned ✅. **`just drill` PASSED** on `v2` @ `d6f9946` (cold clone → seed 18/729/9168/9168 → grounded citation attempt 1/5, arm=`hybrid_rerank`, Grafana 6 panels) |
 | 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | ✅ done | All three implemented **and measured**. Rewrite compared on a matched sample and rejected on evidence — a recorded negative result |
 | 11 | **Bonus: cloud deployment** | 2 | ⬜ optional | Buffer-day only. Never at the cost of 1–10 |
 | 12 | **Bonus: extras** | 3 | 🟡 partial | Eval regression gate ✅ built; audiobook + Obsidian BookShelf are buffer-day |
@@ -44,8 +44,8 @@ Last updated: 2026-09-04 (WP07–WP10 thin surface + HomelibClient conformance; 
 - [x] Images lean enough to actually build: **18.5 GB → 2.68 GB**
 - [x] Grafana on a read-only DB role — verified `INSERT` is refused
 - [x] Schema created by `initdb/`; ivfflat index deferred until after load
-- [ ] `docker compose up` verified all-healthy **end to end** (needs api + ui + ingest images)
-- [ ] Cold-clone drill green (`just drill`) — script written, blocked on the API
+- [x] `docker compose up` verified all-healthy **end to end** — `homelib-{api,ui,grafana,postgres,ollama}-1` healthy; API `:8010/health` 200 (2026-09-04)
+- [x] Cold-clone drill green (`just drill`) — PASSED @ `d6f9946` (~9 min this run; log `/tmp/homelib-drill-run.log`)
 - [ ] Reviewer path timed end to end on a clean machine
 
 ## C. Engineering quality (the "maintainable, extendable" half)
@@ -125,9 +125,9 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Coffee Table/Shelf/Observatory/Projection |
 | **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save (rotunda cut) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 prep — evidence/handoff/OpenAPI/CHECKLIST updated; **residual owner Mon:** quiet-box `just drill`, Compose all-healthy e2e, `just publish`, Cloud, submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ — **residual owner Mon:** `just publish`, Streamlit Cloud, submit, peer×3 |
 
-**Progress (2026-09-04):** WP00–WP10 thin product surface on `feat/v2-wp08-wp11-surface` (PR → `v2`). P0 SQLite API wire when `HOMELIB_SQLITE_PATH` set. **v2 build ≈85%** of WP00–WP11. Remaining for GO/NO-GO: quiet-box `just drill`, Compose all-healthy e2e proof, Mon owner Cloud publish. Criterion 9 still partial until drill green.
+**Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 
 **GO/NO-GO** Sun Sep 6 18:00 (product §12.4; **local gate per addendum** — not live public URL). Pass requires local `APP_MODE=demo` rehearsal green (fresh session-isolated state, resettable seed, RSS within Community Cloud limits), cited answer resolves, both evals committed, ingest repeatable, feedback+≥5 charts, Compose healthy, drill plausible for Monday, no rights/secret/isolation blocker. Live logged-out URL check moves to **Mon Sep 7** after owner deploy. NO-GO ⇒ submit v1 Monday (`v1-fallback`). Never trade a scored 2-point row for polish / Home/Pro / rotunda / TTS.
 
@@ -193,7 +193,7 @@ Pavlo merges **oldest → newest** (~10 PRs into `v2`). Agents do **not** merge 
   equivalent). Restack downstream feature branches after each merge.
 - **Draft newer PRs** until their base PR lands; avoid parallel review of
   dependent stacks.
-- **`v2` → `main` blocked** until the v2 cold-clone drill is green.
+- **`v2` → `main`:** cold-clone drill green on `d6f9946` — merge when you’re ready (owner call).
 - **PR #4** is closed history (WP00 landed via that merge).
 - **Sep 2 gate (addendum):** no public canary until Mon Sep 7 owner deploy;
   rehearse `APP_MODE=demo` locally instead (see [`docs/evidence.md`](docs/evidence.md)
