@@ -1,0 +1,78 @@
+# ADAPTED from studio-kit ci/templates/post-merge-cleanup.yml (tripwire template) —
+# edit the canonical copy there, then re-adapt this one.
+# Consumers carry an ADAPTED copy (`# TEMPLATE:` blocks filled per repo), NOT a
+# byte-identical one — templates.sync.json marks this entry `tripwire`.
+#
+# After every push to main: list (and, when applied, delete) the remote
+# branches whose head is already an ancestor of main — i.e. landed — that are
+# not protected and have no open PR. Then `git worktree prune`. Landed is
+# decided by `git merge-base --is-ancestor`, never `branch --merged` (which
+# under-reports rebase merges; see wiki/git-worktree-hygiene).
+#
+# Dry-run by default: `push` only prints what it WOULD delete. Deleting is
+# opt-in via workflow_dispatch(apply=true) — run that once you have read a
+# week of dry-run logs. Flip the repo's "delete branch after merge" default
+# (Settings -> Repository -> Pull Requests, or PATCH /repos/{owner}/{repo}
+# default_delete_branch_after_merge) so new branches stop accumulating; this
+# job is the sweep for what already accumulated and for merges done by hand.
+name: post-merge-cleanup
+
+# Deliberately no `permissions:` block: Forgejo ignores the field (and warns
+# about it). The token this job pushes with is the one actions/checkout
+# persists; it can delete branches only if Settings -> Actions grants it.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Delete the landed branches (default: print only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: post-merge-cleanup
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    # TEMPLATE: runner label — the cheapest lane; this is a git-only job.
+    runs-on: [self-hosted, quick]
+    timeout-minutes: 10
+    env:
+      # TEMPLATE: branches that are never candidates, space-separated.
+      PROTECTED_BRANCHES: main v2
+    steps:
+      # hostexecutor runners do not clone on their own; every job checks out.
+      # Full history: the ancestor check needs every branch's commits.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Sweep landed branches
+        env:
+          APPLY: ${{ github.event.inputs.apply }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --prune origin
+          # Heads of open PRs are never candidates, whatever git says.
+          open_heads=$(curl -fsS -H "Authorization: token $TOKEN" \
+            "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls?state=open&limit=100" \
+            | python3 -c 'import json,sys; print("\n".join(p["head"]["ref"] for p in json.load(sys.stdin)))')
+          landed=0; skipped=0
+          for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v '/HEAD$'); do
+            b="${ref#origin/}"
+            case " $PROTECTED_BRANCHES " in *" $b "*) continue ;; esac
+            if printf '%s\n' "$open_heads" | grep -qx "$b"; then skipped=$((skipped+1)); continue; fi
+            git merge-base --is-ancestor "$ref" origin/main || continue
+            landed=$((landed+1))
+            if [ "$APPLY" = "true" ]; then
+              git push origin --delete "$b" && echo "deleted  $b"
+            else
+              echo "landed   $b   (would delete; run workflow_dispatch apply=true)"
+            fi
+          done
+          git worktree prune
+          echo "== $landed landed branch(es), $skipped skipped (open PR), apply=${APPLY:-false}"
