@@ -72,9 +72,11 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
     migrate(conn, target_version=1)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
     assert versions == {1}
-    conn.execute(
-        "INSERT INTO principal (id, kind, created_at) VALUES ('local-user', 'local_user', 't')"
-    )
+    # migrate ensures the well-known selfhosted principal (Coffee Table / playlists).
+    local = conn.execute(
+        "SELECT kind FROM principal WHERE id = 'local-user'"
+    ).fetchone()
+    assert local is not None and local[0] == "local_user"
     conn.execute("INSERT INTO books (book_id, title) VALUES ('keep-me', 'Kept Across Upgrade')")
     conn.commit()
 
