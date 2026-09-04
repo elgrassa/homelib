@@ -430,3 +430,34 @@ def test_chunk_embeddings_resource_batches_not_one_at_a_time(
     assert len(calls) == 1
     assert calls[0] == len(rows)
     assert all(isinstance(r["embedding"], list) for r in rows)
+
+
+def test_run_pipeline_cleans_up_dlt_tmpdir_even_when_the_run_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the per-run dlt working dir (`homelib_dlt_<scope>` under the
+    OS temp dir) outlived every run — 13 of them / ~1GB found 2026-09-04
+    alongside the sqlite pipeline's 41. It is scratch; it goes with the run,
+    on the failure path too."""
+    import apps.ingest.pipeline as pipeline_mod
+
+    scratch = tmp_path / "homelib_dlt_test-scope"
+    scratch.mkdir()
+    (scratch / "load-package").write_text("x")
+
+    class _FakePipeline:
+        pipelines_dir = str(scratch)
+
+    monkeypatch.setattr(pipeline_mod, "_make_pipeline", lambda _url: _FakePipeline())
+    monkeypatch.setattr(pipeline_mod, "_sync_staging_to_public", lambda _url: None)
+    monkeypatch.setattr(pipeline_mod, "_ensure_ivfflat_index", lambda _url: None)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("load failed")
+
+    monkeypatch.setattr(pipeline_mod, "_run_with_retry", _boom)
+
+    with pytest.raises(RuntimeError, match="load failed"):
+        run_pipeline(database_url="postgresql://unused")
+
+    assert not scratch.exists()

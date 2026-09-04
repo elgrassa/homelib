@@ -59,6 +59,7 @@ import gzip
 import json
 import logging
 import os
+import shutil
 import tempfile
 import time
 from collections.abc import Iterable, Iterator, Sequence
@@ -540,11 +541,14 @@ def run_pipeline(
     """
     resolved_database_url = database_url or os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
     pipeline = _make_pipeline(resolved_database_url)
-
-    info = _run_with_retry(pipeline, snapshot, catalog)
-
-    _sync_staging_to_public(resolved_database_url)
-    _ensure_ivfflat_index(resolved_database_url)
+    try:
+        info = _run_with_retry(pipeline, snapshot, catalog)
+        _sync_staging_to_public(resolved_database_url)
+        _ensure_ivfflat_index(resolved_database_url)
+    finally:
+        # The per-run working dir is scratch (see _make_pipeline); left in
+        # place it never goes away (13 dirs / ~1GB found on 2026-09-04).
+        shutil.rmtree(pipeline.pipelines_dir, ignore_errors=True)
     return info
 
 
