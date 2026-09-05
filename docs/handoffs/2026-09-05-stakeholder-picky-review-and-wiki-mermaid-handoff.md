@@ -26,7 +26,7 @@
 | 8 | Containerization | 2 | 2 | `--build` on seeds; api pinned selfhosted |
 | 9 | Reproducibility | 2 (`d6f9946`, 2026-09-04) | **2 — `just drill` PASSED on the train tip `ee0f318`** (22:01, attempt 2/5, one 300 s load timeout) | re-run #1 on `ae83d51` failed the ask step under load 340–410 (3/5 timeouts) — infra, recorded; `v2` @ `86ba349` itself is undrilled until the train merges |
 | 10 | Best practices | 3 | 3 | unchanged |
-| 11 | Cloud (bonus) | 0 | 0 — **not deployed**; PR-B2 files drafted, held until the drill re-run passes | owner creates the app Mon (Python 3.13, Groq secrets) |
+| 11 | Cloud (bonus) | 0 | 0 — **not deployed**; PR-B2 #30 open (owner GO 2026-09-06): root shim, committed seed `.gz` + cold-start inflate, `uv.lock` install, Groq one-secret fallback; rehearsed without a key only | owner creates the app Mon (Python 3.13, `GROQ_API_KEY` + `HOMELIB_SQLITE_PATH` secrets) |
 | 12 | Extras (bonus) | partial | partial | Mentor agent, eval gate |
 
 ## 2. Findings
@@ -58,8 +58,19 @@
 | # | Decision | Where |
 |---|---|---|
 | M3 | Licence: tree Apache-2.0 vs ADR-007 PolyForm-NC | decision-log "Licence — owner decision"; no LICENSE change in any PR |
-| M4 | Cloud deploy: owner creates the app, picks Python 3.13, pastes Groq `LLM_*` secrets | `docs/submission.md`; PR-B2 |
+| M4 | Cloud deploy: owner creates the app, picks Python 3.13, pastes `GROQ_API_KEY` (or the `LLM_*` triple) + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` | `docs/submission.md`; PR-B2 #30 |
 | — | `just publish`, public remote, `/design-login`, Grafana removal, `v2`→`main`, merges | issue #24 |
+
+### Phase 2 picky review of the train (2026-09-06, owner: "verify picky all PRs")
+
+| Car | Finding | Fix commit / test |
+|---|---|---|
+| #25 | **MED** — 401 re-mint inside `ApiClient` never reached `st.session_state`; after the 24 h demo TTL every rerun re-minted a principal | on PR-B2 (keeps the gated SHAs): `view_model.persist_demo_session` called from `app.py::main` in a `finally`; `test_persist_demo_session_keeps_a_reminted_id_for_the_next_rerun` |
+| B2 | **HIGH** (own draft) — `httpx.ASGITransport` is async-only in httpx 0.28; a sync `httpx.Client` over it raised on the first request | `SyncASGITransport` (private loop thread, read-timeout mapped to `httpx.ReadTimeout`); `test_inprocess_client_serves_real_requests_over_asgi`, `test_sync_asgi_transport_maps_a_stalled_app_to_a_read_timeout` |
+| B2 | **MED** — `OpenAIClient` passed `LLM_API_KEY=""` straight to the SDK → 500 `Missing credentials` on Cloud with an empty secret | blank = unset; `GROQ_API_KEY` alone selects Groq; three tests in `test_answer.py` |
+| B2 | **MED** — the seed inflater accepted any repo-local path; pytest's basetemp under `just ci` is repo-local, so a missing store there was silently inflated (first gate 2 failed / 685 passed) | guard narrowed to `data/` only; `test_require_sqlite_path_inflates_once_and_refuses_path_traversal` extended |
+| #26 #27 #28 #29 | clean (accepted risks and one LOW listed in `docs/evidence.md`) | — |
+| all | mutation testing | **not wired, not run** |
 
 ### Stack status at hand-off
 
@@ -70,7 +81,7 @@
 | D #27 | `feat/crossroads-rotunda` @ `ee0f318` | B | `just ci` 675 passed / 90.45% | run 13129 running at hand-off |
 | C #28 | `docs/stakeholder-review-wiki-mermaid-sync` | D | `just ci` 678 passed / 90.45%; 23/23 mermaid render | pushed; drill-#2 docs added as a follow-up commit |
 | E #29 | `chore/graphify-out` @ `48a74fd` (owner-opened draft) | C | graph-guard + graph-refresh (`HEAD:${ref}` for `main`/`v2`), `.graphifyignore`, `CLAUDE.md` step 1bis, 4 hygiene tests; **no `graphify-out/` in the PR** | restacked onto the #28 head after the docs commit |
-| B2 | `feat/streamlit-cloud-groq-files` | train tip when opened | **not opened** — drafted; drill now PASSED, so it waits only on **owner GO** (bonus #11, never blocks rows 1–10) | — |
+| B2 #30 | `feat/streamlit-cloud-groq-files` | E #29 (`2b97f8f`) | **opened on owner GO (2026-09-06)** — Cloud files, in-process bridge over a real ASGI transport, demo-session write-back (the #25 MED), blank-key + Groq fallback; `just ci` **693 passed / 0 failed, coverage 90.59%** (ruff, ruff format, mypy --strict clean; 8 min once the box quietened); rehearsal in `docs/evidence.md` (degraded ask 27 s, RSS ~160 MB, no key) | bonus #11, never blocks rows 1–10 |
 
 ## 3. Talk track (5–8 min)
 

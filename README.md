@@ -144,7 +144,7 @@ One OpenAI-compatible client, three `LLM_*` variables, no provider chain:
 |---|---|---|
 | Compose (`just up`) | Ollama in the stack, `qwen2.5:7b-instruct` | `docker/docker-compose.yml` defaults; `.env` overrides |
 | Local `streamlit run` / tests | any local Ollama or LM Studio endpoint | `.env` |
-| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — the key is never in the tree (`.env.example` shows the shape) |
+| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — one secret, `GROQ_API_KEY`, is enough (with `LLM_API_KEY` blank the client falls back to Groq); the key is never in the tree (`.env.example` shows the shape) |
 
 A missing or unreachable model never fabricates: the answer comes back
 `degraded=true` with the retrieval still shown.

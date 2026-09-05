@@ -196,3 +196,12 @@ publish:
     esac
     git push public "$branch:main"
     echo "→ pinned commit: $sha"
+
+# Build the committed Cloud seed from a seeded data/homelib.sqlite: checkpoint
+# the WAL so the copy is self-contained, then gzip deterministically (-n drops
+# the timestamp so an unchanged seed produces an identical artefact).
+seed-gz:
+    sqlite3 data/homelib.sqlite "PRAGMA wal_checkpoint(TRUNCATE);"
+    mkdir -p data/seed
+    gzip -9 -n -c data/homelib.sqlite > data/seed/homelib.sqlite.gz
+    ls -la data/seed/homelib.sqlite.gz

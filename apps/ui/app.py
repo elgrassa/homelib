@@ -37,6 +37,7 @@ from apps.ui.view_model import (
     normalize_level,
     observatory_chart_titles,
     parse_interests,
+    persist_demo_session,
     playlist_visible_items,
     record_vote,
     resolve_prerequisite_titles,
@@ -391,7 +392,11 @@ def main() -> None:
     door = normalize_door(st.session_state["door"])
     st.caption(f"Open door: {door}")
     st.divider()
-    DOOR_RENDERERS[door](client)
+    try:
+        DOOR_RENDERERS[door](client)
+    finally:
+        # A 401 remint inside any call must reach the next rerun (view_model).
+        persist_demo_session(client, st.session_state)
 
 
 if __name__ == "__main__":

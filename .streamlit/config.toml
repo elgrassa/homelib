@@ -6,3 +6,10 @@ backgroundColor = "#f7f0e3"
 secondaryBackgroundColor = "#fffaf0"
 textColor = "#241c16"
 font = "serif"
+
+# No hot reload anywhere this runs (Community Cloud, the compose ui container,
+# AppTest). The watcher also walks every imported module's __path__, which
+# triggers transformers' lazy image-processor imports and logs a torchvision
+# ModuleNotFoundError traceback per module on every page run.
+[server]
+fileWatcherType = "none"

@@ -111,6 +111,7 @@ Streamlit Secrets (or a private local `.env`), never into git.
 | Secret / env | Value |
 |---|---|
 | `APP_MODE` | `demo` |
+| `GROQ_API_KEY` | `gsk_…` — **the one-secret form**: with `LLM_API_KEY` blank or absent, `OpenAIClient` targets Groq with `GROQ_MODEL` (default `llama-3.3-70b-versatile`); the explicit `LLM_*` triple below still works and wins when `LLM_API_KEY` is set |
 | `LLM_BASE_URL` | `https://api.groq.com/openai/v1` |
 | `LLM_API_KEY` | `gsk_…` (owner key) |
 | `LLM_MODEL` | `llama-3.3-70b-versatile` |
@@ -129,11 +130,16 @@ Owner creates the Community Cloud app from the **public GitHub** mirror on
 submission day (late deploy). Agents do not create the Cloud app or paste keys.
 
 **Deploy-path status (tip):** Cloud secrets target the in-process demo path
-(`APP_MODE=demo` + seed SQLite + `LLM_*`). The live `apps/ui/app.py` entry
-still constructs `ApiClient` (HTTP → FastAPI). That is correct for Compose
-reviewers; for Community Cloud, Ask/Mentor need the `InProcessClient` factory
-(specs/client.md) before the showcase URL can answer without a sidecar API.
-Do not point Cloud at Compose — wire secrets for Groq on the demo process.
+(`APP_MODE=demo` + seed SQLite + `LLM_*`). `build_homelib_client()` already
+returns `InProcessClient` under `APP_MODE=demo` with no `API_URL`, so the
+showcase URL answers without a sidecar API. Entrypoint: root `streamlit_app.py`
+(a shim over `apps/ui/app.py`). Dependencies: Cloud picks **`uv.lock`** first
+(it wins over any `requirements.txt`), which already pins CPU torch via the
+pytorch-cpu index. Python: choose **3.13** in Advanced settings — the default is
+3.12 and `requires-python` is `>=3.13,<3.14`. Seed: `HOMELIB_SQLITE_PATH=data/homelib.sqlite`
+in secrets; on a cold start the app inflates the committed
+`data/seed/homelib.sqlite.gz` once. Do not point Cloud at Compose — wire secrets
+for Groq on the demo process.
 
 ## Final-day order of operations
 

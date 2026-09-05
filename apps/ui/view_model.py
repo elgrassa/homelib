@@ -128,6 +128,24 @@ def ensure_demo_session(
     return session_id
 
 
+def persist_demo_session(
+    client: HttpClient | InProcessClient,
+    session_state: MutableMapping[str, Any] | SessionStateProxy,
+) -> None:
+    """Write a reminted demo id back to session state once the doors have run.
+
+    ``ApiClient._request`` mints a fresh session on a 401 (server restart, TTL
+    sweep) and uses it for the rest of the run — but the next rerun re-attaches
+    whatever ``ensure_demo_session`` stored. Without this write-back the stale
+    id is sent again, 401s again, and every rerun lands on a brand-new
+    principal: the Coffee Table empties after each click. Call it after
+    rendering, in ``finally``, so a door that raised still hands the fresh id on.
+    """
+    current = client.demo_session_id
+    if current and session_state.get(DEMO_SESSION_KEY) != current:
+        session_state[DEMO_SESSION_KEY] = current
+
+
 def format_api_error_message(exc: ApiClientError | ApiUnavailableError) -> str:
     """A readable message for any client failure — never a stack trace."""
     if isinstance(exc, ApiUnavailableError):

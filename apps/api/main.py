@@ -115,6 +115,8 @@ def _infer_provider(base_url: str) -> str:
         return "openai"
     if "anthropic.com" in host:
         return "anthropic"
+    if "groq.com" in host:
+        return "groq"
     if host in ("localhost", "127.0.0.1", "ollama", "") or "11434" in base_url:
         return "ollama"
     return host

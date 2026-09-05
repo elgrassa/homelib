@@ -674,3 +674,49 @@ def test_citation_carries_a_block_id_that_can_be_resolved() -> None:
 
     assert response.degraded is False
     assert response.citations[0].block_id == "blk-1"
+
+
+def test_openai_client_treats_empty_api_key_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A blank `LLM_API_KEY` (empty Cloud secret) must construct like an absent
+    one — the SDK rejects "" outright, which made every request 500 instead of
+    degrading at call time like any other unreachable LLM."""
+    from homelib_rag.answer import OpenAIClient
+
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:9/v1")
+    client = OpenAIClient()
+    assert client._client.api_key == "ollama"
+
+
+def test_openai_client_falls_back_to_groq_when_llm_api_key_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The public demo sets one secret. With `LLM_API_KEY` blank or absent and
+    `GROQ_API_KEY` present, the client targets Groq's OpenAI-compatible
+    endpoint and a Groq model — never the Ollama model name left in `LLM_*`."""
+    from homelib_rag.answer import OpenAIClient
+
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("LLM_BASE_URL", "http://ollama:11434/v1")
+    monkeypatch.setenv("LLM_MODEL", "qwen2.5:7b-instruct")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    monkeypatch.delenv("GROQ_MODEL", raising=False)
+    client = OpenAIClient()
+    assert client.base_url == "https://api.groq.com/openai/v1"
+    assert client.model == "llama-3.3-70b-versatile"
+    assert client._client.api_key == "gsk-test"
+
+
+def test_openai_client_prefers_a_set_llm_api_key_over_groq(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compose keeps Ollama even when a Groq key is also in the environment."""
+    from homelib_rag.answer import OpenAIClient
+
+    monkeypatch.setenv("LLM_API_KEY", "ollama")
+    monkeypatch.setenv("LLM_BASE_URL", "http://ollama:11434/v1")
+    monkeypatch.setenv("LLM_MODEL", "qwen2.5:7b-instruct")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    client = OpenAIClient()
+    assert client.base_url == "http://ollama:11434/v1"
+    assert client.model == "qwen2.5:7b-instruct"
+    assert client._client.api_key == "ollama"

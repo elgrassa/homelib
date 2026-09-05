@@ -66,6 +66,12 @@ logger = logging.getLogger(__name__)
 _DEFAULT_BASE_URL = "http://localhost:11434/v1"
 _DEFAULT_API_KEY = "ollama"
 _DEFAULT_MODEL = "qwen2.5:7b-instruct"
+# Groq free tier is the public demo's provider (docs/submission.md). Set only
+# GROQ_API_KEY in Streamlit secrets and the demo answers on Groq; LLM_* stays
+# the compose/Ollama configuration. Not a provider chain: the choice is made
+# once, at construction, by which key is present.
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+_GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
 _DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/homelib"
 # Measured on the pure-compose stack (CPU-only Ollama in the Docker VM):
 # prefill ~49 tok/s, generation ~7.4 tok/s uncontended, so a real /v1/ask
@@ -162,6 +168,35 @@ class OpenAICompatibleClient(Protocol):
     ) -> LLMResponse: ...
 
 
+def _resolve_llm_env() -> tuple[str, str, str]:
+    """`(base_url, api_key, model)` from the environment, in this order:
+
+    1. `LLM_API_KEY` non-empty → the `LLM_*` triple (compose / Ollama, or a
+       fully spelled-out provider).
+    2. otherwise `GROQ_API_KEY` non-empty → Groq's OpenAI-compatible endpoint
+       with `GROQ_MODEL` (default `llama-3.3-70b-versatile`) — the public
+       demo needs one secret, and a blank `LLM_API_KEY` does not hide it.
+    3. otherwise the Ollama placeholder key, so an unreachable LLM degrades
+       the answer at call time. The OpenAI SDK refuses `""` at construction,
+       which used to turn every request into a 500 on a blank secret.
+    """
+    llm_key = os.environ.get("LLM_API_KEY", "").strip()
+    if llm_key:
+        return (
+            os.environ.get("LLM_BASE_URL") or _DEFAULT_BASE_URL,
+            llm_key,
+            os.environ.get("LLM_MODEL") or _DEFAULT_MODEL,
+        )
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if groq_key:
+        return _GROQ_BASE_URL, groq_key, os.environ.get("GROQ_MODEL") or _GROQ_DEFAULT_MODEL
+    return (
+        os.environ.get("LLM_BASE_URL") or _DEFAULT_BASE_URL,
+        _DEFAULT_API_KEY,
+        os.environ.get("LLM_MODEL") or _DEFAULT_MODEL,
+    )
+
+
 class OpenAIClient:
     """Default `OpenAICompatibleClient`, backed by the `openai` SDK against
     an OpenAI-compatible chat-completions endpoint (Ollama `/v1` by default;
@@ -181,13 +216,12 @@ class OpenAIClient:
         model: str | None = None,
         timeout: float = _TIMEOUT_SECONDS,
     ) -> None:
-        self.model = model or os.environ.get("LLM_MODEL", _DEFAULT_MODEL)
-        self.base_url = base_url or os.environ.get("LLM_BASE_URL", _DEFAULT_BASE_URL)
+        env_base_url, env_api_key, env_model = _resolve_llm_env()
+        self.model = model or env_model
+        self.base_url = base_url or env_base_url
         self._timeout = timeout
         self._client = OpenAI(
-            base_url=self.base_url,
-            api_key=api_key or os.environ.get("LLM_API_KEY", _DEFAULT_API_KEY),
-            timeout=timeout,
+            base_url=self.base_url, api_key=api_key or env_api_key, timeout=timeout
         )
 
     def chat(

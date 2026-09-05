@@ -451,3 +451,42 @@ def test_ensure_demo_session_is_a_noop_that_clears_in_selfhosted() -> None:
     assert fake.mints == 0
     assert fake.set_calls == [None]
     assert DEMO_SESSION_KEY not in state
+
+
+def test_persist_demo_session_keeps_a_reminted_id_for_the_next_rerun() -> None:
+    """Server forgot the session (TTL sweep): the client remints on the 401,
+    the fresh id must reach session state, and the next rerun must attach the
+    fresh id — not the stale one — so the Coffee Table stays on one principal."""
+    import httpx
+
+    from apps.runtime_settings import AppMode
+    from apps.ui.api_client import DEMO_SESSION_HEADER, HttpClient
+    from apps.ui.view_model import DEMO_SESSION_KEY, ensure_demo_session, persist_demo_session
+
+    seen: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        header = request.headers.get(DEMO_SESSION_HEADER.lower())
+        if request.url.path == "/v1/demo/session":
+            return httpx.Response(200, json={"demo_session_id": "fresh", "principal_id": "p"})
+        seen.append(header)
+        if header == "stale":
+            return httpx.Response(401, json={"detail": "unknown demo session"})
+        return httpx.Response(200, json={"playlist_id": "p1", "items": []})
+
+    def client() -> HttpClient:
+        return HttpClient(
+            "http://api", http_client=httpx.Client(transport=httpx.MockTransport(handler))
+        )
+
+    state: dict[str, object] = {DEMO_SESSION_KEY: "stale"}
+    first = client()
+    ensure_demo_session(first, state, AppMode.DEMO)
+    first.get_playlist()
+    persist_demo_session(first, state)
+    assert state[DEMO_SESSION_KEY] == "fresh"
+
+    second = client()
+    ensure_demo_session(second, state, AppMode.DEMO)
+    second.get_playlist()
+    assert seen == ["stale", "fresh", "fresh"]
