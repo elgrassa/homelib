@@ -19,10 +19,12 @@ things on top of it:
    justified reading plan from a book catalog.
 3. **Library view** — what's ingested, how it was extracted, and how well.
 
-Everything runs **fully self-hosted**. `docker compose up` brings up Postgres
-(full-text + pgvector), a local LLM, the API, the UI, and Grafana. A cloud API
-key is an optional override, never a requirement — there is nothing to sign up
-for.
+Everything runs **fully self-hosted**. Compose still brings up Postgres
+(full-text + pgvector), Grafana, a local LLM, the API, and the UI. When
+`HOMELIB_SQLITE_PATH` is set (the tip product path), asks and feedback also
+land in SQLite, and the UI's Observatory door serves ≥5 charts in-app. A cloud
+API key is an optional override, never a requirement — there is nothing to sign
+up for.
 
 ---
 
@@ -55,9 +57,16 @@ are overridable in `.env` if something already listens on a default.
 
 | Service | Default | What it is |
 |---|---|---|
-| UI | http://localhost:8501 | Streamlit: ask, roadmap, library |
+| UI | http://localhost:8501 | Streamlit: Crossroads doors (Ask, Mentor, Shelf, Observatory, …) |
 | API | http://localhost:8000/docs | FastAPI + Swagger — the full contract |
-| Grafana | http://localhost:3001 | Provisioned dashboard, 6 panels |
+| Grafana | http://localhost:3001 | Provisioned dashboard, 6 panels (Postgres `query_log`) |
+
+**Reviewer notes.** Dual monitoring path, not a choice of one:
+
+- With `HOMELIB_SQLITE_PATH` set (compose tip): feedback and charts live in the
+  **Observatory** UI door (`GET /v1/observatory`) — Grafana may not show new
+  SQLite feedback rows.
+- Postgres-only path: use the provisioned **Grafana** dashboard as before.
 
 ---
 
@@ -210,17 +219,16 @@ strict there: `done` means verified by a command whose output is recorded in
 | Retrieval flow (KB + LLM) | 2 | done | Postgres FTS + pgvector + grounded, citation-validated answers — [`packages/homelib-rag`](packages/homelib-rag), [`apps/api/main.py`](apps/api/main.py) |
 | Retrieval evaluation | 2 | done | 4 arms × 235 questions, 0 degraded — [`evals/results/retrieval.md`](evals/results/retrieval.md), [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 | LLM evaluation | 2 | done | 4 prompt arms × 30 questions, judge with bias control; null result recorded — [`evals/results/llm_eval.md`](evals/results/llm_eval.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md) |
-| Interface (UI or API) | 2 | done | Both — FastAPI (OpenAPI-pinned) and a 3-tab Streamlit UI — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui) |
+| Interface (UI or API) | 2 | done | Both — FastAPI (OpenAPI-pinned) and Streamlit Crossroads UI — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui) |
 | Ingestion pipeline (e.g. dlt) | 2 | done | Real dlt source/resources, ELT into the canonical schema, 37 tests against a live Postgres — [`apps/ingest/pipeline.py`](apps/ingest/pipeline.py) |
-| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | 6 Grafana panels + feedback loop verified live end to end — [`docs/evidence.md`](docs/evidence.md) |
+| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Feedback + ≥5 charts on both paths: Grafana (Postgres) and Observatory (SQLite) — [`docs/evidence.md`](docs/evidence.md) |
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
-| Reproducibility | 2 | partial | Pins, snapshot and digests are done; the cold-clone drill (`just drill`) is mid re-run right now on a quiet machine — [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh), [`docs/evidence.md`](docs/evidence.md) |
+| Reproducibility | 2 | done | Pins, snapshot, digests, and **`just drill` PASSED** on `v2` @ `d6f9946` — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 
-Floor without any bonus, on the statuses above: 19/21 confirmed done plus
-reproducibility's partial credit. See `CHECKLIST.md` for the bonus rows
-(cloud deployment, extras) and the engineering-quality checklist behind this
-table.
+Floor without any bonus, on the statuses above: **21/21** confirmed done. See
+`CHECKLIST.md` for the bonus rows (cloud deployment, extras) and the
+engineering-quality checklist behind this table.
 
 ## License
 
