@@ -20,6 +20,7 @@ from apps.ui.api_client import (
     AskResponse,
     InProcessClient,
 )
+from apps.ui.rotunda import build_rotunda_html, door_from_query
 from apps.ui.view_model import (
     CROSSROADS_DOORS,
     LEVELS,
@@ -357,15 +358,35 @@ def main() -> None:
 
     if "door" not in st.session_state:
         st.session_state["door"] = CROSSROADS_DOORS[0]
+    # The rotunda's Enter is a same-document link to `?door=<label>`
+    # (its script cannot touch session state; the page reloads instead).
+    # Consume the param once so a later grid click is not overridden on rerun.
+    if "door" in st.query_params:
+        st.session_state["door"] = door_from_query(
+            st.query_params.to_dict(), st.session_state["door"], CROSSROADS_DOORS
+        )
+        del st.query_params["door"]
 
     st.caption(
         f"Library Crossroads — {len(CROSSROADS_DOORS)} doors into a private academic library. "
         "Ask across the shelf, follow a Roadmap, walk a Coffee Table path, or project a chapter."
     )
+    # The rotating room (specs/rotunda.md), rendered inline: Streamlit's
+    # iframe sandbox blocks parent navigation, so the fragment shares this
+    # page and Enter is a plain `?door=` link. The button grid beneath stays
+    # the accessible path. The slot is reserved above the grid but filled
+    # after it, so a grid click and the room agree within the same run.
+    rotunda_slot = st.empty()
     cols = st.columns(len(CROSSROADS_DOORS))
     for col, door in zip(cols, CROSSROADS_DOORS, strict=True):
         if col.button(door, key=f"door_{door}"):
             st.session_state["door"] = normalize_door(door)
+    # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
+    # and DOOR_COPY only — never from user input.
+    rotunda_slot.html(
+        build_rotunda_html(CROSSROADS_DOORS, normalize_door(st.session_state["door"])),
+        unsafe_allow_javascript=True,
+    )
 
     door = normalize_door(st.session_state["door"])
     st.caption(f"Open door: {door}")

@@ -1,8 +1,15 @@
 # spec: rotunda — Library Crossroads doors (product §5.2)
 
-**Implemented by:** WP08 (static door grid first), WP09 (custom rotation).
-**Consumed by:** Explore / Crossroads UI. HTML prototype in `docs/mockups/`
-is **first in the cut order** — reference only; do not ship it.
+**Implemented by:** WP08 (static door grid first), PR-D 2026-09-05
+(`apps/ui/rotunda.py` + `rotunda_template.html`, rendered inline through
+`st.html(unsafe_allow_javascript=True)`). **Consumed by:** the Crossroads in
+`apps/ui/app.py`. The HTML prototype in `docs/mockups/` was the template's
+source; its six named wings and regex "search" did **not** ship — doors come
+from `CROSSROADS_DOORS`. Enter is a same-document link (`<a href="?door=X">`):
+the iframe route (`st.iframe` / `components.v1.html`) was tried first and
+Streamlit's iframe sandbox has no `allow-top-navigation`, so a parent
+navigation from inside it is a SecurityError. The static grid beneath the
+room is always rendered: if the script fails, the grid is the navigation.
 
 ## Purpose
 

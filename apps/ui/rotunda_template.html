@@ -1,0 +1,168 @@
+<style>
+  #hl-rotunda {
+    /* The page theme is the parchment (light) theme in .streamlit/config.toml;
+       light-dark() must not follow the OS and paint a dark room on a light page. */
+    color-scheme: light;
+    --hl-ink: light-dark(#241c16, #f8f0df);
+    --hl-muted: light-dark(#756758, #c9baa5);
+    --hl-shell: light-dark(#f7f0e3, #15120f);
+    --hl-panel: light-dark(#fffaf0, #211b16);
+    --hl-panel-2: light-dark(#eee0c7, #30251d);
+    --hl-line: light-dark(#cab995, #66523d);
+    --hl-gold: light-dark(#8a5b13, #e2b85f);
+    --hl-gold-soft: light-dark(#ead8ac, #4a391f);
+    --hl-green: light-dark(#315c4b, #89b9a2);
+    color: var(--hl-ink);
+    font-family: Georgia, "Times New Roman", serif;
+    width: 100%;
+  }
+  #hl-rotunda * { box-sizing: border-box; }
+  #hl-rotunda .hl-room {
+    position: relative; height: 350px; max-width: 900px; margin: 0 auto; overflow: hidden;
+    border: 1px solid var(--hl-line); border-radius: 18px;
+    background:
+      linear-gradient(90deg, transparent 49.6%, color-mix(in srgb, var(--hl-gold) 26%, transparent) 50%, transparent 50.4%),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 15%, transparent) 0 2px, transparent 2px 82px),
+      linear-gradient(var(--hl-panel-2), var(--hl-shell) 72%);
+    perspective: 900px;
+  }
+  #hl-rotunda .hl-room::after {
+    content: ""; position: absolute; left: -10%; right: -10%; bottom: -95px; height: 185px;
+    border-top: 1px solid var(--hl-line); border-radius: 50%;
+    background: repeating-radial-gradient(ellipse at center, color-mix(in srgb, var(--hl-gold) 12%, transparent) 0 2px, transparent 2px 28px);
+    transform: rotateX(62deg);
+  }
+  #hl-rotunda .hl-compass { position: absolute; top: 13px; left: 16px; z-index: 5; color: var(--hl-muted); font: 13px system-ui, sans-serif; }
+  #hl-rotunda .hl-stage {
+    position: absolute; inset: 50% auto auto 50%; width: 0; height: 0;
+    transform-style: preserve-3d; transition: transform 700ms cubic-bezier(.2,.75,.25,1);
+  }
+  #hl-rotunda .hl-door {
+    position: absolute; left: -68px; top: -115px; width: 136px; height: 230px;
+    border: 0; padding: 0; color: var(--hl-ink); background: transparent; cursor: pointer;
+    transform-style: preserve-3d; font: inherit;
+  }
+  #hl-rotunda .hl-door-face {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    gap: 9px; padding: 16px 9px; border: 2px solid var(--hl-line); border-radius: 68px 68px 9px 9px;
+    background:
+      radial-gradient(circle at 76% 50%, var(--hl-gold) 0 4px, transparent 5px),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 28%, transparent) 0 1px, transparent 1px 27px),
+      var(--hl-panel);
+    box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--hl-line) 22%, transparent), 0 20px 35px color-mix(in srgb, var(--hl-ink) 20%, transparent);
+    transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+    backface-visibility: hidden; /* the far doors must not show mirrored labels */
+  }
+  #hl-rotunda .hl-door:hover .hl-door-face,
+  #hl-rotunda .hl-door:focus-visible .hl-door-face { transform: translateY(-5px); border-color: var(--hl-gold); }
+  #hl-rotunda .hl-door[aria-pressed="true"] .hl-door-face {
+    border-color: var(--hl-gold);
+    box-shadow: inset 0 0 0 8px var(--hl-gold-soft), 0 0 30px color-mix(in srgb, var(--hl-gold) 42%, transparent);
+  }
+  #hl-rotunda .hl-door-name { max-width: 110px; font-weight: 500; line-height: 1.15; text-align: center; }
+  #hl-rotunda .hl-door-kind { color: var(--hl-muted); font: 11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  #hl-rotunda .hl-turn {
+    position: absolute; right: 14px; top: 12px; z-index: 6; min-height: 36px; padding: 7px 10px;
+    border: 1px solid var(--hl-gold); border-radius: 10px; color: var(--hl-ink); background: var(--hl-panel);
+    font: 500 14px system-ui, sans-serif; cursor: pointer;
+  }
+  #hl-rotunda .hl-result {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; max-width: 900px;
+    margin: 14px auto 0; padding: 14px 16px; border: 1px solid var(--hl-line); border-radius: 14px;
+    background: var(--hl-panel); font-family: system-ui, sans-serif;
+  }
+  #hl-rotunda .hl-result h2 { margin: 0 0 4px; font: 500 18px Georgia, serif; }
+  #hl-rotunda .hl-result p { margin: 0; color: var(--hl-muted); }
+  #hl-rotunda .hl-enter-link {
+    display: inline-block; min-height: 44px; line-height: 44px; padding: 0 16px; border-radius: 10px;
+    border: 1px solid var(--hl-gold); color: var(--hl-panel); background: var(--hl-gold);
+    font: 500 14px system-ui, sans-serif; text-decoration: none; white-space: nowrap;
+  }
+  #hl-rotunda .hl-enter-link[hidden] { display: none; }
+  #hl-rotunda.hl-reduced .hl-stage, #hl-rotunda.hl-reduced .hl-door-face { transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    #hl-rotunda .hl-stage, #hl-rotunda .hl-door-face { transition: none; }
+  }
+  @media (max-width: 720px) {
+    #hl-rotunda .hl-room { height: 380px; }
+    #hl-rotunda .hl-door { left: -58px; width: 116px; height: 205px; }
+    #hl-rotunda .hl-result { grid-template-columns: 1fr; }
+  }
+</style>
+<div id="hl-rotunda" class="hl-rotunda__MOTION_CLASS__">
+  <section class="hl-room" aria-label="Rotating library room">
+    <div class="hl-compass" id="hl-compass">Facing: __ACTIVE_ESCAPED__</div>
+    <button type="button" class="hl-turn" id="hl-turn">↻ Turn the room</button>
+    <div class="hl-stage" id="hl-stage"></div>
+  </section>
+  <section class="hl-result" aria-live="polite">
+    <div>
+      <h2 id="hl-result-title">__ACTIVE_ESCAPED__</h2>
+      <p id="hl-result-copy">__ACTIVE_COPY_ESCAPED__</p>
+    </div>
+    <div class="hl-actions" id="hl-actions">
+__ENTER_LINKS__
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const doors = __LABELS_JSON__;
+  const copy = __COPY_JSON__;
+  const roots = document.querySelectorAll('#hl-rotunda');
+  const root = roots[roots.length - 1];
+  if (!root || root.dataset.hlReady === '1') { return; }
+  root.dataset.hlReady = '1';
+  const stage = root.querySelector('#hl-stage');
+  const compass = root.querySelector('#hl-compass');
+  const title = root.querySelector('#hl-result-title');
+  const copyEl = root.querySelector('#hl-result-copy');
+  const links = Array.from(root.querySelectorAll('.hl-enter-link'));
+  let active = __ACTIVE_INDEX__;
+  const angle = 360 / doors.length;
+
+  function enter(name) {
+    // Same-document navigation: this script runs inline in the Streamlit page
+    // (st.html), so `?door=NAME` reloads the Crossroads on the chosen door.
+    // No less-than sign anywhere in this script: DOMPurify (SAFE_FOR_XML)
+    // drops the whole element when its text looks like markup.
+    // Script cannot touch st.session_state; app.py reads the param instead.
+    window.location.assign('?door=' + encodeURIComponent(name));
+  }
+
+  doors.forEach((name, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'hl-door';
+    button.dataset.door = name;
+    button.setAttribute('aria-label', 'Face ' + name);
+    button.setAttribute('aria-pressed', index === active ? 'true' : 'false');
+    const face = document.createElement('span');
+    face.className = 'hl-door-face';
+    const glyph = document.createElement('span'); glyph.textContent = '▯'; glyph.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span'); label.className = 'hl-door-name'; label.textContent = name;
+    const kind = document.createElement('span'); kind.className = 'hl-door-kind'; kind.textContent = 'door';
+    face.append(glyph, label, kind);
+    button.appendChild(face);
+    button.style.transform = 'rotateY(' + (index * angle) + 'deg) translateZ(300px)';
+    button.addEventListener('click', () => {
+      if (index === active) { enter(name); return; }
+      face_door(index);
+    });
+    stage.appendChild(button);
+  });
+
+  function face_door(index) {
+    active = (index + doors.length) % doors.length;
+    stage.style.transform = 'rotateY(' + (-active * angle) + 'deg)';
+    root.querySelectorAll('.hl-door').forEach((door, i) => door.setAttribute('aria-pressed', i === active ? 'true' : 'false'));
+    compass.textContent = 'Facing: ' + doors[active];
+    title.textContent = doors[active];
+    copyEl.textContent = copy[doors[active]] || '';
+    links.forEach((a, i) => { a.hidden = i !== active; });
+  }
+
+  root.querySelector('#hl-turn').addEventListener('click', () => face_door(active + 1));
+  face_door(active);
+})();
+</script>

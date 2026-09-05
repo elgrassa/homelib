@@ -53,3 +53,29 @@ def test_clicking_a_door_button_opens_that_door() -> None:
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == target
     assert f"Open door: {target}" in [c.value for c in at.caption]
+    # The rotunda is filled after the grid, so the room agrees in the same run.
+    (rotunda,) = at.get("html")
+    assert f"Facing: {target}" in rotunda.body
+
+
+def test_door_query_param_opens_that_door_and_is_consumed() -> None:
+    """The rotunda's Enter reloads the page on `?door=X`; the app must open X
+    and drop the param so a later grid click is not overridden on rerun."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.query_params["door"] = "Shelf"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["door"] == "Shelf"
+    assert "Open door: Shelf" in [c.value for c in at.caption]
+    assert "door" not in at.query_params
+    (rotunda,) = at.get("html")
+    assert "Facing: Shelf" in rotunda.body
+
+
+def test_unknown_door_query_param_does_not_crash_the_crossroads() -> None:
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.query_params["door"] = "Rotunda"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["door"] == "Ask"
+    assert "Open door: Ask" in [c.value for c in at.caption]

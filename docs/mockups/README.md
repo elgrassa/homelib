@@ -2,7 +2,7 @@
 
 Owner-attached stills for WP08/WP09. Binary images are allowed in this PR. Do not invent new art. The standalone HTML prototype is first in the cut order (`docs/plan-v2.md` §0.5 / product §13) and is kept here as a reference artifact, not as a shipped UI.
 
-**Live UI vs these stills:** the shipped Streamlit surface is a lightweight parchment/gold theme plus the static six-door Crossroads grid (`.streamlit/config.toml`). Rotunda carousel, Memory Sphere polish, and the HTML prototype remain aspirational / post-capstone — open the stills here for intent, not as a pixel match of `:8501`.
+**Live UI vs these stills:** the shipped Streamlit surface is the parchment/gold theme (`.streamlit/config.toml`), the **rotunda** above the Crossroads (PR-D — `apps/ui/rotunda_template.html` is derived from `homelib-magic-library-standalone.html`, rendered inline with `st.html`, doors injected from `CROSSROADS_DOORS`, seven of them) and the static door grid beneath it. Memory Sphere polish and the prototype's regex "search" remain aspirational / cut — open the stills for intent, not as a pixel match of `:8501`.
 
 Audio/voice in the mentor still is **Coming soon** (ADR-009): schema may reserve columns; the capstone does not ship TTS/STT.
 
