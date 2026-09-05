@@ -8,6 +8,7 @@ Observatory / Projection.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from typing import Literal
 
 import streamlit as st
@@ -324,6 +325,21 @@ def render_roadmap_tab(client: Client) -> None:
             st.write(f"Estimated effort: {step.est_effort}")
 
 
+# One entry per Crossroads door, in grid order. `CROSSROADS_DOORS` is the
+# single source of the door set; this table must cover it exactly (pinned by
+# `test_every_door_has_a_renderer_and_vice_versa`). The previous `elif` chain
+# let `render_roadmap_tab` exist for a week without any door reaching it.
+DOOR_RENDERERS: dict[str, Callable[[Client], None]] = {
+    "Ask": render_ask_tab,
+    "Mentor": render_mentor_tab,
+    "Roadmap": render_roadmap_tab,
+    "Coffee Table": render_coffee_table_tab,
+    "Shelf": render_library_tab,
+    "Observatory": render_observatory_tab,
+    "Projection": render_projection_tab,
+}
+
+
 def main() -> None:
     st.set_page_config(page_title="HomeLib — Library Crossroads", page_icon="📚", layout="wide")
     st.title("HomeLib")
@@ -343,8 +359,8 @@ def main() -> None:
         st.session_state["door"] = CROSSROADS_DOORS[0]
 
     st.caption(
-        "Library Crossroads — six doors into a private academic library. "
-        "Ask across the shelf, walk a Coffee Table path, or project a chapter."
+        f"Library Crossroads — {len(CROSSROADS_DOORS)} doors into a private academic library. "
+        "Ask across the shelf, follow a Roadmap, walk a Coffee Table path, or project a chapter."
     )
     cols = st.columns(len(CROSSROADS_DOORS))
     for col, door in zip(cols, CROSSROADS_DOORS, strict=True):
@@ -354,18 +370,7 @@ def main() -> None:
     door = normalize_door(st.session_state["door"])
     st.caption(f"Open door: {door}")
     st.divider()
-    if door == "Ask":
-        render_ask_tab(client)
-    elif door == "Mentor":
-        render_mentor_tab(client)
-    elif door == "Coffee Table":
-        render_coffee_table_tab(client)
-    elif door == "Shelf":
-        render_library_tab(client)
-    elif door == "Observatory":
-        render_observatory_tab(client)
-    elif door == "Projection":
-        render_projection_tab(client)
+    DOOR_RENDERERS[door](client)
 
 
 if __name__ == "__main__":

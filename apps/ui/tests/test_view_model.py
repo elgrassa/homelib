@@ -157,17 +157,28 @@ def test_ui_boundary_forbids_store_and_provider_imports() -> None:
 
 
 def test_crossroads_doors_cover_thin_e2e_journey() -> None:
-    """Crossroads → Ask (Wing) → Mentor → Coffee Table → Projection reader."""
+    """Crossroads → Ask (Wing) → Mentor → Roadmap → Coffee Table → Projection."""
     assert "Ask" in CROSSROADS_DOORS
     assert "Mentor" in CROSSROADS_DOORS
+    assert "Roadmap" in CROSSROADS_DOORS
     assert "Coffee Table" in CROSSROADS_DOORS
     assert "Projection" in CROSSROADS_DOORS
     assert "Rotunda" not in CROSSROADS_DOORS
     app_src = (Path(__file__).resolve().parent.parent / "app.py").read_text()
-    for door in CROSSROADS_DOORS:
-        assert f'door == "{door}"' in app_src
     assert "render_projection_tab" in app_src
     assert "Enter projector mode" in app_src
+
+
+def test_every_door_has_a_renderer_and_vice_versa() -> None:
+    """The door grid and the dispatch table are the same set — no unreachable
+    renderer (Roadmap was built and never wired) and no door that renders
+    nothing. Behavioural: reads the table, not the source text."""
+    from apps.ui.app import DOOR_RENDERERS
+
+    assert set(DOOR_RENDERERS) == set(CROSSROADS_DOORS)
+    assert list(DOOR_RENDERERS) == list(CROSSROADS_DOORS)
+    for door, renderer in DOOR_RENDERERS.items():
+        assert callable(renderer), door
 
 
 # --------------------------------------------------------------------------

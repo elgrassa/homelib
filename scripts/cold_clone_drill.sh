@@ -192,11 +192,28 @@ sys.exit(
 PY
 
 step "monitoring recorded that request"
-logged="$(curl -fsS -u "admin:$(grep '^GRAFANA_PASSWORD=' .env | cut -d= -f2)" \
-    "http://localhost:$GRAFANA_PORT/api/dashboards/uid/homelib-overview" \
-    | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["dashboard"]["panels"]))')" \
-    || fail "Grafana dashboard not provisioned"
-[ "$logged" -ge 5 ] || fail "dashboard has $logged panels, expected at least 5"
-echo "dashboard provisioned with $logged panels"
+# The ask above was logged to SQLite (HOMELIB_SQLITE_PATH is set on the tip
+# path), so the in-app Observatory is the monitoring surface that can see it
+# (ADR-005). Grafana still charts the Postgres query_log, which this request
+# never touched — counting its provisioned panels proved nothing about the
+# request, which is why this step no longer does that.
+python3 - "$API_PORT" <<'PY' || exit 1
+import json
+import sys
+import urllib.request
+
+port = sys.argv[1]
+with urllib.request.urlopen(f"http://localhost:{port}/v1/observatory", timeout=30) as r:
+    data = json.load(r)
+charts = data["charts"]
+if len(charts) < 5:
+    sys.exit(f"✗ observatory serves {len(charts)} charts, expected at least 5")
+queries = next((c for c in charts if c["id"] == "queries_over_time"), None)
+if queries is None or not queries["points"]:
+    sys.exit("✗ queries_over_time has no points — the ask above was not logged")
+populated = sum(1 for c in charts if c["points"])
+print(f"observatory: {len(charts)} charts, {populated} populated; "
+      f"queries_over_time has {len(queries['points'])} point(s)")
+PY
 
 printf '\n✓ DRILL PASSED — pinned commit %s\n' "$PINNED_SHA"

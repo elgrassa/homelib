@@ -67,14 +67,19 @@ are overridable in `.env` if something already listens on a default.
 |---|---|---|
 | UI | http://localhost:8501 | Streamlit: Crossroads doors (Ask, Mentor, Shelf, Observatory, …) |
 | API | http://localhost:8000/docs | FastAPI + Swagger — the full contract |
-| Grafana | http://localhost:3001 | Provisioned dashboard, 6 panels (Postgres `query_log`) |
+| Grafana | http://localhost:3001 | v1 dashboard, 6 panels over the **Postgres** `query_log` — empty on the tip path, see below |
 
-**Reviewer notes.** Dual monitoring path, not a choice of one:
+**Reviewer notes.** Monitoring is the in-app **Observatory** door
+(`GET /v1/observatory`, six charts + thumbs feedback) — that is the v2 surface
+and the one `just drill` asserts on ([ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md)).
 
-- With `HOMELIB_SQLITE_PATH` set (compose tip): feedback and charts live in the
-  **Observatory** UI door (`GET /v1/observatory`) — Grafana may not show new
-  SQLite feedback rows.
-- Postgres-only path: use the provisioned **Grafana** dashboard as before.
+- With `HOMELIB_SQLITE_PATH` set (the compose default and the tip path) every
+  ask and feedback row lands in SQLite. Grafana reads the Postgres `query_log`,
+  which this path never writes, so its panels stay **empty** — it is not
+  a second view of the same data.
+- Grafana only populates when the API runs with `HOMELIB_SQLITE_PATH` unset
+  (the v1 Postgres path, tag `v1-fallback`). It stays in compose until the
+  Observatory has been green through a drill; removing it is tracked, not done.
 
 ---
 
@@ -229,7 +234,7 @@ strict there: `done` means verified by a command whose output is recorded in
 | LLM evaluation | 2 | done | 4 prompt arms × 30 questions, judge with bias control; null result recorded — [`evals/results/llm_eval.md`](evals/results/llm_eval.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md) |
 | Interface (UI or API) | 2 | done | Both — FastAPI (OpenAPI-pinned) and Streamlit Crossroads UI — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui) |
 | Ingestion pipeline (e.g. dlt) | 2 | done | Real dlt source/resources, ELT into the canonical schema, 37 tests against a live Postgres — [`apps/ingest/pipeline.py`](apps/ingest/pipeline.py) |
-| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Feedback + ≥5 charts on both paths: Grafana (Postgres) and Observatory (SQLite) — [`docs/evidence.md`](docs/evidence.md) |
+| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Observatory door: 6 charts over SQLite `query_log` + thumbs feedback, asserted by `just drill`; Grafana (Postgres) is the v1 surface and is empty on the tip path — [ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md), [`docs/evidence.md`](docs/evidence.md) |
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
 | Reproducibility | 2 | done | Pins, snapshot, digests, and **`just drill` PASSED** on `v2` @ `d6f9946` — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |

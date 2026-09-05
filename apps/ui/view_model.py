@@ -231,6 +231,7 @@ def library_summary(books: list[BookSummary]) -> LibrarySummary:
 CROSSROADS_DOORS: tuple[str, ...] = (
     "Ask",
     "Mentor",
+    "Roadmap",
     "Coffee Table",
     "Shelf",
     "Observatory",

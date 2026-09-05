@@ -383,3 +383,18 @@ def test_seed_one_shots_build_the_profile_image_before_running() -> None:
         assert runs, f"{name}: no seed one-shot found"
         for line in runs:
             assert "--build" in line, f"{name}: seed one-shot without --build: {line.strip()}"
+
+
+def test_drill_verifies_monitoring_via_observatory_not_grafana_panel_count() -> None:
+    """Hygiene pin (string-match, not behavioural): on the tip path the API
+    logs asks to SQLite, so Grafana's Postgres panels chart an unwritten table.
+    Counting provisioned panels proved nothing about the ask the drill just
+    made. The drill must read `GET /v1/observatory` and assert the ask landed
+    in `queries_over_time`.
+    """
+    drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
+    assert "/v1/observatory" in drill
+    assert "queries_over_time" in drill
+    assert '["dashboard"]["panels"]' not in drill, (
+        "drill still asserts on Grafana panel count — vacuous on the SQLite path"
+    )
