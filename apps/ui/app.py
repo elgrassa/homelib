@@ -324,7 +324,7 @@ def render_roadmap_tab(client: Client) -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="homelib", page_icon="📚", layout="wide")
+    st.set_page_config(page_title="HomeLib — Library Crossroads", page_icon="📚", layout="wide")
     st.title("HomeLib")
     # Community Cloud puts LLM_*/APP_MODE in st.secrets, not os.environ.
     with contextlib.suppress(Exception):
@@ -334,13 +334,17 @@ def main() -> None:
     if "door" not in st.session_state:
         st.session_state["door"] = CROSSROADS_DOORS[0]
 
-    st.caption("Library Crossroads")
+    st.caption(
+        "Library Crossroads — six doors into a private academic library. "
+        "Ask across the shelf, walk a Coffee Table path, or project a chapter."
+    )
     cols = st.columns(len(CROSSROADS_DOORS))
     for col, door in zip(cols, CROSSROADS_DOORS, strict=True):
         if col.button(door, key=f"door_{door}"):
             st.session_state["door"] = normalize_door(door)
 
     door = normalize_door(st.session_state["door"])
+    st.caption(f"Open door: {door}")
     st.divider()
     if door == "Ask":
         render_ask_tab(client)

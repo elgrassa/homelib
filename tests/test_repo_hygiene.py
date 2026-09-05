@@ -234,6 +234,36 @@ def test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve() -> None:
     )
 
 
+def test_streamlit_theme_pins_parchment_gold_from_mockups() -> None:
+    """Peer-facing shell: parchment/ink/gold tokens from magic-library mockup.
+
+    Without a committed `.streamlit/config.toml`, Compose and Community Cloud
+    fall back to default white Streamlit chrome. Theme only — not the HTML
+    rotunda (cut order: static door grid before rotating-room).
+    """
+    config = (REPO_ROOT / ".streamlit/config.toml").read_text()
+
+    assert 'primaryColor = "#8a5b13"' in config
+    assert 'backgroundColor = "#f7f0e3"' in config
+    assert 'secondaryBackgroundColor = "#fffaf0"' in config
+    assert 'textColor = "#241c16"' in config
+    assert 'font = "serif"' in config
+
+
+def test_ui_dockerfile_copies_streamlit_theme_into_image() -> None:
+    """UI image only COPY'd apps/ + packages/; theme must be copied explicitly.
+
+    Streamlit loads `$CWD/.streamlit/config.toml` from WORKDIR /app. Omitting
+    this COPY leaves Compose on default white chrome while Cloud (full checkout)
+    looks themed — a peer/local skew.
+    """
+    dockerfile = (REPO_ROOT / "docker/ui.Dockerfile").read_text()
+
+    assert "COPY .streamlit/ .streamlit/" in dockerfile, (
+        "ui.Dockerfile must COPY .streamlit/ so parchment theme reaches Compose"
+    )
+
+
 def test_compose_api_wires_homelib_sqlite_path_for_v2_doors() -> None:
     """Coffee Table / playlists 503 when the API container lacks the SQLite path.
 

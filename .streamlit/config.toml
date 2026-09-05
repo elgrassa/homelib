@@ -1,0 +1,8 @@
+# HomeLib peer-facing theme — parchment / ink / gold from docs/mockups
+# (homelib-magic-library-standalone.html CSS tokens). Theme only; no rotunda.
+[theme]
+primaryColor = "#8a5b13"
+backgroundColor = "#f7f0e3"
+secondaryBackgroundColor = "#fffaf0"
+textColor = "#241c16"
+font = "serif"

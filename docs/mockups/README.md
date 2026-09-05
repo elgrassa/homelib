@@ -2,6 +2,8 @@
 
 Owner-attached stills for WP08/WP09. Binary images are allowed in this PR. Do not invent new art. The standalone HTML prototype is first in the cut order (`docs/plan-v2.md` §0.5 / product §13) and is kept here as a reference artifact, not as a shipped UI.
 
+**Live UI vs these stills:** the shipped Streamlit surface is a lightweight parchment/gold theme plus the static six-door Crossroads grid (`.streamlit/config.toml`). Rotunda carousel, Memory Sphere polish, and the HTML prototype remain aspirational / post-capstone — open the stills here for intent, not as a pixel match of `:8501`.
+
 Audio/voice in the mentor still is **Coming soon** (ADR-009): schema may reserve columns; the capstone does not ship TTS/STT.
 
 Apple Foundation Models in the topology diagram are later/optional. This week's Mac-home preferred runtime is LM Studio; Ollama is the reviewer Compose runtime. The diagram is a home-topology metaphor, not a capstone-week requirement to ship Apple FM.

@@ -34,6 +34,8 @@ RUN mkdir -p packages/homelib-core/src/homelib_core packages/homelib-rag/src/hom
 
 COPY packages/ packages/
 COPY apps/ apps/
+# Theme lives at repo-root .streamlit/; Streamlit loads $CWD/.streamlit from /app.
+COPY .streamlit/ .streamlit/
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8501
