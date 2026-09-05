@@ -28,6 +28,21 @@ up for.
 
 ---
 
+## What it looks like
+
+The UI is one page — the **Library Crossroads** — with seven doors: Ask,
+Mentor, Roadmap, Coffee Table, Shelf, Observatory, Projection. The rotunda
+above the grid is the room you turn; the button grid beneath it is always
+rendered, so navigation never depends on the animation.
+
+![The Crossroads rotunda facing the Ask door, seven doors in the grid beneath](docs/screenshots/crossroads-rotunda-seven-doors.png)
+
+![The Observatory door open: the room turned to Observatory, the charts below](docs/screenshots/observatory-door.png)
+
+Both stills are the live Streamlit UI at PR-D (`streamlit run apps/ui/app.py`
+against the compose API). The HTML mockups in [`docs/mockups/`](docs/mockups/)
+are design intent — the rotunda's template came from them — not a pixel match.
+
 ## Quickstart
 
 ```bash
@@ -121,10 +136,60 @@ and the one `just drill` asserts on ([ADR-005](docs/adrs/ADR-005-observatory-rep
 The **UI never touches the database.** It talks only through the public API, so
 the API stays the single contract — and the Swagger page is the documentation.
 
+### Which LLM answers
+
+One OpenAI-compatible client, three `LLM_*` variables, no provider chain:
+
+| Edition | `LLM_BASE_URL` / `LLM_MODEL` | Where it is set |
+|---|---|---|
+| Compose (`just up`) | Ollama in the stack, `qwen2.5:7b-instruct` | `docker/docker-compose.yml` defaults; `.env` overrides |
+| Local `streamlit run` / tests | any local Ollama or LM Studio endpoint | `.env` |
+| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — the key is never in the tree (`.env.example` shows the shape) |
+
+A missing or unreachable model never fabricates: the answer comes back
+`degraded=true` with the retrieval still shown.
+
+One real ask, SQLite-only edition (`DATABASE_URL` unset, `APP_MODE=demo`,
+local Ollama `qwen2.5:7b-instruct`, 2026-09-05, `scripts/sqlite_only_smoke.sh`):
+
+```text
+POST /v1/ask {"query": "Who wrote Walden?", "k": 3}
+→ degraded: false · arm_used: hybrid_rerank · latency_ms: 35857
+→ answer: Henry David Thoreau
+→ citation 1: "Walden, and On The Duty Of Civil Disobedience", block 25a30321b30d03cc
+GET /v1/blocks/25a30321b30d03cc → 200 (the citation opens)
+```
+
 ## Evaluation results
 
-**Retrieval.** 4 arms × 235 ground-truth questions, k=5, **0 degraded across all
-940 arm-runs** — every row measures the arm it names, not a silent fallback.
+**Retrieval on the tip store — SQLite FTS5 + float32 matrix (measured
+2026-09-03).** 4 arms × 235 ground-truth questions, k=5, **0 degraded across
+all 940 arm-runs**. This is the store the product reads when
+`HOMELIB_SQLITE_PATH` is set, and the one `just ci` gates against
+([`evals/eval-baseline.json`](evals/eval-baseline.json), margin 0.01).
+
+| arm | hit-rate@5 | MRR@5 | mean latency |
+|---|---:|---:|---:|
+| `lexical` | 0.064 | 0.055 | 12 ms |
+| `vector` | 0.630 | 0.473 | 45 ms |
+| `hybrid` | 0.638 | 0.483 | 11 ms |
+| **`hybrid_rerank`** | **0.638** | **0.572** | 68 ms |
+
+On this store the vector arm carries retrieval and fusion adds a little on
+top (0.630 → 0.638). Rerank leaves hit-rate flat and lifts MRR 0.483 → 0.572
+— the reranker signature: it reorders a fixed candidate set, it cannot
+retrieve what fusion did not surface. Two bugs had to be fixed before this
+table was trustworthy — embeddings were stored as float32 BLOBs but decoded as
+JSON (vector arm 100% degraded), and the FTS5 query AND-required stopwords
+unlike Postgres `plainto_tsquery` — each with a named regression test
+([ADR-001 §v2](docs/adrs/ADR-001-retrieval-arm.md)). Do **not** read the
+vector jump against the Postgres run below (0.106 → 0.630) as a model or
+chunker win: the stores, index approximation and encoding all differ, and a
+matched re-run on both stores is an open item. Production runs
+`hybrid_rerank`; query rewrite stays off.
+
+**Retrieval on the v1 store — Postgres FTS + pgvector (measured 2026-08-30,
+kept for the record).** Same 235 questions, k=5, 0 degraded.
 
 | arm | hit-rate@5 | MRR@5 |
 |---|---:|---:|
@@ -133,25 +198,20 @@ the API stays the single contract — and the Swagger page is the documentation.
 | `hybrid` | 0.174 | 0.152 |
 | **`hybrid_rerank`** | **0.174** | **0.167** |
 
-Fusion is where the gain is: hybrid beats the better single arm by **+64%**
-(0.174 vs 0.106) because lexical and vector fail on different questions.
-Rerank lifts MRR (0.152 → 0.167) and leaves hit-rate flat — that's exactly
-what a reranker does; it reorders a fixed candidate set, it can't retrieve
-what fusion didn't surface. Query rewriting was measured on a matched 80-row
-sample and **rejected**: 0.150/0.144 hit-rate/MRR with rewrite off vs.
-0.150/0.138 with it on — a recorded negative result, not an oversight.
-Production runs `hybrid_rerank` ([ADR-001](docs/adrs/ADR-001-retrieval-arm.md)).
-
-0.174 reads low, so it was checked rather than reported bare. A 60-question
-proximity probe over the same index asked not "was the labelled chunk
-retrieved" but "was anything near it retrieved": exact-chunk hit-rate is
-0.133, but the **correct book** is in the top-5 65.0% of the time and the
-**correct section** 40.0% of the time, across 18 books (chance is 5.6%).
-Both things are true at once — the metric is single-positive and
-chunk-exact, so a neighbouring chunk with equally relevant prose scores as a
-total miss, which understates usefulness; and 0.650 book-level accuracy is
-not a good score in absolute terms either, so there is real headroom too.
-Full reasoning in [ADR-001](docs/adrs/ADR-001-retrieval-arm.md).
+There, fusion was where the gain was: hybrid beat the better single arm by
++64% (0.174 vs 0.106) because lexical and vector failed on different
+questions, and rerank lifted MRR (0.152 → 0.167) with hit-rate flat. Query
+rewriting was measured on a matched 80-row sample and **rejected**:
+0.150/0.144 hit-rate/MRR with rewrite off vs. 0.150/0.138 with it on — a
+recorded negative result, not an oversight. Because 0.174 read low, a
+60-question proximity probe asked not "was the labelled chunk retrieved" but
+"was anything near it retrieved": exact-chunk hit-rate 0.133, the **correct
+book** in the top-5 65.0% of the time and the **correct section** 40.0%,
+across 18 books (chance 5.6%). The metric is single-positive and chunk-exact,
+so a neighbouring chunk with equally relevant prose scores as a total miss;
+that understates usefulness, and 0.650 book-level accuracy is not a good
+absolute score either. Full reasoning in
+[ADR-001](docs/adrs/ADR-001-retrieval-arm.md).
 
 **LLM answer quality.** 4 prompt arms — 3 challengers plus the production
 prompt as a control — × 30 questions, scored by an LLM judge with bias
@@ -230,18 +290,24 @@ strict there: `done` means verified by a command whose output is recorded in
 |---|---:|---|---|
 | Problem description | 2 | done | Stated in user terms above — unsearchable shelf, unplanned reading order |
 | Retrieval flow (KB + LLM) | 2 | done | Postgres FTS + pgvector + grounded, citation-validated answers — [`packages/homelib-rag`](packages/homelib-rag), [`apps/api/main.py`](apps/api/main.py) |
-| Retrieval evaluation | 2 | done | 4 arms × 235 questions, 0 degraded — [`evals/results/retrieval.md`](evals/results/retrieval.md), [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
+| Retrieval evaluation | 2 | done | 4 arms × 235 questions, 0 degraded, on both stores (SQLite 2026-09-03 is the gated one) — [`evals/results/retrieval.md`](evals/results/retrieval.md), [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 | LLM evaluation | 2 | done | 4 prompt arms × 30 questions, judge with bias control; null result recorded — [`evals/results/llm_eval.md`](evals/results/llm_eval.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md) |
-| Interface (UI or API) | 2 | done | Both — FastAPI (OpenAPI-pinned) and Streamlit Crossroads UI — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui) |
+| Interface (UI or API) | 2 | done | Both — FastAPI (18 paths, OpenAPI-pinned) and the Streamlit Crossroads: **seven doors** behind the rotunda, static grid always rendered — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui), [`specs/ui.md`](specs/ui.md) |
 | Ingestion pipeline (e.g. dlt) | 2 | done | Real dlt source/resources, ELT into the canonical schema, 37 tests against a live Postgres — [`apps/ingest/pipeline.py`](apps/ingest/pipeline.py) |
 | Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Observatory door: 6 charts over SQLite `query_log` + thumbs feedback, asserted by `just drill`; Grafana (Postgres) is the v1 surface and is empty on the tip path — [ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md), [`docs/evidence.md`](docs/evidence.md) |
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
-| Reproducibility | 2 | done | Pins, snapshot, digests, and **`just drill` PASSED** on `v2` @ `d6f9946` — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
+| Reproducibility | 2 | done on `d6f9946`; **re-run pending** | Pins, snapshot, digests; **`just drill` PASSED** on `v2` @ `d6f9946` (2026-09-04, quiet box). The 2026-09-05 re-run on `ae83d51` passed clone, `--build` seeds and `/health` 18/9168, then **failed the ask step** under host load 340–410 (3 of 5 asks hit the 300 s timeout) — recorded, not waved through; a quiet-box re-run is the GO/NO-GO input — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
+| Cloud deployment (bonus) | 2 | not done | No public URL from this tree. The Cloud files (root `streamlit_app.py`, committed seed, Python 3.13 in Advanced settings, Groq secrets) are drafted and held until the drill re-run passes; the owner creates the Streamlit Community Cloud app on Mon Sep 7 — [`docs/submission.md`](docs/submission.md) |
+| Extras (bonus) | 1 | partial | Mentor agent with abstention, eval regression gate with an append-only history, Coffee Table state machine, the rotunda — the reviewer's call |
 
-Floor without any bonus, on the statuses above: **21/21** confirmed done. See
-`CHECKLIST.md` for the bonus rows (cloud deployment, extras) and the
+Floor without any bonus, on the statuses above: **21/21** done, with row 9
+flagged for a quiet-box drill re-run. See `CHECKLIST.md` for the
 engineering-quality checklist behind this table.
+
+**Public demo URL:** none yet — owner deploy Mon Sep 7 (bonus row above).
+**Submission commit:** the `v2` tip after the stack merges, recorded in
+[`docs/evidence.md`](docs/evidence.md) at submission time.
 
 ## License
 

@@ -1,117 +1,97 @@
-# spec: ui — `apps/ui` (Streamlit)
+# spec: ui — `apps/ui` (Streamlit Crossroads)
 
-**Implemented by:** WP-14/16/17 (v1 three-tab HTTP UI). **v2 target:** WP08
-vertical experience via `HomelibClient` (`specs/client.md`). Destinations:
-product §5.1 (Crossroads, Shelf, Discover, Coffee Table, Mentor, Observatory)
-not the HTML nav labels.
+**Implemented by:** WP08 (static door grid, `HomelibClient`), WP09 (Projection),
+WP10 (Observatory door), PR-B 2026-09-05 (Roadmap door, `DOOR_RENDERERS`),
+PR-D (rotunda above the grid). **Supersedes** the v1 three-tab description that
+lived here until 2026-09-05; the v1 tabs are on tag `v1-fallback`.
 
 **Consumed by:** the human reviewer; nothing consumes this — it is the leaf.
 
 ## Purpose
 
-A reviewer-facing surface with zero setup beyond `docker compose up`, built
-entirely on the public API contract in `specs/api.md`. The binding constraint:
-**the UI never opens a database connection or imports anything from
-`homelib_rag`/`homelib_core` internals — every action goes through
-`HomelibClient`.** v1 is HTTP-only `ApiClient`. v2 demo uses `InProcessClient`;
-selfhosted uses `HttpClient`. The AST boundary test stays.
+One Streamlit page, `apps/ui/app.py`, that a reviewer reaches with zero setup
+beyond `docker compose up` (selfhosted) or a Community Cloud URL (demo). The
+binding constraint is unchanged: **the UI never opens a database connection and
+never imports `homelib_rag` / `homelib_core` / `apps.store` internals — every
+action goes through `HomelibClient`** (`specs/client.md`). Selfhosted uses
+`HttpClient` (HTTP to FastAPI); demo uses `InProcessClient` (FastAPI in the same
+process over `httpx.ASGITransport`). The AST boundary test stays.
 
 ## Public interface
 
 ```python
-# apps/ui/client.py — the ONLY module allowed to make network calls
-class ApiClient:
-    def __init__(self, base_url: str) -> None: ...
-    def ask(self, query: str, *, k: int = 5, arm: str | None = None, rewrite: bool = True) -> AskResponse: ...
-    def get_block(self, block_id: str) -> Block: ...
-    def submit_feedback(self, request_id: str, feedback: Literal["up", "down"]) -> None: ...
-    def build_roadmap(self, interests: list[str], level: str, goal: str, max_steps: int = 8) -> RoadmapResponse: ...
-    def list_books(self) -> list[BookSummary]: ...
+# apps/ui/view_model.py — pure, no Streamlit import
+CROSSROADS_DOORS: tuple[str, ...]      # ("Ask", "Mentor", "Roadmap", "Coffee Table", "Shelf", "Observatory", "Projection")
+def normalize_door(value: str) -> str  # raises ValueError on an unknown label
+def ensure_demo_session(client, session_state, app_mode=None) -> str | None
+def build_homelib_client() -> HttpClient | InProcessClient
+
+# apps/ui/rotunda.py — pure (PR-D)
+def build_rotunda_html(doors: Sequence[str], active: str, *, reduced_motion: bool = False) -> str
+def door_from_query(params: Mapping[str, str], current: str, doors: Sequence[str]) -> str
 
 # apps/ui/app.py
-def render_ask_tab(client: ApiClient) -> None: ...
-def render_roadmap_tab(client: ApiClient) -> None: ...
-def render_library_tab(client: ApiClient) -> None: ...
+DOOR_RENDERERS: dict[str, Callable[[Client], None]]   # keys == CROSSROADS_DOORS, same order
+def render_ask_tab(client) / render_mentor_tab / render_roadmap_tab / render_coffee_table_tab
+def render_library_tab / render_observatory_tab / render_projection_tab
+def main() -> None
 ```
 
-`AskResponse`, `Citation`, `RoadmapRequest`/`RoadmapResponse`, `BookSummary`,
-`Block` are all defined once in `specs/api.md` / `specs/core-models.md` — this
-spec imports them by name, it does not redefine their fields.
+## The doors
+
+| Door | Client calls | Renders |
+|---|---|---|
+| Ask | `ask`, `get_block`, `submit_feedback` | answer, degraded banner when `degraded`, one expander per citation (lazy block fetch), 👍/👎 once per `request_id` |
+| Mentor | `mentor_intake` | proposed path + notice; abstains rather than invents |
+| Roadmap | `build_roadmap` | steps **in `order`** with prerequisites resolved to titles |
+| Coffee Table | `get_playlist`, `add_playlist_item`, `accept_playlist`, `remove_playlist_item`, `save_progress` | current stack; `proposed` items need acceptance before they count |
+| Shelf | `list_books` | table (`title`, `authors`, `blocks`, `chunks`, `format`) + ingest summary line |
+| Observatory | `get_observatory` | ≥5 charts (six shipped) + the feedback loop |
+| Projection | `get_block`, `save_progress` | one-page reader with "Enter projector mode" |
+
+Navigation: `st.session_state["door"]` holds the open door. It changes from the
+button grid (always rendered) or from the rotunda's Enter link — a same-document
+navigation to `?door=<label>` that `door_from_query` resolves and `normalize_door`
+validates. An unknown `?door=` keeps the current door; it never raises.
 
 ## Data contracts (field-level)
 
-No new data shapes. The UI's only state beyond one HTTP request/response cycle
-is Streamlit session state holding the last `AskResponse` (so citation
-expanders and the feedback buttons can reference `request_id` without a second
-`/v1/ask` call), keyed:
+No new shapes. Session state beyond one request/response cycle:
 
 ```
+st.session_state["door"]: str                 # one of CROSSROADS_DOORS
+st.session_state["demo_session_id"]: str      # demo only; sent as X-Demo-Session
 st.session_state["last_ask"]: AskResponse | None
-st.session_state["feedback_sent"]: set[str]     # request_ids already voted on, to disable double-submit
+st.session_state["feedback_sent"]: set[str]   # request_ids already voted
+st.session_state["last_roadmap"]: RoadmapResponse | None
 ```
-
-**Ask tab:** query input -> `client.ask(...)` -> renders `answer`, then one
-expander per `Citation` (`book_title · section_path · page`); expanding a
-citation lazily calls `client.get_block(citation.chunk_id-derived block id)`
-to show the full source block, not just the `quote` already in the response.
-👍/👎 buttons call `client.submit_feedback(request_id, ...)` and then disable
-themselves via `feedback_sent`.
-
-**Roadmap tab:** a form (`interests` free-text split on commas, `level`
-selectbox, `goal` free-text) -> `client.build_roadmap(...)` -> renders
-`steps` **in `order`**, each with `title`, `authors`, `why`, and its
-`prerequisites` resolved to the titles of the referenced earlier steps (not
-raw integers).
-
-**Library tab:** `client.list_books()` rendered as a table (`title`, `authors`,
-`blocks`, `chunks`, `format`) plus a summary line (`sum(blocks)`, `sum(chunks)`,
-book count) as the ingest-stats readout.
 
 ## Error/degradation behavior
 
-- `AskResponse.degraded == True` renders a visible banner above the answer
-  ("answered with a degraded backend: {arm_used}") — the UI never hides a
-  degraded response as if it were a clean one.
-- A `4xx`/`5xx` from any `ApiClient` call surfaces as `st.error(...)` with the
-  response's `detail` field (specs/api.md's error envelope); the UI never
-  crashes the whole page on one failed call — each tab's render function
-  catches its own client errors.
-- `submit_feedback` on an already-voted `request_id` (present in
-  `feedback_sent`) is a no-op in the UI layer — the button is disabled, so the
-  second `POST /v1/feedback` (which would 404 if `request_id` were somehow
-  wrong, or double-count if not) is never sent.
-- `API_URL` unreachable at startup: every tab shows a single shared "backend
-  unavailable" state instead of three independent stack traces; `client.ask`
-  etc. raising a connection error is caught once at the top of `app.py`.
-- The UI holds **no** database credentials and imports **no** module from
-  `packages/homelib-core` or `packages/homelib-rag` other than the Pydantic
-  response models re-exported for typing — enforced by the red test below.
+- `AskResponse.degraded == True` renders a visible banner — never hidden.
+- Any `ApiClientError` / `ApiUnavailableError` inside a door renders `st.error`
+  with the API's `detail`; each renderer catches its own errors so one failing
+  door never takes the page down. The demo-session mint at the top of `main`
+  degrades to `st.warning` for the same reason.
+- Demo: a 401 (server forgot the session) is retried **once** with a fresh
+  session by `ApiClient`; selfhosted never mints.
+- The rotunda is an enhancement: if the component fails to render, the grid is
+  the navigation. Reduced motion disables rotation, not entry.
 
-## Named red tests (write before the code)
+## Named tests (all present)
 
-- `test_ui_module_has_no_db_or_psycopg_import` — static check: `grep`/AST-walk
-  `apps/ui/**/*.py` and assert no import of `psycopg`, `sqlalchemy`, or any
-  `homelib_core.*`/`homelib_rag.*` submodule beyond the shared Pydantic models;
-  behavioral, run as a real test over the actual source tree, not a comment.
-- `test_ask_tab_shows_degraded_banner_when_response_degraded` — `ApiClient`
-  mocked to return `AskResponse(degraded=True, ...)`; rendered output (via
-  Streamlit's `AppTest` harness) contains the degraded banner text.
-- `test_feedback_button_disabled_after_vote` — simulate one 👍 click via
-  `AppTest`, assert the button is disabled on rerender and `submit_feedback`
-  was called exactly once.
-- `test_roadmap_steps_render_in_order` — mocked `RoadmapResponse` with steps
-  `order=[3,1,2]`; rendered list appears in `1,2,3` order.
-- `test_library_tab_summary_matches_book_list` — mocked `list_books()` of 3
-  books; rendered summary line's totals equal the hand-summed `blocks`/`chunks`.
-- `test_api_client_error_does_not_crash_other_tabs` — `ask` raises a connection
-  error; `render_roadmap_tab` and `render_library_tab` still render without
-  raising when called independently in the same `AppTest` session.
+- `test_ui_never_imports_database_or_internal_packages` — AST walk over `apps/ui`.
+- `test_every_door_has_a_renderer_and_vice_versa` — `DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`, same order.
+- `test_every_door_renders_without_exception[door]` — `streamlit.testing.v1.AppTest`, API on a closed port.
+- `test_door_grid_has_one_button_per_door`, `test_clicking_a_door_button_opens_that_door` — AppTest.
+- `test_ensure_demo_session_mints_once_and_reuses_state`, `test_ensure_demo_session_is_a_noop_that_clears_in_selfhosted`.
+- `test_rotunda_html_emits_door_param_link_for_every_door`, `test_rotunda_is_an_inline_fragment_not_an_iframe_document`, `test_rotunda_script_text_contains_no_markup_like_characters`, `test_unknown_door_param_falls_back_via_normalize_door`, `test_rotunda_html_neutralises_script_close` (PR-D).
+- `test_specs_ui_door_list_matches_crossroads_doors` — this spec's door table is the code's tuple.
 
 ## Verify
 
 ```
-uv run pytest apps/ui/tests -v
-uv run python -c "import ast,pathlib; [ast.parse(p.read_text()) for p in pathlib.Path('apps/ui').rglob('*.py')]"   # no import errors
-uv run streamlit run apps/ui/app.py --server.headless true &  # smoke boot, kill after health check
+uv run pytest apps/ui/tests -q
+uv run streamlit run apps/ui/app.py --server.headless true &
 curl -fs localhost:8501/_stcore/health
 ```

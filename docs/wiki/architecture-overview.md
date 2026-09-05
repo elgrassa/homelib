@@ -110,7 +110,34 @@ From [`specs/editions.md`](../../specs/editions.md) and [ADR-006](../adrs/ADR-00
 | Uploads | Disabled | Enabled with rights declaration | Quota storage |
 | Mutable state | Session-scoped, TTL | Persistent | Per-account |
 | Client | `InProcessClient` | `HttpClient` | TBD |
-| Monitoring | Observatory (in-app) | Observatory | TBD |
+| Monitoring | Observatory (in-app) | Observatory (Grafana panels are v1 and empty on this path) | TBD |
+
+### Edition topology (who talks to what)
+
+```mermaid
+flowchart TB
+    subgraph demo["APP_MODE=demo — Streamlit Community Cloud (bonus 11, owner deploy)"]
+        D_UI[Streamlit app.py] -->|InProcessClient| D_ASGI[ApiClient over httpx.ASGITransport]
+        D_ASGI --> D_API[FastAPI app in the same process]
+        D_API --> D_DB[(seed homelib.sqlite<br/>inflated from data/seed/*.gz)]
+        D_API -->|LLM_* from st.secrets| D_LLM[Groq — OpenAI-compatible]
+        D_UI -. X-Demo-Session .-> D_API
+    end
+    subgraph compose["APP_MODE=selfhosted — docker compose (the reviewer path)"]
+        C_UI[ui :8501] -->|HttpClient| C_API[api :8000]
+        C_API --> C_DB[(data/homelib.sqlite<br/>just seed-sqlite)]
+        C_API -->|LLM_BASE_URL| C_OLL[ollama qwen2.5:7b-instruct]
+        C_ING[ingest one-shots] --> C_PG[(postgres — v1 store, Grafana)]
+        C_ING --> C_DB
+        C_GRAF[grafana :3001] --> C_PG
+    end
+    subgraph home["Home / LAN — same image, LM Studio or Ollama"]
+        H_UI[ui] -->|HttpClient| H_API[api]
+        H_API --> H_DB[(persistent SQLite)]
+    end
+```
+
+The demo edition has no network hop between UI and API: `InProcessClient` wraps an `ApiClient` over `httpx.ASGITransport`, so route handlers, `LLM_*` wiring and the SQLite store are the same code as compose. The demo principal travels as `X-Demo-Session` (minted once per browser session, `ensure_demo_session`).
 
 **Commercial packaging:** paid Home/Pro features land in the same Forgejo repo after public GitHub publish — not a second remote ([ADR-010](../adrs/ADR-010-commercial-split.md)).
 

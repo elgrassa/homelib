@@ -135,6 +135,31 @@ flowchart TD
     L --> M[Persist last_opened_item_id]
 ```
 
+Item lifecycle as the store enforces it (`apps/store/coffee_table.py`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> proposed: Mentor proposes (origin=mentor)
+    [*] --> queued: manual add from Shelf / Ask (manual=true)
+    proposed --> queued: accept (whole stack or per item) — accepted_at set
+    proposed --> removed: reject
+    proposed --> proposed: Mentor regen replaces proposed rows only
+    queued --> completed: PATCH /v1/playlists/current/items status=completed
+    queued --> listening: status=listening — stored, audio is Coming soon per ADR-009
+    listening --> completed
+    queued --> removed: DELETE item — resource row kept
+    completed --> [*]
+    removed --> [*]
+    note right of queued
+        manual=true items survive regeneration;
+        user ordinals survive Mentor updates
+    end note
+    note right of completed
+        completed / removed are never
+        silently re-inserted by regen
+    end note
+```
+
 **Rules** ([`specs/coffee-table.md`](../../specs/coffee-table.md)):
 
 1. AI proposals require acceptance before `queued`.

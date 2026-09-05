@@ -158,6 +158,26 @@ For binding decisions, prefer the ADR file as canonical; this page is the naviga
 
 ---
 
+## The path not taken — how v2 got here (narrative)
+
+Read this before proposing a rewrite. Each row is a fork the code already went through.
+
+| Fork | Chosen | Rejected, and why |
+|---|---|---|
+| Rewrite the whole UI as a React/Base44 app | **No.** One Streamlit page, `HomelibClient` boundary | A second frontend stack for a one-week capstone; Community Cloud is the free public host and it runs Streamlit |
+| Query rewrite in retrieval | **Off** (ADR-001) | Measured on a matched sample and rejected on evidence — the negative result is the rubric point |
+| Answer-prompt bake-off | **Incumbent stays** (ADR-003) | Null result: run-to-run variance exceeded between-arm spread |
+| Postgres + pgvector for v2 | **SQLite + FTS5 + float32 matrix** (ADR-004) | Community Cloud has no Postgres; one file seeds in one command |
+| Grafana as v2 monitoring | **In-app Observatory** (ADR-005) | Second origin, no Cloud; on the tip path Grafana charts an unwritten table — the drill now asserts on the Observatory instead |
+| Free-LLM provider chain for the public demo | **Groq only** behind the existing `OpenAIClient`/`LLM_*` | A chain adds a config surface, a `provider` column and a new SDK for a weekend; owner verdict 2026-09-05 |
+| Rotunda before doors | **Doors first, rotunda after PR-A green** (cut order) | Animation must never be the only navigation; kill criterion Sun 12:00 |
+| Retracted diagnoses | Tailscale/MTU (WP-07) — **wrong**, retracted in evidence; "Roadmap door exists" — **wrong** until PR-B | Recorded so nobody acts on them again |
+| `run_agent` as the request path | **Not used**; `Deps.catalog_search` + `build_roadmap` wrapper are | Dispatch fixed inside `agent.search_catalog` covers all three bindings; `test_run_agent_is_not_on_the_demo_request_path` pins it |
+
+## Licence — owner decision, recorded not fixed
+
+`LICENSE`, `pyproject.toml` and README say **Apache-2.0** (v1). ADR-007 decides **PolyForm Noncommercial** for the public capstone snapshot, provisional pending legal review. Nothing in this stack changes the licence: it is an owner sign-off before `just publish`, and an automated "fix" in either direction would be wrong. The ADR index row below reflects the ADR, the tree reflects v1.
+
 ## Related ADRs (quick index)
 
 | ADR | Topic |
@@ -168,7 +188,7 @@ For binding decisions, prefer the ADR file as canonical; this page is the naviga
 | [ADR-004](../adrs/ADR-004-sqlite-replaces-postgres.md) | SQLite + FTS5 + matrix |
 | [ADR-005](../adrs/ADR-005-observatory-replaces-grafana.md) | In-app monitoring |
 | [ADR-006](../adrs/ADR-006-editions-and-hosting.md) | demo vs selfhosted; late Cloud deploy |
-| [ADR-007](../adrs/ADR-007-licence-provisional.md) | Apache-2.0 provisional |
+| [ADR-007](../adrs/ADR-007-licence-provisional.md) | PolyForm-NC decided for the public snapshot (provisional); tree still ships Apache-2.0 — owner sign-off before `just publish` |
 | [ADR-008](../adrs/ADR-008-rights-gate.md) | Unknown rights fail closed |
 | [ADR-009](../adrs/ADR-009-audio-deferred.md) | TTS/STT deferred |
 | [ADR-010](../adrs/ADR-010-commercial-split.md) | Single repo until publish |

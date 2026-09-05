@@ -398,3 +398,52 @@ def test_drill_verifies_monitoring_via_observatory_not_grafana_panel_count() -> 
     assert '["dashboard"]["panels"]' not in drill, (
         "drill still asserts on Grafana panel count — vacuous on the SQLite path"
     )
+
+
+def test_specs_ui_door_list_matches_crossroads_doors() -> None:
+    """`specs/ui.md` describes the doors; the code defines them. The spec's door
+    table must list exactly `CROSSROADS_DOORS`, in order — a door added or
+    renamed in one place and not the other fails here, not in a review."""
+    from apps.ui.view_model import CROSSROADS_DOORS
+
+    text = (REPO_ROOT / "specs/ui.md").read_text()
+    section = text.split("## The doors", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        line
+        for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith(("| Door", "|---"))
+    ]
+    doors = tuple(line.split("|")[1].strip() for line in rows)
+    assert doors == tuple(CROSSROADS_DOORS)
+
+
+def test_personal_books_dir_is_untracked_and_ignored() -> None:
+    """Purchased ebooks never leave this machine: `data/books/` and
+    `data/private/` are ignored and nothing under them is tracked."""
+    import subprocess
+
+    ignore = (REPO_ROOT / ".gitignore").read_text()
+    assert "data/books/" in ignore
+    assert "data/private/" in ignore
+    tracked = subprocess.run(
+        ["git", "ls-files", "data/books", "data/private"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert tracked.strip() == "", tracked
+
+
+def test_no_dotenv_file_is_tracked() -> None:
+    """Only `.env.example` may be tracked; a real `.env*` carries keys."""
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "ls-files", ".env", ".env.*", "**/.env", "**/.env.*"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert all(path.endswith(".env.example") for path in tracked), tracked

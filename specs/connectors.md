@@ -60,3 +60,13 @@ CI: no network. Fixtures under `data/` / test dirs only.
 ```
 uv run pytest -k 'connector or dedup_keeps or unique_count_not' -v
 ```
+
+## Planned (not this capstone): live Open Library connector
+
+Recorded 2026-09-05; the shipped connector federates the **fixture** catalog (`data/catalog.jsonl`, fetched once by `scripts/fetch_catalog.py`). A live connector is the next step and must follow Open Library's API guidelines:
+
+- **Identify:** `User-Agent: HomeLib/<version> (<contact>)` — contact from `HOMELIB_CONTACT` (owner e-mail), never a placeholder. `fetch_catalog.py`'s UA is untouched by this note.
+- **Rate:** ≤1 request/s unidentified, ≤3 request/s identified; one in-flight request; exponential backoff on 429/5xx.
+- **Cache:** responses cached on disk keyed by normalized query for 24 h; the seed DB stays primary so the demo never depends on Open Library being up.
+- **Never bulk-harvest** through the search API — dumps are the bulk path.
+- **Fallback:** any error or timeout → fixture results with a visible "live catalog unavailable" note; never an empty Discover.

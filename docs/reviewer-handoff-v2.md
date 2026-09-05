@@ -3,9 +3,14 @@
 Cold-start pack for a separate review session. Prefer this file +
 [`docs/wiki/README.md`](wiki/README.md) over chat history.
 
-**Git snapshot this handoff describes:** branch `feat/v2-wp08-wp11-surface`
-(targets `forgejo/v2`). Tip before this work: `39913df`. WP00–WP10 thin
-product surface implemented; WP11 drill/publish/Cloud remain owner Mon.
+**Git snapshot this handoff describes (refreshed 2026-09-05):** product tip
+`v2` @ `86ba349`; readiness stack open into `v2`, oldest-first — PR-A #25
+`fix/h1-h3-h2-sqlite-demo-path` (`ae83d51`) → PR-B #26
+`fix/roadmap-door-monitoring-honesty` (`c2675e3`) → PR-D
+`feat/crossroads-rotunda` (`ee0f318`) → PR-C `docs/stakeholder-review-wiki-mermaid-sync`.
+Nothing merged by agents. The picky-review findings, scoreboard and talk track
+live in [`handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md`](handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md);
+this file keeps the cold-start map. WP11 publish/Cloud remain owner Mon.
 
 Forgejo: http://localhost:3000/elgrassa/homelib · remote
 `ssh://git@localhost:2222/elgrassa/homelib.git`
@@ -107,11 +112,11 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | 2 | Retrieval KB + LLM | done (v1); **v2 wired** when `HOMELIB_SQLITE_PATH` | health/books/ask/feedback + mentor/scene/playlists/observatory |
 | 3 | Retrieval evaluation | done | v1 ADR-001; **v2 SQLite re-measure** `evals/results/retrieval.md` + ADR-001 §v2 |
 | 4 | LLM evaluation | done (v1) | ADR-003 null result |
-| 5 | Interface UI or API | done (v1); **v2 thin surface** | Crossroads Streamlit + FastAPI §8 subset |
+| 5 | Interface UI or API | done | FastAPI (18 paths) + Streamlit Crossroads: **seven doors** behind the rotunda (PR-B, PR-D), static grid always rendered |
 | 6 | Ingestion dlt | done | v1 Postgres; v2 SQLite pipeline tests + seed |
-| 7 | Monitoring ≥5 charts + feedback | done (v1 Grafana); **v2 Observatory** | `GET /v1/observatory` + feedback UI→DB |
+| 7 | Monitoring ≥5 charts + feedback | done | Observatory (`GET /v1/observatory`, 6 charts over SQLite `query_log`) + thumbs; asserted by the drill. Grafana charts Postgres only — empty on the tip path (ADR-005 addendum) |
 | 8 | Containerization | done (v1) | `docker/` compose |
-| 9 | Reproducibility | partial | pins yes; **`just drill` not yet green on quiet box** |
+| 9 | Reproducibility | done on `d6f9946`; **re-run pending** | `just drill` PASSED 2026-09-04 on a quiet box; the 2026-09-05 re-run on `ae83d51` passed clone/seed/health and FAILED the ask step under host load 340–410 (3/5 asks hit the 300 s timeout) — `docs/evidence.md` |
 | 10 | Hybrid + rerank + rewrite | done | rewrite rejected on evidence |
 | 11–12 | Bonus cloud / extras | optional / partial | late owner deploy |
 
@@ -127,9 +132,9 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | WP06 | done | PR #10 @ `39b9146`; API `POST /v1/mentor/intake` |
 | WP07 | done | Coffee Table store + `/v1/playlists/*` + progress |
 | WP08 | done | Crossroads doors + HomelibClient conformance + AST |
-| WP09 | done | One-page projection; static doors (rotunda cut) |
+| WP09 | done | One-page projection; static doors; rotunda shipped in PR-D (inline `st.html`, grid kept beneath) |
 | WP10 | done | Observatory ≥5 + `demo_traffic.py` + feedback DB |
-| WP11 | prep only | Docs/evidence/OpenAPI updated; **drill / Compose e2e / Cloud / publish = owner Mon** |
+| WP11 | drill green on `d6f9946`, red under load on `ae83d51` | Docs/evidence synced (PR-C); **quiet-box drill re-run, Cloud, publish, peers = owner Mon** |
 
 ### Named WP04 eval numbers (SQLite, 2026-09-03)
 
@@ -192,7 +197,7 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 4. **P1 — Matched Postgres vs SQLite vector bake-off** (do not over-claim
    0.106→0.630 lift).
 5. **P2 — Live OL smoke** outside CI (fixtures-only in CI by design).
-6. **P3 — UX polish** (rotunda, sphere, audio) — cut-order last.
+6. **P3 — UX polish:** rotunda **shipped** (PR-D); sphere and audio stay cut-order last.
 7. **Mon owner:** Cloud deploy, `just publish`, peer ×3 schedule.
 
 ---
@@ -201,8 +206,8 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 
 | Ref | SHA / note |
 |---|---|
-| `forgejo/v2` | was `39913df` handoff tip — WP07–10 land as follow-up commit |
+| `forgejo/v2` | `86ba349` — product tip; the stack below merges into it oldest-first |
 | `main` / `v1-fallback` | `535f58b` |
-| Open PRs | none required for this surface; open PR after local `just ci` |
+| Open PRs | #25 PR-A → #26 PR-B → PR-D → PR-C, each gated by `just ci` before push; agents never merge |
 
 Merge style: `tea pulls merge <n> --style rebase`. No force-push to `v2`/`main`.

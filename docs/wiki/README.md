@@ -1,6 +1,6 @@
 # HomeLib v2 — Developer Wiki
 
-Architecture and operations documentation for the HomeLib capstone project. This wiki is maintained as repo markdown under `docs/wiki/` and can be synced to the [Forgejo wiki](http://localhost:3000/elgrassa/homelib/wiki).
+Architecture and operations documentation for the HomeLib capstone project. This wiki is maintained as repo markdown under `docs/wiki/` (the repo copy is canonical; the Forgejo wiki tab, when synced, mirrors it).
 
 **Ground truth hierarchy**
 
@@ -22,7 +22,9 @@ Architecture and operations documentation for the HomeLib capstone project. This
 | [Decision log](decision-log.md) | Fork-in-the-road choices with options, pros/cons, and links to ADRs |
 | [Repo structure](repo-structure.md) | Directory tree, where specs/code/tests/data live, branch model |
 | [Data model and schemas](data-model-and-schemas.md) | ER diagram, entities, API map, OpenAPI snapshot |
-| [User flows](user-flows.md) | Sequence diagrams for demo, search, ingest, reset |
+| [Crossroads and doors](crossroads-and-doors.md) | Door map, how a door opens (rotunda → `?door=` → renderer), rules for adding one |
+| [Monitoring and feedback](monitoring-and-feedback.md) | Observatory vs Grafana on the tip path; what the drill asserts |
+| [User flows](user-flows.md) | Sequence diagrams for demo, search, Coffee Table state machine, ingest, reset |
 | [Retrieval pipeline](retrieval-pipeline.md) | FTS5, vector matrix, RRF, rerank, rewrite, scene search |
 | [Local development](local-development.md) | Prerequisites, `just` commands, env vars, compose profiles |
 | [Debugging and troubleshooting](debugging-and-troubleshooting.md) | CI lanes, coverage, eval gates, known hazards |
@@ -32,7 +34,7 @@ Architecture and operations documentation for the HomeLib capstone project. This
 
 ## Implementation status (v2 branch stack)
 
-Honest snapshot as of evidence through **WP06** (see [`docs/evidence.md`](../evidence.md)
+Honest snapshot as of evidence through **WP11 + the 2026-09-05 readiness stack (PR-A/B/C/D)** (see [`docs/evidence.md`](../evidence.md)
 and [`docs/reviewer-handoff-v2.md`](../reviewer-handoff-v2.md)):
 
 | Work package | Branch (typical) | Status |
@@ -43,8 +45,13 @@ and [`docs/reviewer-handoff-v2.md`](../reviewer-handoff-v2.md)):
 | WP03 SQLite ingest (dlt) | `feat/wp03-ingest` | Done (merged) |
 | WP04 FTS5 + vector matrix + eval | `feat/wp04-retrieval` / eval branch | Done (merged + SQLite eval) |
 | WP05 catalog connectors + wiki | `feat/wp05-catalog` | Done (merged) |
-| WP06 mentor library | `feat/wp06-mentor` | Done (merged; API/UI pending) |
-| WP07–WP11 API/UI/Observatory/publish | — | Not started |
+| WP06 mentor library | `feat/wp06-mentor` | Done (merged; `POST /v1/mentor/intake` + Mentor door) |
+| WP07 Coffee Table + progress | `feat/v2-wp08-wp11-surface` | Done (merged) |
+| WP08 Crossroads doors (`HomelibClient`, AST boundary) | same | Done — **seven doors** after PR-B (Roadmap wired); rotunda above the grid in PR-D |
+| WP09 Projection reader | same | Done (one-page reader + progress; Listen planned, `specs/audio.md`) |
+| WP10 Observatory ≥5 charts + feedback | same | Done — six charts; the drill asserts on it since PR-B |
+| WP11 docs / drill / publish | PR-A..PR-D → `v2` | Drill re-run on the stack (see evidence); **owner Mon:** `just publish`, Cloud secrets, submit, peers ×3 |
+| Readiness stack 2026-09-05 | #25 PR-A · #26 PR-B · PR-C · PR-D | H1/H3/H2 fixed with named tests; M1/M2 fixed; M3/M4 recorded as owner decisions — [handoff](../handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md) |
 | v1 fallback | `main` / tag `v1-fallback` | Complete (Postgres + Grafana) |
 
 When a page marks something **implemented** vs **spec-only**, trust [`docs/evidence.md`](../evidence.md) over this table if they diverge.

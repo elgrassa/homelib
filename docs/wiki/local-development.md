@@ -53,11 +53,28 @@ Edit `.env` for port overrides if defaults are taken (`API_PORT`, `UI_PORT`, etc
 
 ---
 
+## Reviewer path (compose): two seeds, one health check
+
+```mermaid
+flowchart LR
+    SNAP[data/snapshot.jsonl<br/>18 public-domain books] --> DLT[dlt source/resources]
+    CAT[data/catalog.jsonl + manifest.yaml<br/>rights per book] --> DLT
+    DLT -->|just seed| STG_PG[staging → canonical<br/>Postgres + pgvector]
+    DLT -->|just seed-sqlite<br/>python -m apps.ingest.sqlite_pipeline| STG_SQ[staging → canonical<br/>SQLite + FTS5 + float32 BLOB]
+    STG_SQ --> H[GET /health<br/>books 18 · chunks 9168 · status ok]
+    STG_SQ --> CNT[CANONICAL_COUNTS 18 / 729 / 9168 / 9168]
+    H --> DRILL[just drill — cold clone, offset ports,<br/>seed both, ask, cite, Observatory]
+    STG_PG --> GRAF[Grafana — v1 only]
+    style GRAF stroke-dasharray: 5 5
+```
+Until `just seed-sqlite` has run, `/health` is HTTP 200 with `"status": "degraded"` and `"books": 0` — SQLite creates the file on first connect, and PR-A made that emptiness loud instead of silent.
+
 ## v1 stack (Postgres — `main` / reviewer path)
 
 ```bash
 just up
 just seed
+just seed-sqlite   # the store the API reads (ADR-004); /health goes ok 18/9168
 open http://localhost:8501    # UI
 open http://localhost:8000/docs
 ```

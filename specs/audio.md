@@ -50,3 +50,12 @@ Microphone / STT: not in the public demo.
 ```
 uv run pytest -k 'audio_capabilities or can_generate_is_false' -v
 ```
+
+## Planned (not this capstone): on-device Listen in Projection
+
+Recorded 2026-09-05 after the stakeholder review; **not built**, no route, no schema.
+
+- **Shape:** the Projection door gets a "Listen" control that uses the reader's own browser voice (`window.speechSynthesis`, i.e. macOS/iOS/Android built-in TTS) through a small `components.v1.html` block. Nothing is generated or stored server-side; `GET /v1/audio/capabilities` keeps `can_generate=False`.
+- **Scope:** public-domain blocks only (the seed corpus). Rights-gated resources never reach the synthesizer (ADR-008 fail-closed).
+- **Prerequisite:** Projection must render real block text end to end (today it opens one block). That is the only change that would touch the OpenAPI snapshot, so it is sequenced after the readiness stack.
+- **Why deferred:** ADR-009 stands; a voice feature that ships before the doors are green would trade against rubric rows 1–10.

@@ -17,14 +17,14 @@ Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual 
 | # | Criterion | Max | Status | Evidence / what remains |
 |---|---|---|---|---|
 | 1 | **Problem description** | 2 | ✅ done | README states the problem in user terms: unsearchable shelf, unplanned reading order |
-| 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Postgres FTS + pgvector + grounded answer with validated citations (WP-14) |
+| 2 | **Retrieval flow** — KB **and** LLM both used | 2 | ✅ done | Dual store: SQLite FTS5 + float32 matrix on the tip path (ADR-004), Postgres FTS + pgvector on `v1-fallback`; grounded answer with validated citations; PR-A made the SQLite-only host answer (`test_answer_end_to_end_not_degraded_on_sqlite_only_host`) |
 | 3 | **Retrieval evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms × 235 questions, 0 degraded; ADR-001 records the choice and the evidence |
 | 4 | **LLM evaluation** — multiple approaches, best one used | 2 | ✅ done | 4 arms (3 challengers + production control) × 30 questions, judge with bias control. **Null result, recorded in ADR-003**: run-to-run variance exceeds between-arm spread, so the incumbent stays |
-| 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (7 endpoints, OpenAPI snapshot pinned) and a 3-tab Streamlit UI |
-| 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema; 37 tests, 0 skipped, against a live Postgres |
-| 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | ✅ done | 6 panels + feedback loop **verified live end to end**: ask → request_id → 👍 → persisted in `query_log` |
-| 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | 7 services, digest-pinned, healthchecked; postgres + grafana verified healthy |
-| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | ✅ done | Exact pins ✅, snapshot ✅, digests ✅, context window pinned ✅. **`just drill` PASSED** on `v2` @ `d6f9946` (cold clone → seed 18/729/9168/9168 → grounded citation attempt 1/5, arm=`hybrid_rerank`, Grafana 6 panels) |
+| 5 | **Interface** — UI or API | 2 | ✅ done | Both: FastAPI (18 paths, OpenAPI snapshot pinned) and the Streamlit Crossroads — **seven doors** (Ask, Mentor, Roadmap, Coffee Table, Shelf, Observatory, Projection), rotunda above the grid (PR-D) |
+| 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema for both stores; `just seed` (Postgres) + `just seed-sqlite` (`python -m apps.ingest.sqlite_pipeline`, exit 1 on an empty seed); 18/729/9168/9168 |
+| 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | ✅ done | Observatory door: six charts over SQLite `query_log` + 👍/👎 → `feedback`; the drill asserts the ask it made appears in `queries_over_time` (PR-B). Grafana is v1 and empty on the tip path (ADR-005 addendum) |
+| 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | postgres, ollama, api, ui, grafana + `seed`-profile ingest, digest-pinned, healthchecked; api pinned `APP_MODE=selfhosted`; seeds run `--build` so a stale image can never pass (PR-A) |
+| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 done on `d6f9946`; re-run pending | Exact pins ✅, snapshot ✅, digests ✅, context window pinned ✅. **`just drill` PASSED** on `v2` @ `d6f9946` (2026-09-04, quiet box: cold clone → seed 18/729/9168/9168 → grounded citation attempt 1/5, arm=`hybrid_rerank`). Re-run on `ae83d51` (2026-09-05, PR-A follow-up): clone, `--build` seeds and `/health` 18/9168 **passed**, then the ask step **FAILED** — 3 of 5 asks hit the drill's 300 s client timeout and the other two came back uncited/degraded, host load 340–410 (CPU Ollama). Recorded as infra in [`docs/evidence.md`](docs/evidence.md); a quiet-box re-run is the GO/NO-GO input. The drill now asserts the Observatory (`queries_over_time`) instead of counting Grafana panels. |
 | 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | ✅ done | All three implemented **and measured**. Rewrite compared on a matched sample and rejected on evidence — a recorded negative result |
 | 11 | **Bonus: cloud deployment** | 2 | ⬜ optional | Buffer-day only. Never at the cost of 1–10 |
 | 12 | **Bonus: extras** | 3 | 🟡 partial | Eval regression gate ✅ built; audiobook + Obsidian BookShelf are buffer-day |
@@ -90,21 +90,27 @@ Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual 
    schema the model fills has no `book_title`/`book_id` field, so an invented
    attribution has no path into a response; titles come from Postgres.
 5. **LLM eval must stay bounded** — ~13s per grounded answer warm.
-7. **Two latent LLM-config hazards, recorded not fixed.** `_TIMEOUT_SECONDS = 30`
+6. **Two latent LLM-config hazards, recorded not fixed.** `_TIMEOUT_SECONDS = 30`
    in `OpenAIClient` is a production ceiling a cold model load can blow through,
    and `_MAX_CONTEXT_HITS = 20` would put prompts near ~7,600 tokens — fine on
    the current 32k-context model, not fine on a 4k or 8k one, and silent from
    the client side either way.
-8. **A zero-citation answer currently counts as a success.** `degraded=False`
+7. **A zero-citation answer currently counts as a success.** `degraded=False`
    with `citations=[]` is the legitimate "the passages do not answer this"
    reply, but it means a prompt variant can win the bake-off by declining more
    often. No winner is published without the per-arm count of ungrounded
    successes.
-6. **The local 7B model is the current ceiling on answer quality.** After the
+8. **The local 7B model is the current ceiling on answer quality.** After the
    citation fixes, 7/12 sampled questions answer without degrading; the rest
    are the model returning a bare `{}` or quoting text that appears in no
    passage. Both are correctly rejected rather than passed off as grounded.
    This is what the prompt-variant bake-off exists to move.
+9. **The last drill on the tip did not pass.** `just drill` is green on `d6f9946`
+   (2026-09-04) and red on `ae83d51` (2026-09-05): everything up to and including
+   `/health` 18/9168 passed, then 3 of 5 asks hit the 300 s timeout under host
+   load 340–410 with a CPU Ollama. Not a code change on the request path, but
+   not a pass either — it is re-run on a quiet box before GO/NO-GO, and the
+   result goes into `docs/evidence.md` whichever way it lands.
 
 ---
 
@@ -122,10 +128,10 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP05** | Lawful connectors | ✅ done — PR #9 → `v2` @ `bda328a` |
 | **WP06** | Mentor + cited answer (library) | ✅ done — PR #10 → `v2` @ `39b9146`; API route `POST /v1/mentor/intake` wired |
 | **WP07** | Coffee Table + progress | ✅ done — store ops + §5.6 reds + `/v1/playlists/*` + `/v1/progress` |
-| **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Coffee Table/Shelf/Observatory/Projection |
-| **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save (rotunda cut) |
+| **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Roadmap/Coffee Table/Shelf/Observatory/Projection (`DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`); rotunda PR-D |
+| **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save; rotunda shipped in PR-D (inline `st.html`, static grid kept beneath) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ — **residual owner Mon:** `just publish`, Streamlit Cloud, submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill PASSED on `d6f9946` (2026-09-04); re-run on `ae83d51` (2026-09-05) FAILED at the ask step under host load (see §E.9) — quiet-box re-run pending. **Residual owner Mon:** `just publish`, Streamlit Cloud (Python 3.13, Groq secrets), submit, peer×3 |
 
 **Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 
