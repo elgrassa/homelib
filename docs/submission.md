@@ -95,6 +95,46 @@ still fresh. Reviewing someone else's project the day before the review
 deadline, on a different set of criteria than the one just internalised, is how
 these get dropped.
 
+## Streamlit Community Cloud (showcase URL)
+
+**What Cloud runs:** one Streamlit process with `APP_MODE=demo` and a seed
+SQLite file — **not** the FastAPI + Ollama Docker Compose stack. Compose stays
+the reviewer / self-hosted path (`just up`). Community Cloud has no sidecar
+API and no local Ollama; generation must use an app-owner cloud LLM via
+secrets (ADR-006).
+
+**Primary free provider: Groq** (OpenAI-compatible, no credit card, tool
+calling + `response_format=json_object`, free-tier limits suitable for peer
+reviewers). Create a key at https://console.groq.com/keys — paste it only into
+Streamlit Secrets (or a private local `.env`), never into git.
+
+| Secret / env | Value |
+|---|---|
+| `APP_MODE` | `demo` |
+| `LLM_BASE_URL` | `https://api.groq.com/openai/v1` |
+| `LLM_API_KEY` | `gsk_…` (owner key) |
+| `LLM_MODEL` | `llama-3.3-70b-versatile` |
+| `LLM_TIMEOUT_SECONDS` | `90` |
+| `HOMELIB_SQLITE_PATH` | `data/homelib.sqlite` (seeded snapshot path in the repo) |
+
+`OpenAIClient` already reads `LLM_*` from the environment; Groq needs no
+base-URL path hacks. Missing/invalid key → fail-closed degraded answers
+(search still works). Compose default remains Ollama — do not flip the
+checked-in `.env.example` defaults to Groq.
+
+**Fallback for local/reviewer:** leave `LLM_BASE_URL=http://ollama:11434/v1`
+(and `LLM_API_KEY=ollama`) as in `.env.example`.
+
+Owner creates the Community Cloud app from the **public GitHub** mirror on
+submission day (late deploy). Agents do not create the Cloud app or paste keys.
+
+**Deploy-path status (tip):** Cloud secrets target the in-process demo path
+(`APP_MODE=demo` + seed SQLite + `LLM_*`). The live `apps/ui/app.py` entry
+still constructs `ApiClient` (HTTP → FastAPI). That is correct for Compose
+reviewers; for Community Cloud, Ask/Mentor need the `InProcessClient` factory
+(specs/client.md) before the showcase URL can answer without a sidecar API.
+Do not point Cloud at Compose — wire secrets for Groq on the demo process.
+
 ## Final-day order of operations
 
 Written as a sequence because on the last day the temptation is to do the
@@ -105,8 +145,10 @@ interesting work first.
 3. Push to Forgejo; wait for CI green.
 4. `just publish`; record the printed SHA.
 5. Open the public URL logged out; run the five checks above.
-6. Submit the URL.
-7. Schedule the three peer reviews **before** closing the laptop.
+6. Owner: create Streamlit Community Cloud app from public repo; set Groq
+   secrets above; smoke Ask once logged out.
+7. Submit the URL (repo + Cloud demo URL as the course form requires).
+8. Schedule the three peer reviews **before** closing the laptop.
 
 ## If something is red at the deadline
 
