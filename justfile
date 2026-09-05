@@ -90,9 +90,21 @@ down: _require-env
 logs SERVICE="": _require-env
     {{compose}} logs -f {{SERVICE}}
 
-# One-shot dlt ingestion: corpus snapshot + catalog -> Postgres.
+# One-shot dlt ingestion: corpus snapshot + catalog -> Postgres (v1 store,
+# Grafana path). The API reads SQLite (ADR-004) — run `just seed-sqlite` too.
 seed: _require-env
     {{compose}} --profile seed run --rm ingest
+
+# One-shot dlt ingestion into the SQLite file the API actually opens
+# (/data/homelib.sqlite in the container == data/homelib.sqlite on the host).
+# A deliberately SEPARATE one-shot, not `&&` in the image CMD: each seed embeds
+# 9,168 chunks, and a cold clone that skips Postgres should not pay twice.
+seed-sqlite: _require-env
+    {{compose}} --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline
+
+# Dev convenience only (needs the host venv). A cold clone uses `just seed-sqlite`.
+seed-sqlite-local:
+    uv run python -m apps.ingest.sqlite_pipeline --db data/homelib.sqlite
 
 ps: _require-env
     {{compose}} ps --format '{{{{.Name}} {{{{.Status}}'

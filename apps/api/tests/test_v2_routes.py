@@ -214,3 +214,32 @@ def test_demo_traffic_populates_observatory_charts(
         body = client.get("/v1/observatory").json()
         assert len(body["charts"]) >= 5
         assert sum(1 for c in body["charts"] if c.get("points")) >= 5
+
+
+def test_demo_mode_same_header_shares_principal_and_missing_header_does_not(
+    sqlite_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The server-side contract the client fix (H3) relies on: a minted
+    `X-Demo-Session` is one stable principal; no header is a fresh anonymous
+    principal every time; an unknown header is 401 (so the client remints)."""
+    monkeypatch.setenv("APP_MODE", "demo")
+    with TestClient(app) as client:
+        minted = client.post("/v1/demo/session").json()
+        headers = {"X-Demo-Session": minted["demo_session_id"]}
+        book_id = client.get("/v1/resources", headers=headers).json()["items"][0]["id"]
+
+        added = client.post(
+            "/v1/playlists/current/items",
+            json={"resource_id": book_id, "origin": "manual_shelf"},
+            headers=headers,
+        )
+        assert added.status_code == 200, added.text
+
+        with_header = client.get("/v1/playlists/current", headers=headers).json()
+        assert len(with_header["items"]) == 1
+
+        without_header = client.get("/v1/playlists/current").json()
+        assert without_header["items"] == []
+
+        unknown = client.get("/v1/playlists/current", headers={"X-Demo-Session": "nope"})
+        assert unknown.status_code == 401

@@ -810,3 +810,19 @@ def test_post_ingest_reraises_http_exception_unchanged() -> None:
 
     assert resp.status_code == 418
     assert resp.json()["detail"] == "teapot"
+
+
+def test_health_is_degraded_when_store_has_zero_books() -> None:
+    """SQLite creates the file on first connect, so a never-seeded clone has a
+    reachable, migrated, empty store. That must read as degraded (still HTTP
+    200 — the compose healthcheck is liveness, seeded-ness is this field)."""
+    deps = _make_deps(db_reachable=lambda: True, llm_reachable=lambda: True, counts=lambda: (0, 0))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.get("/health")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "degraded"
+    assert body["db"] is True
+    assert body["books"] == 0

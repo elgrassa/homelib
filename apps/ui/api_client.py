@@ -25,6 +25,10 @@ DEFAULT_TIMEOUT_SECONDS = 10.0
 # a working API, so these two calls opt into a much longer per-call timeout.
 LLM_CALL_TIMEOUT_SECONDS = 300.0
 
+# The demo-principal header the API reads (apps/api/v2_routes.py). The specs
+# named it `X-Demo-Session-Id` before the route landed; the route is the contract.
+DEMO_SESSION_HEADER = "X-Demo-Session"
+
 
 class ApiClientError(Exception):
     """Raised for a 4xx/5xx response from the API.
@@ -143,6 +147,37 @@ class ApiClient:
         # Optional persistent client — used by the demo ASGI in-process path
         # so Ask shares one transport without a network hop.
         self._http_client = http_client
+        # APP_MODE=demo principal (specs/principals.md). The API mints a fresh
+        # anonymous principal for every header-less request, so a client that
+        # never sends `X-Demo-Session` sees an empty Coffee Table after every
+        # rerun. Set via `set_demo_session`/`create_demo_session`; None in
+        # selfhosted, where the server ignores the header anyway.
+        self.demo_session_id: str | None = None
+
+    def _headers(self) -> dict[str, str]:
+        if self.demo_session_id is None:
+            return {}
+        return {DEMO_SESSION_HEADER: self.demo_session_id}
+
+    def _send(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: dict[str, Any] | None,
+        timeout: float,
+    ) -> httpx.Response:
+        headers = self._headers()
+        try:
+            if self._http_client is not None:
+                return self._http_client.request(
+                    method, url, json=json, timeout=timeout, headers=headers
+                )
+            return httpx.request(method, url, json=json, timeout=timeout, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise ApiUnavailableError(f"Request to {url} timed out") from exc
+        except httpx.TransportError as exc:
+            raise ApiUnavailableError(f"Could not reach the API at {url}") from exc
 
     def _request(
         self,
@@ -151,25 +186,40 @@ class ApiClient:
         *,
         json: dict[str, Any] | None = None,
         timeout: float | None = None,
+        _allow_remint: bool = True,
     ) -> Any:
         url = f"{self._base_url}{path}"
         request_timeout = timeout if timeout is not None else self._timeout
-        try:
-            if self._http_client is not None:
-                response = self._http_client.request(
-                    method, url, json=json, timeout=request_timeout
-                )
-            else:
-                response = httpx.request(method, url, json=json, timeout=request_timeout)
-        except httpx.TimeoutException as exc:
-            raise ApiUnavailableError(f"Request to {url} timed out") from exc
-        except httpx.TransportError as exc:
-            raise ApiUnavailableError(f"Could not reach the API at {url}") from exc
+        response = self._send(method, url, json=json, timeout=request_timeout)
+        # Demo-gated, single retry: a 401 means the server no longer knows our
+        # demo session (restart, TTL sweep). Mint once and resend. Gated on a
+        # session id being set so a selfhosted 401 propagates unchanged rather
+        # than minting a useless session.
+        if response.status_code == 401 and _allow_remint and self.demo_session_id is not None:
+            self.demo_session_id = None
+            self.demo_session_id = self._mint_demo_session()
+            response = self._send(method, url, json=json, timeout=request_timeout)
         if response.status_code >= 400:
             raise ApiClientError(_extract_detail(response), status_code=response.status_code)
         if not response.content:
             return None
         return response.json()
+
+    def _mint_demo_session(self) -> str:
+        data = self._request("POST", "/v1/demo/session", _allow_remint=False)
+        if not isinstance(data, dict) or not data.get("demo_session_id"):
+            raise ApiClientError("demo session response missing demo_session_id", status_code=502)
+        return str(data["demo_session_id"])
+
+    def create_demo_session(self) -> str:
+        """Mint a demo principal via `POST /v1/demo/session` and use it from now on."""
+        self.demo_session_id = self._mint_demo_session()
+        return self.demo_session_id
+
+    def set_demo_session(self, session_id: str | None) -> None:
+        """Adopt an existing demo session id (e.g. one kept in Streamlit session
+        state across reruns), or clear it with None."""
+        self.demo_session_id = session_id
 
     def _request_json(
         self,
@@ -327,6 +377,10 @@ class ApiClient:
 class HomelibClient(Protocol):
     def health(self) -> dict[str, Any]: ...
 
+    def create_demo_session(self) -> str: ...
+
+    def set_demo_session(self, session_id: str | None) -> None: ...
+
     def ask(
         self,
         query: str,
@@ -362,6 +416,7 @@ class InProcessClient:
         self._health = health
         self._ask = ask
         self._delegate = delegate
+        self._demo_session_id: str | None = None
 
     def _require_delegate(self) -> ApiClient:
         if self._delegate is None:
@@ -386,6 +441,20 @@ class InProcessClient:
         return self._require_delegate().ask(query, k=k, arm=arm, rewrite=rewrite)
 
     # Explicit forwards — mypy does not follow __getattr__ for the UI surface.
+
+    @property
+    def demo_session_id(self) -> str | None:
+        if self._delegate is not None:
+            return self._delegate.demo_session_id
+        return self._demo_session_id
+
+    def create_demo_session(self) -> str:
+        return self._require_delegate().create_demo_session()
+
+    def set_demo_session(self, session_id: str | None) -> None:
+        if self._delegate is not None:
+            self._delegate.set_demo_session(session_id)
+        self._demo_session_id = session_id
 
     def get_block(self, block_id: str) -> Block:
         return self._require_delegate().get_block(block_id)

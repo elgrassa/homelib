@@ -25,6 +25,7 @@ from apps.ui.view_model import (
     apply_streamlit_secrets_to_environ,
     block_id_for_citation,
     build_homelib_client,
+    ensure_demo_session,
     format_api_error_message,
     format_citation_label,
     format_degraded_banner,
@@ -330,6 +331,13 @@ def main() -> None:
     with contextlib.suppress(Exception):
         apply_streamlit_secrets_to_environ(dict(st.secrets))
     client = build_homelib_client()
+    # Demo principal survives reruns in session state; no-op in selfhosted.
+    # A failed mint must not take the whole page down: the doors still render
+    # and the Coffee Table door reports the same error on its own request.
+    try:
+        ensure_demo_session(client, st.session_state)
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.warning(format_api_error_message(exc))
 
     if "door" not in st.session_state:
         st.session_state["door"] = CROSSROADS_DOORS[0]

@@ -37,7 +37,7 @@ Identity source:
 
 | `APP_MODE` | Principal | How it is established |
 |---|---|---|
-| `demo` | `demo_session` | Random `demo_session_id` in Streamlit Session State (and `X-Demo-Session-Id` on HTTP). Mutable rows FK this principal. Restart + TTL wipe mutable rows. |
+| `demo` | `demo_session` | Random `demo_session_id` in Streamlit Session State (and `X-Demo-Session` on HTTP). Mutable rows FK this principal. Restart + TTL wipe mutable rows. |
 | `selfhosted` | `local_user` | Single well-known local principal. Persistent. LAN PIN / household profiles are **not** this week (ADR-010). |
 | later | OIDC | Out of scope. |
 
@@ -54,7 +54,7 @@ demo_session   id: str PK
                expires_at: datetime
                reset_generation: int
 
-X-Demo-Session-Id   request header on mutating HTTP calls in APP_MODE=demo
+X-Demo-Session   request header on mutating HTTP calls in APP_MODE=demo
                     InProcessClient reads Streamlit session state instead
 ```
 

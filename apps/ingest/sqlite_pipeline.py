@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import gzip
 import hashlib
 import json
@@ -10,6 +11,7 @@ import os
 import shutil
 import sqlite3
 import struct
+import sys
 import tempfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -37,7 +39,13 @@ from apps.ingest.pipeline import (
     chunks_resource,
     embed_texts,
 )
-from apps.store.sqlite import can_index_text, connect, migrate, rights_status_from_manifest
+from apps.store.sqlite import (
+    can_index_text,
+    connect,
+    migrate,
+    rights_status_from_manifest,
+    row_counts,
+)
 
 __all__ = [
     "CANONICAL_COUNTS",
@@ -45,7 +53,9 @@ __all__ = [
     "REPO_ROOT",
     "SNAPSHOT_PATH",
     "expected_chunk_ids_from_snapshot",
+    "main",
     "manifest_rights_by_book_id",
+    "manifest_rights_from_path",
     "run_sqlite_pipeline",
     "staging_db_path",
 ]
@@ -152,7 +162,13 @@ def staging_db_path(canonical_db: Path) -> Path:
 
 
 def manifest_rights_by_book_id(repo_root: Path = REPO_ROOT) -> dict[str, str]:
-    manifest_path = repo_root / "data" / "manifest.yaml"
+    return manifest_rights_from_path(repo_root / "data" / "manifest.yaml")
+
+
+def manifest_rights_from_path(manifest_path: Path) -> dict[str, str]:
+    """`book_id -> rights_status` from a manifest file. Split out from the
+    repo-root form because the compose ingest image copies `apps/` and
+    `packages/` but mounts `data/` at `/data` — there is no `/app/data`."""
     entries = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(entries, list):
         raise TypeError("manifest.yaml must be a list")
@@ -435,3 +451,76 @@ def run_sqlite_pipeline(
         # place it never goes away (41 dirs / ~8GB found on 2026-09-04).
         shutil.rmtree(pipeline.pipelines_dir, ignore_errors=True)
     return info
+
+
+# ── CLI ──────────────────────────────────────────────────────────────────────
+#
+# `python -m apps.ingest.sqlite_pipeline` is what `just seed-sqlite` and the
+# cold-clone drill run inside the compose `ingest` one-shot. Every argument
+# has an environment default so the container needs no argv: SNAPSHOT /
+# CATALOG are the same variables the Postgres pipeline reads, the manifest is
+# looked up beside the snapshot (both live under the mounted /data), and the
+# database is HOMELIB_SQLITE_PATH — the exact file the API opens.
+#
+# Exit 1 on a seed that produced no indexable chunks: a silent success here
+# is the bug this CLI exists to close (the API creates an empty schema on
+# first connect, so "the file exists" proves nothing).
+
+_SEED_REPORT_KEYS = ("books", "blocks", "chunks", "chunk_embeddings", "catalog")
+
+
+def _default_db_path() -> Path:
+    raw = os.environ.get("HOMELIB_SQLITE_PATH", "").strip()
+    return Path(raw) if raw else REPO_ROOT / "data" / "homelib.sqlite"
+
+
+def _default_manifest_path(snapshot: Path) -> Path:
+    raw = os.environ.get("MANIFEST", "").strip()
+    if raw:
+        return Path(raw)
+    beside_snapshot = snapshot.parent / "manifest.yaml"
+    if beside_snapshot.exists():
+        return beside_snapshot
+    return REPO_ROOT / "data" / "manifest.yaml"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m apps.ingest.sqlite_pipeline",
+        description="dlt ingestion of the committed corpus snapshot + catalog into SQLite.",
+    )
+    snapshot_default = Path(os.environ.get("SNAPSHOT", str(SNAPSHOT_PATH)))
+    parser.add_argument("--db", type=Path, default=_default_db_path())
+    parser.add_argument("--snapshot", type=Path, default=snapshot_default)
+    parser.add_argument(
+        "--catalog", type=Path, default=Path(os.environ.get("CATALOG", str(CATALOG_PATH)))
+    )
+    parser.add_argument("--manifest", type=Path, default=None)
+    args = parser.parse_args(argv)
+    manifest: Path = args.manifest or _default_manifest_path(args.snapshot)
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    rights_by_book = manifest_rights_from_path(manifest)
+    run_sqlite_pipeline(
+        args.db, snapshot=args.snapshot, catalog=args.catalog, rights_by_book=rights_by_book
+    )
+
+    conn = connect(args.db)
+    try:
+        counts = row_counts(conn)
+    finally:
+        conn.close()
+    report = {key: counts.get(key, 0) for key in _SEED_REPORT_KEYS}
+    print(json.dumps({"db": str(args.db), **report}))
+    if report["books"] == 0 or report["chunks"] == 0:
+        print(
+            f"seed produced no indexable corpus in {args.db} "
+            f"(books={report['books']}, chunks={report['chunks']})",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

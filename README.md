@@ -34,8 +34,16 @@ up for.
 cp .env.example .env
 docker compose -p homelib --env-file .env -f docker/docker-compose.yml up -d --build
 docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
+docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline
 open http://localhost:8501
 ```
+
+The two seed lines are not a typo. The first loads Postgres (the v1 store the
+Grafana dashboard reads); the second loads the **SQLite** file the API and the
+Crossroads doors actually read (ADR-004). Until the second one has run,
+`/health` returns HTTP 200 with `"status": "degraded"` and `"books": 0` — the
+file exists because SQLite creates it on first connect, and that emptiness is
+made loud on purpose.
 
 Neither flag is optional, and both exist because the compose file lives in
 `docker/`:
@@ -49,8 +57,8 @@ Neither flag is optional, and both exist because the compose file lives in
   stack back attached to a different, empty volume while the seeded one sits
   untouched. Both observed here.
 
-`just up && just seed` does all of this for you and refuses to run without a
-`.env`, which is the recommended path.
+`just up && just seed && just seed-sqlite` does all of this for you and refuses
+to run without a `.env`, which is the recommended path.
 
 Ports (`API_PORT`, `UI_PORT`, `GRAFANA_PORT`, `POSTGRES_PORT`, `OLLAMA_PORT`)
 are overridable in `.env` if something already listens on a default.

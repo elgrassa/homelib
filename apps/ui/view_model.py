@@ -15,9 +15,9 @@ guarantee a comment cannot give.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from apps.runtime_settings import AppMode, read_app_mode
 from apps.ui.api_client import (
@@ -30,6 +30,9 @@ from apps.ui.api_client import (
     InProcessClient,
     RoadmapStep,
 )
+
+if TYPE_CHECKING:
+    from streamlit.runtime.state import SessionStateProxy
 
 DEFAULT_API_URL = "http://localhost:8000"
 
@@ -98,6 +101,31 @@ def build_homelib_client() -> HttpClient | InProcessClient:
 
         return build_inprocess_client()
     return HttpClient(get_api_url())
+
+
+DEMO_SESSION_KEY = "demo_session_id"
+
+
+def ensure_demo_session(
+    client: HttpClient | InProcessClient,
+    session_state: MutableMapping[str, Any] | SessionStateProxy,
+    app_mode: AppMode | None = None,
+) -> str | None:
+    """Mint the demo principal once per browser session and re-attach it on
+    every rerun (``build_homelib_client`` returns a fresh client each time).
+
+    In ``selfhosted`` the header is meaningless to the server, so the client is
+    explicitly cleared — a leaked ``APP_MODE=demo`` cannot make it send one.
+    """
+    mode = read_app_mode() if app_mode is None else app_mode
+    if mode is not AppMode.DEMO:
+        client.set_demo_session(None)
+        return None
+    raw = session_state.get(DEMO_SESSION_KEY)
+    session_id = str(raw) if raw else client.create_demo_session()
+    session_state[DEMO_SESSION_KEY] = session_id
+    client.set_demo_session(session_id)
+    return session_id
 
 
 def format_api_error_message(exc: ApiClientError | ApiUnavailableError) -> str:

@@ -115,3 +115,24 @@ uv run python apps/ingest/pipeline.py
 docker compose exec postgres psql -U homelib -c "select count(*) from chunks; select count(*) from chunk_embeddings;"   # unchanged
 uv run pytest apps/ingest/tests/test_pipeline.py -v
 ```
+
+## SQLite seed CLI (2026-09-05)
+
+`python -m apps.ingest.sqlite_pipeline` — `apps/ingest/sqlite_pipeline.py::main`.
+Every argument defaults from the environment so the compose `ingest` one-shot
+needs no argv: `--db` ← `HOMELIB_SQLITE_PATH`, `--snapshot`/`--catalog` ←
+`SNAPSHOT`/`CATALOG` (shared with the Postgres pipeline), `--manifest` ←
+`MANIFEST`, else `manifest.yaml` beside the snapshot (the image has no `/app/data`;
+`data/` is mounted at `/data`). Prints one JSON line of row counts and **exits 1
+when the seed produced 0 books or 0 chunks** — an empty-but-migrated SQLite file
+is exactly the failure this closes (`/health` reports it as `degraded`).
+
+Invoked by `just seed-sqlite` and by `scripts/cold_clone_drill.sh` as a **second
+compose one-shot** after the Postgres seed (locked: the image `CMD` stays
+Postgres-only; no `&&` double-embed in one process).
+
+Named tests: `test_cli_main_seeds_db_and_reports_counts`,
+`test_cli_main_exits_nonzero_on_empty_seed` (apps/ingest/tests/test_sqlite_ingest.py);
+`test_health_is_degraded_when_store_has_zero_books` (apps/api/tests/test_api.py);
+`test_compose_ingest_can_write_sqlite_seed`, `test_drill_asserts_seed_counts_via_health`
+(tests/test_repo_hygiene.py).

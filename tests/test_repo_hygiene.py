@@ -304,3 +304,67 @@ def test_ci_pytest_forces_workspace_basetemp() -> None:
     assert "--basetemp=" in workflow, (
         "CI pytest invocations must pin --basetemp under the workspace TMPDIR"
     )
+
+
+def test_run_agent_is_not_on_the_demo_request_path() -> None:
+    """`homelib_rag.agent.run_agent`'s tool table binds `get_block` to the
+    Postgres implementation. That is only safe because no request path in
+    `apps/` calls `run_agent` — the API wires `get_block`/`search_catalog`
+    through `Deps`, which dispatch on HOMELIB_SQLITE_PATH. Pin the fact, so a
+    future "just call run_agent" lands with the dispatch work, not without.
+    """
+    offenders = [
+        path.relative_to(REPO_ROOT)
+        for path in (REPO_ROOT / "apps").rglob("*.py")
+        if "tests" not in path.parts and "run_agent" in path.read_text()
+    ]
+    assert offenders == [], f"run_agent referenced on a request path: {offenders}"
+
+
+def _compose() -> dict[str, object]:
+    compose = yaml.safe_load((REPO_ROOT / "docker/docker-compose.yml").read_text())
+    assert isinstance(compose, dict)
+    return compose
+
+
+def test_compose_api_pins_selfhosted_like_ui() -> None:
+    """`.env.example` ships `APP_MODE=demo` for the Community Cloud path. The
+    api service used to read `${APP_MODE:-selfhosted}`, so a reviewer who
+    copied `.env.example` got a demo-mode API that minted a fresh anonymous
+    principal for every header-less request — an always-empty Coffee Table
+    on the reviewer stack. Both containers pin selfhosted; the env var is for
+    the Streamlit-only demo process."""
+    services = _compose()["services"]
+    assert isinstance(services, dict)
+    for name in ("api", "ui"):
+        env = services[name]["environment"]
+        assert env["APP_MODE"] == "selfhosted", f"{name}: {env.get('APP_MODE')!r}"
+
+
+def test_compose_ingest_can_write_sqlite_seed() -> None:
+    """Hygiene (string/structure match, not behavioural). The api service reads
+    `/data/homelib.sqlite`; the ingest one-shot must be able to write it: the
+    env var is set and the data mount is not read-only. The image CMD stays
+    the Postgres pipeline — the SQLite seed is `just seed-sqlite`, a second
+    one-shot, so a cold clone never embeds the corpus twice in one process."""
+    services = _compose()["services"]
+    assert isinstance(services, dict)
+    ingest = services["ingest"]
+    assert ingest["environment"]["HOMELIB_SQLITE_PATH"] == "/data/homelib.sqlite"
+    data_mounts = [v for v in ingest["volumes"] if str(v).startswith("../data:")]
+    assert data_mounts == ["../data:/data"], data_mounts
+    dockerfile = (REPO_ROOT / "docker/ingest.Dockerfile").read_text()
+    assert "apps.ingest.pipeline" in dockerfile
+    assert "sqlite_pipeline" not in dockerfile, "SQLite seed is a separate one-shot, not the CMD"
+    assert "python -m apps.ingest.sqlite_pipeline" in JUSTFILE.read_text()
+
+
+def test_drill_asserts_seed_counts_via_health() -> None:
+    """The drill used to seed Postgres, then ask the API — which reads SQLite —
+    and never checked the counts. It must seed SQLite through the compose
+    one-shot (not a host `uv run`) and assert 18 books / 9168 chunks."""
+    drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
+    assert "run --rm ingest python -m apps.ingest.sqlite_pipeline" in drill
+    assert "/health" in drill
+    assert "18" in drill and "9168" in drill
+    assert "uv run" not in drill

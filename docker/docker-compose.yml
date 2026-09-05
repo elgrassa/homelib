@@ -86,7 +86,10 @@ services:
       # and ~49 tok/s prefill, so a real /v1/ask costs ~70s minimum — well
       # past a GPU-host-sized timeout. See homelib_rag.answer._TIMEOUT_SECONDS.
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-300}
-      APP_MODE: ${APP_MODE:-selfhosted}
+      # Pinned like the ui service: .env.example ships APP_MODE=demo for the
+      # Community Cloud path, and a demo-mode API mints a fresh anonymous
+      # principal per header-less request — the reviewer stack is selfhosted.
+      APP_MODE: selfhosted
       # v2 Crossroads doors (Coffee Table, playlists, observatory, …) require
       # SQLite. When set, health/books/ask/feedback also prefer this store;
       # DATABASE_URL stays for Postgres ingest / unset-SQLite runs.
@@ -117,8 +120,12 @@ services:
       SNAPSHOT: /data/corpus_snapshot.jsonl.gz
       CATALOG: /data/catalog.jsonl
       EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      # `just seed-sqlite` runs `python -m apps.ingest.sqlite_pipeline` in this
+      # same one-shot; it writes the file the api service reads (ADR-004).
+      HOMELIB_SQLITE_PATH: /data/homelib.sqlite
     volumes:
-      - ../data:/data:ro
+      # RW: the SQLite seed and its dlt staging DB are written here.
+      - ../data:/data
     depends_on:
       postgres: {condition: service_healthy}
     profiles: [seed]

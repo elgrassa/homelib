@@ -7,18 +7,20 @@ import os
 import re
 import sqlite3
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from homelib_core.models import CatalogEntry
 
 from homelib_rag.models import Hit
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-__all__ = ["search_lexical", "search_vector", "sqlite_path"]
+__all__ = ["book_metadata", "search_catalog", "search_lexical", "search_vector", "sqlite_path"]
 
 _DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 _EMBED_DIM = 384
@@ -338,3 +340,105 @@ def search_vector(
     finally:
         if owns_conn:
             db.close()
+
+
+# ── Metadata lookups (the SQLite side of the seams in answer.py / agent.py) ──
+#
+# `answer._book_metadata` and `agent.search_catalog` were Postgres-only while
+# retrieval already dispatched here on HOMELIB_SQLITE_PATH — so on a SQLite-only
+# host every ask came back degraded ("failed to load book metadata") after a
+# perfectly good retrieval. Both seams now dispatch to these on the same env
+# predicate as `search_lexical`/`search_vector` (ADR-004).
+
+_MAX_CATALOG_RESULTS = 20
+
+
+def _json_list_or_empty(raw: object) -> list[str]:
+    if raw is None:
+        return []
+    try:
+        return _json_list(str(raw))
+    except (TypeError, ValueError):
+        return []
+
+
+def book_metadata(
+    book_ids: Sequence[str], *, conn: sqlite3.Connection | None = None
+) -> dict[str, tuple[str, list[str]]]:
+    """`book_id -> (title, authors)` from the SQLite `books` table.
+
+    `authors` is stored as JSON text (default `'[]'`); a malformed value
+    decodes to `[]` rather than failing the whole answer — the title is the
+    load-bearing part of the citation, the author list is context.
+    """
+    ids = sorted({str(b) for b in book_ids})
+    if not ids:
+        return {}
+    owns_conn = conn is None
+    db = _connect() if owns_conn else conn
+    assert db is not None
+    try:
+        placeholders = ",".join("?" for _ in ids)
+        rows = db.execute(
+            f"SELECT book_id, title, authors FROM books WHERE book_id IN ({placeholders})",  # noqa: S608
+            ids,
+        ).fetchall()
+        return {str(row[0]): (str(row[1]), _json_list_or_empty(row[2])) for row in rows}
+    finally:
+        if owns_conn:
+            db.close()
+
+
+def search_catalog(
+    query: str,
+    subjects: Sequence[str] | None = None,
+    *,
+    conn: sqlite3.Connection | None = None,
+) -> list[CatalogEntry]:
+    """SQLite twin of `homelib_rag.agent.search_catalog`: subject overlap when
+    `subjects` is given, otherwise a case-insensitive title/subject substring
+    match. `authors`/`subjects` are JSON text columns and are decoded here.
+    """
+    if not query.strip():
+        raise ValueError("query must not be empty")
+    owns_conn = conn is None
+    db = _connect() if owns_conn else conn
+    assert db is not None
+    try:
+        rows = db.execute(
+            """
+            SELECT ol_key, title, authors, subjects, first_publish_year,
+                   description, provenance_note
+            FROM catalog
+            """
+        ).fetchall()
+    finally:
+        if owns_conn:
+            db.close()
+
+    wanted = {s.lower() for s in subjects} if subjects else None
+    needle = query.lower()
+    out: list[CatalogEntry] = []
+    for row in rows:
+        entry_subjects = _json_list_or_empty(row[3])
+        if wanted is not None:
+            if not any(s.lower() in wanted for s in entry_subjects):
+                continue
+        elif needle not in str(row[1]).lower() and not any(
+            needle in s.lower() for s in entry_subjects
+        ):
+            continue
+        out.append(
+            CatalogEntry(
+                ol_key=str(row[0]),
+                title=str(row[1]),
+                authors=_json_list_or_empty(row[2]),
+                subjects=entry_subjects,
+                first_publish_year=row[4],
+                description=row[5],
+                provenance_note=str(row[6] or ""),
+            )
+        )
+        if len(out) >= _MAX_CATALOG_RESULTS:
+            break
+    return out

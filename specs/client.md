@@ -56,8 +56,15 @@ AST boundary (port v1 `test_ui_module_has_no_db_or_psycopg_import`):
 `homelib_core` parsers, `homelib_rag` internals, `sqlalchemy`, `dlt`, or
 vendor SDKs. Shared Pydantic models re-exported for typing are allowed.
 
-`X-Demo-Session-Id`: `HttpClient` sends it in `demo`; `InProcessClient`
-reads Streamlit session state.
+`X-Demo-Session` (the header the route reads — the earlier `-Id` spelling never
+shipped): both clients expose `create_demo_session() -> str` (`POST /v1/demo/session`)
+and `set_demo_session(id | None)`. `apps.ui.view_model.ensure_demo_session` mints
+once per browser session, keeps the id in Streamlit session state under
+`demo_session_id`, and re-attaches it on every rerun (each rerun builds a fresh
+client). In `selfhosted` it clears the id, so a leaked `APP_MODE=demo` cannot make
+the client send one. `ApiClient._request` retries a 401 **exactly once**, and only
+when a session id is set: mint a fresh session, resend. A selfhosted 401 propagates.
+`InProcessClient` forwards both methods explicitly (no `__getattr__`).
 
 ## Error/degradation behavior
 
@@ -71,6 +78,13 @@ reads Streamlit session state.
 - `test_inprocess_http_conformance_health` — parametrize both clients.
 - `test_inprocess_http_conformance_ask_degraded_flag`.
 - `test_http_client_ask_timeout_is_not_ten_seconds`.
+- `test_demo_session_header_sent_on_playlist_and_progress_calls` — both clients.
+- `test_create_demo_session_returns_id_on_both_clients`.
+- `test_request_retries_once_with_fresh_session_on_401_in_demo`.
+- `test_request_does_not_remint_on_401_in_selfhosted`.
+- `test_401_retry_happens_at_most_once`.
+- `test_ensure_demo_session_mints_once_and_reuses_state` (view model).
+- `test_demo_mode_same_header_shares_principal_and_missing_header_does_not` (route).
 
 ## Verify
 

@@ -148,6 +148,13 @@ def search_catalog(query: str, subjects: list[str] | None = None) -> list[Catalo
     (post-strip) `query`, matching `homelib_rag.index`'s own convention."""
     if not query.strip():
         raise ValueError("query must not be empty")
+    if os.environ.get("HOMELIB_SQLITE_PATH", "").strip():
+        # Same predicate as homelib_rag.index (ADR-004). Dispatching HERE, not
+        # in the API deps, covers every binding at once: `Deps.catalog_search`,
+        # the `build_roadmap` wrapper below, and `_TOOL_FUNCTIONS`.
+        from homelib_rag.sqlite_index import search_catalog as _sqlite_search_catalog
+
+        return _sqlite_search_catalog(query, subjects)
     with _connect() as conn, conn.cursor() as cur:
         if subjects:
             cur.execute(

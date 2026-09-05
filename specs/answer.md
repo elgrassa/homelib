@@ -97,3 +97,13 @@ uv run pytest packages/homelib-rag/tests/test_answer.py evals/tests/test_citatio
 uv run pytest packages/homelib-rag/tests/test_answer.py -k "citations_resolve or quote_present or unreachable or hallucinated" -v
 uv run mypy --strict packages/homelib-rag/src/homelib_rag/answer.py
 ```
+
+## Store dispatch (2026-09-05)
+
+`_book_metadata(book_ids)` — the title/authors lookup that fills `Citation.book_title`
+and the prompt context — dispatches on the same predicate as `homelib_rag.index`
+(ADR-004): when `HOMELIB_SQLITE_PATH` is non-empty it reads the SQLite `books`
+table via `homelib_rag.sqlite_index.book_metadata` (JSON `authors` decoded, malformed
+→ `[]`); otherwise Postgres. Before this, a SQLite-only host degraded **every** answer
+after a successful retrieval. Pinned by
+`test_answer_end_to_end_not_degraded_on_sqlite_only_host` (scripted LLM, no Postgres).

@@ -80,6 +80,29 @@ $COMPOSE ps --format '{{.Name}} {{.Status}}'
 step "seed the database"
 $COMPOSE --profile seed run --rm ingest || fail "ingestion failed"
 
+# The API reads SQLite (ADR-004); the step above seeded Postgres. This is a
+# second compose one-shot on purpose — never a host-side Python invocation,
+# which a cold clone does not have — and it writes the same /data file the
+# api service mounts.
+step "seed the SQLite store the API reads"
+$COMPOSE --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline \
+    || fail "SQLite seed failed"
+
+step "health reports the seeded corpus, not an empty schema"
+python3 - "$API_PORT" <<'PY' || exit 1
+import json, sys, urllib.request
+
+port = sys.argv[1]
+with urllib.request.urlopen(f"http://localhost:{port}/health", timeout=30) as resp:
+    health = json.load(resp)
+books, chunks, status = health.get("books"), health.get("chunks"), health.get("status")
+print(f"health: status={status} books={books} chunks={chunks}")
+if books != 18 or chunks != 9168:
+    sys.exit(f"✗ expected 18 books / 9168 chunks after seed, got {books} / {chunks}")
+if status != "ok":
+    sys.exit(f"✗ health status is {status!r} after seed (db/llm/seed all required for ok)")
+PY
+
 step "ask real questions and require a grounded, resolvable citation"
 
 # Several questions, not one. The drill asserts that a cold clone CAN produce

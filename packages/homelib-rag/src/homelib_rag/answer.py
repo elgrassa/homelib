@@ -332,6 +332,13 @@ def _book_metadata(book_ids: Sequence[str]) -> dict[str, tuple[str, list[str]]]:
     """
     if not book_ids:
         return {}
+    if os.environ.get("HOMELIB_SQLITE_PATH", "").strip():
+        # Same predicate as homelib_rag.index (ADR-004): SQLite when set,
+        # Postgres otherwise. Lazy import keeps the Postgres path free of
+        # the SQLite module's numpy/store imports.
+        from homelib_rag.sqlite_index import book_metadata as _sqlite_book_metadata
+
+        return _sqlite_book_metadata(book_ids)
     with psycopg.connect(_dsn()) as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT book_id, title, authors FROM books WHERE book_id = ANY(%s)",

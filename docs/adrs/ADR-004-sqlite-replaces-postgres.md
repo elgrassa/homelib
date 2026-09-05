@@ -26,3 +26,9 @@ Seed `.sqlite` files are not byte-reproducible across machines (SQLite headers, 
 **Positive** — one engine for demo and home; Community Cloud can ship a seed file; v1 fallback remains on Postgres.
 
 **Negative** — two stores exist until WP02 cutover; FTS5/NumPy must re-earn ADR-001's measured arm choice; WAL/busy-timeout/FK discipline is new operational surface.
+
+**Addendum 2026-09-05** — the dispatch predicate (`HOMELIB_SQLITE_PATH` non-empty)
+now also covers `answer._book_metadata` and `agent.search_catalog`. Until then the
+tip degraded every answer on a SQLite-only host ("failed to load book metadata")
+because retrieval had moved to SQLite while synthesis still looked titles up in
+Postgres. Reviewer path unaffected only because compose still runs Postgres.

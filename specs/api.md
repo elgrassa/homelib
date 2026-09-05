@@ -18,7 +18,7 @@ auto-generates OpenAPI at `/openapi.json` and Swagger UI at `/docs` — that is
 the reviewer-facing API documentation, and the README links it.
 
 Identity: mutating v2 routes require a principal (`specs/principals.md`).
-`APP_MODE=demo` sends `X-Demo-Session-Id`; missing owner → **403**, never a
+`APP_MODE=demo` sends `X-Demo-Session`; missing owner → **403**, never a
 null-owner insert.
 
 ## Endpoints — live v1 (OpenAPI snapshot)

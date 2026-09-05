@@ -316,3 +316,98 @@ def test_run_sqlite_pipeline_cleans_up_dlt_tmpdir(
     )
 
     assert not list(scratch.glob("homelib_sqlite_dlt_*")), sorted(scratch.iterdir())
+
+
+# ── H2: the seed CLI the compose one-shot and the drill run ──────────────────
+
+
+_CATALOG_HEADER = '{"_provenance": "test fixture"}\n'
+_CATALOG_ROW = json.dumps(
+    {
+        "ol_key": "/works/OLTEST1W",
+        "title": "Test Catalog Book",
+        "authors": ["Fixture Author"],
+        "subjects": ["testing"],
+        "first_publish_year": 2001,
+        "description": None,
+        "provenance_note": "test fixture",
+    }
+)
+
+
+def _write_catalog(path: Path) -> None:
+    # dlt only creates staging.catalog when the resource yields a row, and the
+    # sync step selects from it unconditionally — an empty file is not "no catalog".
+    path.write_text(_CATALOG_HEADER + _CATALOG_ROW + "\n", encoding="utf-8")
+
+
+def _write_manifest(path: Path, rights: dict[str, str]) -> None:
+    path.write_text(
+        "".join(
+            f"- book_id: {book_id}\n  rights_status: {status}\n"
+            for book_id, status in rights.items()
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.slow
+def test_cli_main_seeds_db_and_reports_counts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`python -m apps.ingest.sqlite_pipeline` with env defaults only (the
+    compose one-shot passes no argv): seeds the file named by
+    HOMELIB_SQLITE_PATH, finds the manifest beside SNAPSHOT, prints counts,
+    exits 0."""
+    from apps.ingest.sqlite_pipeline import main
+
+    data = tmp_path / "data"
+    data.mkdir()
+    _write_snapshot(data / "corpus_snapshot.jsonl.gz", [_book("cli-book")])
+    _write_manifest(data / "manifest.yaml", {"cli-book": "public_domain"})
+    _write_catalog(data / "catalog.jsonl")
+    db = data / "homelib.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db))
+    monkeypatch.setenv("SNAPSHOT", str(data / "corpus_snapshot.jsonl.gz"))
+    monkeypatch.setenv("CATALOG", str(data / "catalog.jsonl"))
+    monkeypatch.delenv("MANIFEST", raising=False)
+
+    assert main([]) == 0
+
+    report = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert report["books"] == 1
+    assert report["chunks"] >= 1
+    assert report["chunk_embeddings"] == report["chunks"]
+    conn = connect(db)
+    try:
+        assert _corpus_counts(conn)["books"] == 1
+    finally:
+        conn.close()
+
+
+@pytest.mark.slow
+def test_cli_main_exits_nonzero_on_empty_seed(tmp_path: Path) -> None:
+    """A seed that indexes nothing (every book rights-gated out) must fail
+    loudly — an empty-but-migrated SQLite file is exactly what the API would
+    otherwise happily serve as 'ok'."""
+    from apps.ingest.sqlite_pipeline import main
+
+    data = tmp_path / "data"
+    data.mkdir()
+    _write_snapshot(data / "corpus_snapshot.jsonl.gz", [_book("gated")])
+    _write_manifest(data / "manifest.yaml", {"gated": "metadata_only"})
+    _write_catalog(data / "catalog.jsonl")
+
+    rc = main(
+        [
+            "--db",
+            str(data / "homelib.sqlite"),
+            "--snapshot",
+            str(data / "corpus_snapshot.jsonl.gz"),
+            "--catalog",
+            str(data / "catalog.jsonl"),
+            "--manifest",
+            str(data / "manifest.yaml"),
+        ]
+    )
+    assert rc == 1

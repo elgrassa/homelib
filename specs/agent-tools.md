@@ -20,6 +20,10 @@ hit.
 ```python
 def search_shelf(query: str, k: int = 5) -> list[Hit]                       # Hit: specs/indexing.md
 def search_catalog(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]   # specs/core-models.md
+# Dispatches to homelib_rag.sqlite_index.search_catalog when HOMELIB_SQLITE_PATH is set
+# (ADR-004) — inside the function, so Deps.catalog_search, build_roadmap and
+# _TOOL_FUNCTIONS all follow. run_agent itself is not on any apps/ request path
+# (tests/test_repo_hygiene.py::test_run_agent_is_not_on_the_demo_request_path).
 def build_roadmap(interests: list[str], level: Level, goal: str) -> RoadmapResponse       # specs/api.md, specs/roadmap.md
 def get_block(block_id: str) -> Block                                        # specs/core-models.md
 

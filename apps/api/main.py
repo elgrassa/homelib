@@ -532,8 +532,13 @@ def get_health(deps: Deps = Depends(get_deps)) -> Health:
     db_ok = deps.db_reachable()
     llm_ok = deps.llm_reachable()
     books, chunks = deps.counts() if db_ok else (0, 0)
+    # An empty store is reachable, migrated and useless: SQLite creates the
+    # file on first connect, so a cold clone that never ran the seed would
+    # otherwise report "ok" with 0 books. HTTP stays 200 (the compose
+    # healthcheck is liveness, not seeded-ness); the JSON says degraded.
+    seeded = books > 0
     return Health(
-        status="ok" if (db_ok and llm_ok) else "degraded",
+        status="ok" if (db_ok and llm_ok and seeded) else "degraded",
         db=db_ok,
         llm=LLMHealth(provider=deps.llm_provider, model=deps.llm_client.model, reachable=llm_ok),
         books=books,

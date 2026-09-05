@@ -398,3 +398,45 @@ def test_observatory_chart_titles_preserve_order() -> None:
         {"charts": [{"title": "A", "id": "a"}, {"id": "b"}, {"title": "C"}]}
     )
     assert titles == ["A", "b", "C"]
+
+
+# ── H3: demo session minted once per browser session, re-attached per rerun ──
+
+
+class _SessionFake:
+    def __init__(self) -> None:
+        self.mints = 0
+        self.set_calls: list[str | None] = []
+
+    def create_demo_session(self) -> str:
+        self.mints += 1
+        return f"sess-{self.mints}"
+
+    def set_demo_session(self, session_id: str | None) -> None:
+        self.set_calls.append(session_id)
+
+
+def test_ensure_demo_session_mints_once_and_reuses_state() -> None:
+    from apps.runtime_settings import AppMode
+    from apps.ui.view_model import DEMO_SESSION_KEY, ensure_demo_session
+
+    fake = _SessionFake()
+    state: dict[str, object] = {}
+    first = ensure_demo_session(fake, state, AppMode.DEMO)  # type: ignore[arg-type]
+    second = ensure_demo_session(fake, state, AppMode.DEMO)  # type: ignore[arg-type]
+    assert first == second == "sess-1"
+    assert fake.mints == 1
+    assert state[DEMO_SESSION_KEY] == "sess-1"
+    assert fake.set_calls == ["sess-1", "sess-1"]
+
+
+def test_ensure_demo_session_is_a_noop_that_clears_in_selfhosted() -> None:
+    from apps.runtime_settings import AppMode
+    from apps.ui.view_model import DEMO_SESSION_KEY, ensure_demo_session
+
+    fake = _SessionFake()
+    state: dict[str, object] = {}
+    assert ensure_demo_session(fake, state, AppMode.SELFHOSTED) is None  # type: ignore[arg-type]
+    assert fake.mints == 0
+    assert fake.set_calls == [None]
+    assert DEMO_SESSION_KEY not in state
