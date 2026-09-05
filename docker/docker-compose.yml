@@ -128,8 +128,10 @@ services:
       context: ..
       dockerfile: docker/ui.Dockerfile
     environment:
+      # Always HTTP to the api service. APP_MODE=demo is Cloud / local
+      # `streamlit run` only (InProcessClient); do not inherit .env demo here.
       API_URL: http://api:8000
-      APP_MODE: ${APP_MODE:-selfhosted}
+      APP_MODE: selfhosted
     ports: ["127.0.0.1:${UI_PORT:-8501}:8501"]
     depends_on:
       api: {condition: service_healthy}

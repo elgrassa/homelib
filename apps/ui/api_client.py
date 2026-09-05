@@ -131,9 +131,18 @@ def _extract_detail(response: httpx.Response) -> str:
 class ApiClient:
     """Thin synchronous client over the homelib public API."""
 
-    def __init__(self, base_url: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        http_client: httpx.Client | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        # Optional persistent client — used by the demo ASGI in-process path
+        # so Ask shares one transport without a network hop.
+        self._http_client = http_client
 
     def _request(
         self,
@@ -146,7 +155,12 @@ class ApiClient:
         url = f"{self._base_url}{path}"
         request_timeout = timeout if timeout is not None else self._timeout
         try:
-            response = httpx.request(method, url, json=json, timeout=request_timeout)
+            if self._http_client is not None:
+                response = self._http_client.request(
+                    method, url, json=json, timeout=request_timeout
+                )
+            else:
+                response = httpx.request(method, url, json=json, timeout=request_timeout)
         except httpx.TimeoutException as exc:
             raise ApiUnavailableError(f"Request to {url} timed out") from exc
         except httpx.TransportError as exc:
@@ -330,21 +344,30 @@ class HttpClient(ApiClient):
 class InProcessClient:
     """Demo edition — same shapes as HttpClient, no network hop.
 
-    Callables are injected so this module never imports SQLite, RAG, or
-    provider SDKs (AST boundary in apps/ui/tests).
+    Callables are injected for conformance tests so this module never imports
+    SQLite, RAG, or provider SDKs (AST boundary in apps/ui/tests). Production
+    demo wiring passes an ASGI-backed ``ApiClient`` as ``delegate`` from
+    ``apps.inprocess_bridge`` (outside the UI package).
     """
 
     def __init__(
         self,
         *,
-        health: Callable[[], dict[str, Any]],
-        ask: Callable[..., AskResponse],
+        health: Callable[[], dict[str, Any]] | None = None,
+        ask: Callable[..., AskResponse] | None = None,
+        delegate: ApiClient | None = None,
     ) -> None:
+        if health is None and ask is None and delegate is None:
+            raise TypeError("InProcessClient requires health/ask callables or a delegate")
         self._health = health
         self._ask = ask
+        self._delegate = delegate
 
     def health(self) -> dict[str, Any]:
-        return self._health()
+        if self._health is not None:
+            return self._health()
+        assert self._delegate is not None
+        return self._delegate.health()
 
     def ask(
         self,
@@ -354,4 +377,12 @@ class InProcessClient:
         arm: Literal["lexical", "vector", "hybrid", "hybrid_rerank"] | None = None,
         rewrite: bool = False,
     ) -> AskResponse:
-        return self._ask(query, k=k, arm=arm, rewrite=rewrite)
+        if self._ask is not None:
+            return self._ask(query, k=k, arm=arm, rewrite=rewrite)
+        assert self._delegate is not None
+        return self._delegate.ask(query, k=k, arm=arm, rewrite=rewrite)
+
+    def __getattr__(self, name: str) -> Any:
+        if self._delegate is None:
+            raise AttributeError(name)
+        return getattr(self._delegate, name)

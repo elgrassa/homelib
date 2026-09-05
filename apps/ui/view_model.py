@@ -15,19 +15,39 @@ guarantee a comment cannot give.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from apps.runtime_settings import AppMode, read_app_mode
 from apps.ui.api_client import (
     ApiClientError,
     ApiUnavailableError,
     AskResponse,
     BookSummary,
     Citation,
+    HomelibClient,
+    HttpClient,
     RoadmapStep,
 )
 
 DEFAULT_API_URL = "http://localhost:8000"
+
+# Streamlit Community Cloud secrets → os.environ (OpenAIClient / factory read env).
+DEMO_ENV_KEYS: frozenset[str] = frozenset(
+    {
+        "APP_MODE",
+        "API_URL",
+        "HOMELIB_SQLITE_PATH",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_TIMEOUT_SECONDS",
+        "LLM_MAX_OUTPUT_TOKENS",
+        "EMBED_MODEL",
+        "HOMELIB_DEFAULT_ARM",
+    }
+)
 
 Level = Literal["beginner", "intermediate", "advanced"]
 LEVELS: tuple[Level, ...] = ("beginner", "intermediate", "advanced")
@@ -36,6 +56,48 @@ LEVELS: tuple[Level, ...] = ("beginner", "intermediate", "advanced")
 def get_api_url() -> str:
     """Read ``API_URL`` from the environment, defaulting to localhost:8000."""
     return os.environ.get("API_URL", DEFAULT_API_URL)
+
+
+def apply_streamlit_secrets_to_environ(secrets: Mapping[str, Any]) -> None:
+    """Copy known demo keys from Streamlit secrets into ``os.environ`` if unset."""
+    for key in DEMO_ENV_KEYS:
+        if key in os.environ and os.environ[key].strip() != "":
+            continue
+        if key not in secrets:
+            continue
+        value = secrets[key]
+        if value is None:
+            continue
+        os.environ[key] = str(value)
+
+
+def wants_inprocess_client(environ: Mapping[str, str] | None = None) -> bool:
+    """True for Cloud/local demo: ``APP_MODE=demo`` and no ``API_URL``.
+
+    Compose always injects ``API_URL=http://api:8000``, so the UI stays on
+    HTTP even if ``APP_MODE=demo`` leaks from ``.env.example``.
+    """
+    env = os.environ if environ is None else environ
+    api_url = (env.get("API_URL") or "").strip()
+    if api_url:
+        return False
+    return read_app_mode(env) is AppMode.DEMO
+
+
+def build_homelib_client() -> HomelibClient:
+    """Factory: demo → InProcessClient; else HttpClient(API_URL)."""
+    if wants_inprocess_client():
+        raw = os.environ.get("HOMELIB_SQLITE_PATH", "").strip()
+        if not raw:
+            raise RuntimeError(
+                "APP_MODE=demo requires HOMELIB_SQLITE_PATH "
+                "(seed SQLite path, e.g. data/homelib.sqlite)"
+            )
+        # Heavy store/RAG imports live outside apps/ui (AST boundary).
+        from apps.inprocess_bridge import build_inprocess_client
+
+        return build_inprocess_client()
+    return HttpClient(get_api_url())
 
 
 def format_api_error_message(exc: ApiClientError | ApiUnavailableError) -> str:

@@ -7,6 +7,7 @@ Observatory / Projection.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Literal
 
 import streamlit as st
@@ -16,15 +17,18 @@ from apps.ui.api_client import (
     ApiClientError,
     ApiUnavailableError,
     AskResponse,
+    HomelibClient,
+    InProcessClient,
 )
 from apps.ui.view_model import (
     CROSSROADS_DOORS,
     LEVELS,
+    apply_streamlit_secrets_to_environ,
     block_id_for_citation,
+    build_homelib_client,
     format_api_error_message,
     format_citation_label,
     format_degraded_banner,
-    get_api_url,
     has_voted,
     library_summary,
     normalize_door,
@@ -37,8 +41,10 @@ from apps.ui.view_model import (
     steps_in_order,
 )
 
+Client = ApiClient | InProcessClient | HomelibClient
 
-def render_ask_tab(client: ApiClient) -> None:
+
+def render_ask_tab(client: Client) -> None:
     st.header("Ask")
     query = st.text_input("Ask your library a question", key="ask_query")
     k = st.slider("Number of results", min_value=1, max_value=10, value=5, key="ask_k")
@@ -85,7 +91,7 @@ def render_ask_tab(client: ApiClient) -> None:
                 st.text(block_text)
 
 
-def _cast_vote(client: ApiClient, request_id: str, feedback: Literal["up", "down"]) -> None:
+def _cast_vote(client: Client, request_id: str, feedback: Literal["up", "down"]) -> None:
     try:
         client.submit_feedback(request_id, feedback)
     except (ApiClientError, ApiUnavailableError) as exc:
@@ -95,7 +101,7 @@ def _cast_vote(client: ApiClient, request_id: str, feedback: Literal["up", "down
         st.session_state["feedback_sent"] = record_vote(feedback_sent, request_id)
 
 
-def render_mentor_tab(client: ApiClient) -> None:
+def render_mentor_tab(client: Client) -> None:
     st.header("Mentor")
     with st.form("mentor_form"):
         goal = st.text_input("Goal", key="mentor_goal")
@@ -127,7 +133,7 @@ def render_mentor_tab(client: ApiClient) -> None:
             st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
 
 
-def render_coffee_table_tab(client: ApiClient) -> None:
+def render_coffee_table_tab(client: Client) -> None:
     st.header("Coffee Table")
     try:
         resources = client.list_resources()
@@ -178,7 +184,7 @@ def render_coffee_table_tab(client: ApiClient) -> None:
                 st.error(format_api_error_message(exc))
 
 
-def render_library_tab(client: ApiClient) -> None:
+def render_library_tab(client: Client) -> None:
     st.header("Shelf")
     try:
         books = client.list_books()
@@ -219,7 +225,7 @@ def render_library_tab(client: ApiClient) -> None:
                 st.write(f"**{hit.get('open_anchor')}** — {hit.get('quote', '')[:200]}")
 
 
-def render_observatory_tab(client: ApiClient) -> None:
+def render_observatory_tab(client: Client) -> None:
     st.header("Observatory")
     try:
         payload = client.get_observatory()
@@ -245,7 +251,7 @@ def render_observatory_tab(client: ApiClient) -> None:
         )
 
 
-def render_projection_tab(client: ApiClient) -> None:
+def render_projection_tab(client: Client) -> None:
     """WP09 one-page projection mode — large type, chrome-light reader stage."""
     st.header("Projection")
     projector = st.toggle("Enter projector mode", key="projector_mode")
@@ -281,7 +287,7 @@ def render_projection_tab(client: ApiClient) -> None:
     )
 
 
-def render_roadmap_tab(client: ApiClient) -> None:
+def render_roadmap_tab(client: Client) -> None:
     st.header("Roadmap (v1)")
     with st.form("roadmap_form"):
         interests_raw = st.text_input("Interests (comma-separated)", key="roadmap_interests")
@@ -321,7 +327,10 @@ def render_roadmap_tab(client: ApiClient) -> None:
 def main() -> None:
     st.set_page_config(page_title="homelib", page_icon="📚", layout="wide")
     st.title("HomeLib")
-    client = ApiClient(get_api_url())
+    # Community Cloud puts LLM_*/APP_MODE in st.secrets, not os.environ.
+    with contextlib.suppress(Exception):
+        apply_streamlit_secrets_to_environ(st.secrets)  # type: ignore[arg-type]
+    client = build_homelib_client()
 
     if "door" not in st.session_state:
         st.session_state["door"] = CROSSROADS_DOORS[0]
