@@ -364,7 +364,22 @@ def test_drill_asserts_seed_counts_via_health() -> None:
     and never checked the counts. It must seed SQLite through the compose
     one-shot (not a host `uv run`) and assert 18 books / 9168 chunks."""
     drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
-    assert "run --rm ingest python -m apps.ingest.sqlite_pipeline" in drill
+    assert "run --rm --build ingest python -m apps.ingest.sqlite_pipeline" in drill
     assert "/health" in drill
     assert "18" in drill and "9168" in drill
     assert "uv run" not in drill
+
+
+def test_seed_one_shots_build_the_profile_image_before_running() -> None:
+    """Hygiene pin. `compose up --build` builds only the services it starts; the
+    ingest service is behind the `seed` profile, so `run --rm ingest` reuses any
+    image already tagged for the project. The first drill after PR-A ran a
+    five-day-old ingest image and failed with "No module named
+    apps.ingest.sqlite_pipeline". Every seed one-shot must pass `--build`."""
+    drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
+    justfile = JUSTFILE.read_text()
+    for text, name in ((drill, "drill"), (justfile, "justfile")):
+        runs = [line for line in text.splitlines() if "--profile seed run" in line]
+        assert runs, f"{name}: no seed one-shot found"
+        for line in runs:
+            assert "--build" in line, f"{name}: seed one-shot without --build: {line.strip()}"

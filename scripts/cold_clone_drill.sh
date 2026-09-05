@@ -78,14 +78,18 @@ done
 $COMPOSE ps --format '{{.Name}} {{.Status}}'
 
 step "seed the database"
-$COMPOSE --profile seed run --rm ingest || fail "ingestion failed"
+# --build on both seeds: `up --build` above builds only the services it starts,
+# and ingest is behind the `seed` profile. Without it, `run` reuses any image
+# already tagged for this project — the previous drill's, days old — which is
+# precisely the "pass by reusing" this script exists to prevent.
+$COMPOSE --profile seed run --rm --build ingest || fail "ingestion failed"
 
 # The API reads SQLite (ADR-004); the step above seeded Postgres. This is a
 # second compose one-shot on purpose — never a host-side Python invocation,
 # which a cold clone does not have — and it writes the same /data file the
 # api service mounts.
 step "seed the SQLite store the API reads"
-$COMPOSE --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline \
+$COMPOSE --profile seed run --rm --build ingest python -m apps.ingest.sqlite_pipeline \
     || fail "SQLite seed failed"
 
 step "health reports the seeded corpus, not an empty schema"

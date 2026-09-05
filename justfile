@@ -92,15 +92,19 @@ logs SERVICE="": _require-env
 
 # One-shot dlt ingestion: corpus snapshot + catalog -> Postgres (v1 store,
 # Grafana path). The API reads SQLite (ADR-004) — run `just seed-sqlite` too.
+# `--build`: the ingest service sits behind the `seed` profile, so `just up`
+# (compose up --build) never builds it. Without --build, `run` happily reuses
+# whatever `homelib-ingest` image exists — days old, missing modules — and the
+# drill found exactly that (a 5-day-old image without sqlite_pipeline).
 seed: _require-env
-    {{compose}} --profile seed run --rm ingest
+    {{compose}} --profile seed run --rm --build ingest
 
 # One-shot dlt ingestion into the SQLite file the API actually opens
 # (/data/homelib.sqlite in the container == data/homelib.sqlite on the host).
 # A deliberately SEPARATE one-shot, not `&&` in the image CMD: each seed embeds
 # 9,168 chunks, and a cold clone that skips Postgres should not pay twice.
 seed-sqlite: _require-env
-    {{compose}} --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline
+    {{compose}} --profile seed run --rm --build ingest python -m apps.ingest.sqlite_pipeline
 
 # Dev convenience only (needs the host venv). A cold clone uses `just seed-sqlite`.
 seed-sqlite-local:
