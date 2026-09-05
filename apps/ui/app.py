@@ -17,7 +17,6 @@ from apps.ui.api_client import (
     ApiClientError,
     ApiUnavailableError,
     AskResponse,
-    HomelibClient,
     InProcessClient,
 )
 from apps.ui.view_model import (
@@ -41,7 +40,7 @@ from apps.ui.view_model import (
     steps_in_order,
 )
 
-Client = ApiClient | InProcessClient | HomelibClient
+Client = ApiClient | InProcessClient
 
 
 def render_ask_tab(client: Client) -> None:
@@ -329,7 +328,7 @@ def main() -> None:
     st.title("HomeLib")
     # Community Cloud puts LLM_*/APP_MODE in st.secrets, not os.environ.
     with contextlib.suppress(Exception):
-        apply_streamlit_secrets_to_environ(st.secrets)  # type: ignore[arg-type]
+        apply_streamlit_secrets_to_environ(dict(st.secrets))
     client = build_homelib_client()
 
     if "door" not in st.session_state:

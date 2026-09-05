@@ -363,11 +363,15 @@ class InProcessClient:
         self._ask = ask
         self._delegate = delegate
 
+    def _require_delegate(self) -> ApiClient:
+        if self._delegate is None:
+            raise ApiUnavailableError("InProcessClient has no delegate for this call")
+        return self._delegate
+
     def health(self) -> dict[str, Any]:
         if self._health is not None:
             return self._health()
-        assert self._delegate is not None
-        return self._delegate.health()
+        return self._require_delegate().health()
 
     def ask(
         self,
@@ -379,10 +383,80 @@ class InProcessClient:
     ) -> AskResponse:
         if self._ask is not None:
             return self._ask(query, k=k, arm=arm, rewrite=rewrite)
-        assert self._delegate is not None
-        return self._delegate.ask(query, k=k, arm=arm, rewrite=rewrite)
+        return self._require_delegate().ask(query, k=k, arm=arm, rewrite=rewrite)
 
-    def __getattr__(self, name: str) -> Any:
-        if self._delegate is None:
-            raise AttributeError(name)
-        return getattr(self._delegate, name)
+    # Explicit forwards — mypy does not follow __getattr__ for the UI surface.
+
+    def get_block(self, block_id: str) -> Block:
+        return self._require_delegate().get_block(block_id)
+
+    def submit_feedback(
+        self,
+        request_id: str,
+        feedback: Literal["up", "down"],
+        *,
+        comment: str | None = None,
+    ) -> None:
+        self._require_delegate().submit_feedback(request_id, feedback, comment=comment)
+
+    def build_roadmap(
+        self,
+        interests: list[str],
+        level: Literal["beginner", "intermediate", "advanced"],
+        goal: str,
+        max_steps: int = 8,
+    ) -> RoadmapResponse:
+        return self._require_delegate().build_roadmap(
+            interests, level, goal, max_steps=max_steps
+        )
+
+    def list_books(self) -> list[BookSummary]:
+        return self._require_delegate().list_books()
+
+    def list_resources(self, *, q: str | None = None) -> dict[str, Any]:
+        return self._require_delegate().list_resources(q=q)
+
+    def mentor_intake(
+        self,
+        goal: str,
+        interests: list[str] | None = None,
+        level: str | None = None,
+    ) -> dict[str, Any]:
+        return self._require_delegate().mentor_intake(goal, interests, level)
+
+    def get_playlist(self) -> dict[str, Any]:
+        return self._require_delegate().get_playlist()
+
+    def add_playlist_item(self, resource_id: str, origin: str = "manual_shelf") -> dict[str, Any]:
+        return self._require_delegate().add_playlist_item(resource_id, origin)
+
+    def accept_playlist(self, accept_item_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._require_delegate().accept_playlist(accept_item_ids)
+
+    def remove_playlist_item(self, item_id: str) -> dict[str, Any]:
+        return self._require_delegate().remove_playlist_item(item_id)
+
+    def save_progress(
+        self,
+        resource_id: str,
+        *,
+        kind: str = "read",
+        char_offset: int | None = None,
+        block_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self._require_delegate().save_progress(
+            resource_id, kind=kind, char_offset=char_offset, block_id=block_id
+        )
+
+    def scene_search(
+        self,
+        resource_id: str,
+        query: str,
+        *,
+        mode: str = "smart",
+        k: int = 5,
+    ) -> dict[str, Any]:
+        return self._require_delegate().scene_search(resource_id, query, mode=mode, k=k)
+
+    def get_observatory(self) -> dict[str, Any]:
+        return self._require_delegate().get_observatory()

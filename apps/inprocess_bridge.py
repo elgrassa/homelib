@@ -42,7 +42,8 @@ def build_inprocess_client() -> InProcessClient:
     # Import after the sqlite path check so misconfig fails before heavy deps.
     from apps.api.main import app
 
-    transport = httpx.ASGITransport(app=app)
+    # httpx stubs type ASGITransport narrower than Client's transport param.
+    transport: httpx.BaseTransport = httpx.ASGITransport(app=app)  # type: ignore[assignment]
     http_client = httpx.Client(transport=transport, base_url=_INPROCESS_BASE)
     delegate = ApiClient(_INPROCESS_BASE, http_client=http_client)
     return InProcessClient(delegate=delegate)

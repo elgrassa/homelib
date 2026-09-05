@@ -26,8 +26,8 @@ from apps.ui.api_client import (
     AskResponse,
     BookSummary,
     Citation,
-    HomelibClient,
     HttpClient,
+    InProcessClient,
     RoadmapStep,
 )
 
@@ -84,7 +84,7 @@ def wants_inprocess_client(environ: Mapping[str, str] | None = None) -> bool:
     return read_app_mode(env) is AppMode.DEMO
 
 
-def build_homelib_client() -> HomelibClient:
+def build_homelib_client() -> HttpClient | InProcessClient:
     """Factory: demo → InProcessClient; else HttpClient(API_URL)."""
     if wants_inprocess_client():
         raw = os.environ.get("HOMELIB_SQLITE_PATH", "").strip()
