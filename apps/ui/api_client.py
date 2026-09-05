@@ -406,9 +406,7 @@ class InProcessClient:
         goal: str,
         max_steps: int = 8,
     ) -> RoadmapResponse:
-        return self._require_delegate().build_roadmap(
-            interests, level, goal, max_steps=max_steps
-        )
+        return self._require_delegate().build_roadmap(interests, level, goal, max_steps=max_steps)
 
     def list_books(self) -> list[BookSummary]:
         return self._require_delegate().list_books()
