@@ -161,3 +161,87 @@ jobs:
         run: |
           export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
           rm -rf "$TMPDIR"
+
+  # Canonical PR-side graph guard — see studio-kit ci/graphify/graph-guard.yml.
+  # PRs must NOT touch graphify-out/: the committed graph is refreshed on
+  # main/v2 by graph-refresh after each merge. Homelib adaptations vs the
+  # studio-kit template (documented here; do not silent-edit the template):
+  # runs-on uses this repo's [macos-arm64, quick] labels (not `native`);
+  # graph-refresh pushes HEAD:$GITHUB_REF_NAME for main|v2 only (canonical
+  # template always pushes HEAD:main, which would no-op on v2). Bootstrap:
+  # this PR wires the jobs but does NOT commit graphify-out/; the first
+  # post-merge refresh creates it so the guard never gates its own bootstrap.
+  graph-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: [macos-arm64, quick]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Set up PATH (LaunchAgent-spawned runner has a minimal one)
+        run: |
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: PRs must not touch graphify-out/
+        run: |
+          git fetch origin "${GITHUB_BASE_REF:-main}" --quiet
+          touched="$(git diff --name-only "origin/${GITHUB_BASE_REF:-main}...HEAD" -- graphify-out/)"
+          if [ -n "$touched" ]; then
+            echo "$touched"
+            echo "::error::PR modifies committed graph artifacts — drop the graphify-out/ delta; the graph-refresh job regenerates it on main/v2 after merge"
+            exit 1
+          fi
+          echo "graphify-out/ untouched"
+      - name: Graph generation smoke (advisory)
+        run: |
+          command -v graphify >/dev/null || { echo "::warning::graphify not installed on runner — skipping"; exit 0; }
+          # PYTHONHASHSEED pinned: graphify's import tie-breaks and community
+          # detection follow Python hash order — unpinned, identical input can
+          # produce different graphs (live-observed).
+          PYTHONHASHSEED=0 graphify update . >/dev/null || { echo "::warning::graphify update failed on this tree — the post-merge refresh will fail the same way"; exit 0; }
+          echo "graph generation OK"
+
+  # Canonical post-merge graph refresh — see studio-kit ci/graphify/graph-refresh.yml.
+  # Homelib: push to the protected branch that was just pushed (main or v2),
+  # not always main. Feature-branch pushes never reach this job (workflow
+  # `on.push.branches` is [main, v2] only); the ref check is belt-and-braces.
+  graph-refresh:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: [macos-arm64, quick]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Set up PATH (LaunchAgent-spawned runner has a minimal one)
+        run: |
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Refresh committed graph (fail-open — a broken refresh must not block CI)
+        run: |
+          ref="${GITHUB_REF_NAME:-}"
+          case "$ref" in
+            main|v2) ;;
+            *)
+              echo "::warning::graph-refresh refusing to push to non-protected ref $ref"
+              exit 0
+              ;;
+          esac
+          command -v graphify >/dev/null || { echo "::warning::graphify not installed on runner — graph not refreshed"; exit 0; }
+          PYTHONHASHSEED=0 graphify update . >/dev/null || { echo "::warning::graphify update failed — graph not refreshed"; exit 0; }
+          # built_at_commit records the rebuilding HEAD; filter it. Textual
+          # diff because --quiet short-circuits on blob identity BEFORE -I
+          # applies (git 2.50) and would always report drift.
+          if [ -z "$(git diff -I '"built_at_commit"' -- graphify-out/graph.json)" ]; then
+            echo "graph is fresh"
+            exit 0
+          fi
+          git add graphify-out/
+          git -c user.name="graph-refresh-bot" -c user.email="graph-refresh-bot@noreply.localhost" \
+            commit -m "chore(graph): refresh ${ref} post-merge"
+          # Race-safe: non-FF is self-healing on the next merge's run.
+          ALLOW_PUSH_TO_MAIN=1 git push origin "HEAD:${ref}" || { echo "::warning::push to ${ref} failed (non-FF race is self-healing; an auth error needs a token with write access)"; exit 0; }
+          echo "graph refreshed and pushed to ${ref} — the retriggered run verifies freshness"

@@ -44,6 +44,12 @@ clean:
 test-fast:
     mkdir -p .pytest-tmp && TMPDIR="$PWD/.pytest-tmp" uv run pytest -q --no-cov -x
 
+# Local code-graph refresh for inspection. Never commit the output — branches
+# that touch graphify-out/ hard-fail graph-guard; graph-refresh owns the
+# committed graph on main/v2 after merge (studio-kit ci/graphify/).
+graph:
+    PYTHONHASHSEED=0 graphify update .
+
 # What the pre-push hook runs. Everything cheap, nothing slow: the integration
 # tests, the embedding-model loads and the coverage floor are the PR's job.
 # Keep this under a minute — a slow pre-push gate teaches people --no-verify.

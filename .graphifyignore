@@ -1,0 +1,11 @@
+.venv/
+node_modules/
+__pycache__/
+.ruff_cache/
+.pytest-tmp/
+.pytest_cache/
+graphify-out/
+.git/
+data/
+.claude/
+scratchpad/

@@ -447,3 +447,53 @@ def test_no_dotenv_file_is_tracked() -> None:
         check=True,
     ).stdout.split()
     assert all(path.endswith(".env.example") for path in tracked), tracked
+
+
+def test_ci_graph_guard_job_exists() -> None:
+    """PRs must not carry a private graphify-out/ snapshot (studio-kit #47)."""
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    jobs = workflow["jobs"]
+    assert "graph-guard" in jobs, "ci.yml is missing the graph-guard job"
+    guard = jobs["graph-guard"]
+    assert guard.get("runs-on") == ["macos-arm64", "quick"]
+    body = CI_WORKFLOW.read_text()
+    assert "graphify-out/" in body
+    assert "github.event_name == 'pull_request'" in body or "pull_request" in str(
+        guard.get("if", "")
+    )
+
+
+def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
+    """Homelib refreshes on main AND v2 — never a literal HEAD:main only.
+
+    The studio-kit template always pushes HEAD:main; copied verbatim that
+    would warn-and-exit on every v2 merge and never create the graph on the
+    integration branch sessions actually target.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    jobs = workflow["jobs"]
+    assert "graph-refresh" in jobs, "ci.yml is missing the graph-refresh job"
+    refresh = jobs["graph-refresh"]
+    assert refresh.get("runs-on") == ["macos-arm64", "quick"]
+    body = CI_WORKFLOW.read_text()
+    assert "GITHUB_REF_NAME" in body, "graph-refresh must key off the pushed ref"
+    assert "HEAD:${ref}" in body or 'HEAD:"${ref}"' in body or "HEAD:${ref}" in body
+    # Must not be the unadapted template that only ever targets main.
+    assert "git push origin HEAD:main" not in body or "HEAD:${ref}" in body
+    assert "main|v2" in body
+
+
+def test_graphifyignore_excludes_generated_and_data_paths() -> None:
+    """Indexer excludes: do not confuse with .gitignore — graphify-out/ is committed."""
+    ignore = (REPO_ROOT / ".graphifyignore").read_text()
+    for path in (".venv/", "graphify-out/", "data/", ".pytest-tmp/"):
+        assert path in ignore, f".graphifyignore missing {path!r}"
+
+
+def test_claude_md_routes_named_symbols_through_graphify_explain() -> None:
+    """Without 1bis, a committed graph is dead weight — sessions still crawl."""
+    text = (REPO_ROOT / "CLAUDE.md").read_text()
+    assert "graphify explain" in text
+    assert "graphify-out/graph.json" in text  # the ban target
+    assert "Never" in text or "never" in text
+    assert len(text.splitlines()) <= 70
