@@ -157,7 +157,7 @@ AST test enforces no direct DB imports in UI:
 uv run pytest apps/ui/tests -v -k boundary
 ```
 
-If citation "open source" fails end-to-end, run `just drill` on a **quiet machine** — saturated host gave inconclusive results (evidence).
+If citation "open source" fails end-to-end, run `just drill` on a **quiet machine** and read the attempt count, not just the verdict: on 2026-09-05 a host at load 340–410 turned the CPU model into 300 s timeouts (3/5 asks failed on `ae83d51`), while the same code passed on `ee0f318` at load 200–440 on attempt 2/5 (evidence).
 
 ---
 

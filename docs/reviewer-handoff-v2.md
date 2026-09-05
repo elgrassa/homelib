@@ -116,7 +116,7 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | 6 | Ingestion dlt | done | v1 Postgres; v2 SQLite pipeline tests + seed |
 | 7 | Monitoring ≥5 charts + feedback | done | Observatory (`GET /v1/observatory`, 6 charts over SQLite `query_log`) + thumbs; asserted by the drill. Grafana charts Postgres only — empty on the tip path (ADR-005 addendum) |
 | 8 | Containerization | done (v1) | `docker/` compose |
-| 9 | Reproducibility | done on `d6f9946`; **re-run pending** | `just drill` PASSED 2026-09-04 on a quiet box; the 2026-09-05 re-run on `ae83d51` passed clone/seed/health and FAILED the ask step under host load 340–410 (3/5 asks hit the 300 s timeout) — `docs/evidence.md` |
+| 9 | Reproducibility | done (train tip `ee0f318`) | `just drill` PASSED 2026-09-04 on `d6f9946` (quiet box) and 2026-09-05 on `ee0f318` (attempt 2/5 under load); the 2026-09-05 re-run on `ae83d51` failed the ask step under load — all three in `docs/evidence.md` |
 | 10 | Hybrid + rerank + rewrite | done | rewrite rejected on evidence |
 | 11–12 | Bonus cloud / extras | optional / partial | late owner deploy |
 
@@ -134,7 +134,7 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | WP08 | done | Crossroads doors + HomelibClient conformance + AST |
 | WP09 | done | One-page projection; static doors; rotunda shipped in PR-D (inline `st.html`, grid kept beneath) |
 | WP10 | done | Observatory ≥5 + `demo_traffic.py` + feedback DB |
-| WP11 | drill green on `d6f9946`, red under load on `ae83d51` | Docs/evidence synced (PR-C); **quiet-box drill re-run, Cloud, publish, peers = owner Mon** |
+| WP11 | drill green on `ee0f318` (train tip) | Docs/evidence synced (#28); **owner Mon: merge train A→B→D→C→E, `just publish`, Cloud, peers** |
 
 ### Named WP04 eval numbers (SQLite, 2026-09-03)
 
@@ -181,9 +181,10 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 4. **Rights / GDPR:** unknown fail-closed; metadata_only not in FTS; queries
    hashed by default; local-first LLM.
 5. **Coverage floor:** `just ci` ≥ 90%.
-6. **Honest residual (WP11):** quiet-box `just drill`, Compose all-healthy
-   e2e proof, `just publish`, Streamlit Cloud, peer×3 — **owner Mon**. Do not
-   claim a live public URL from this branch tip.
+6. **Honest residual (WP11):** `just drill` is green on the train tip `ee0f318`
+   (2026-09-05; the same-day run on `ae83d51` failed under load — both recorded).
+   Still owner Mon: merge the train, `just publish`, Streamlit Cloud, peer×3. Do
+   not claim a live public URL, and do not claim `v2` @ `86ba349` is drilled.
 7. **Compose:** if Docker healthy, `just up` + `/health` + one `/v1/ask`.
    For SQLite demo path also set `HOMELIB_SQLITE_PATH` + seed.
 
@@ -208,6 +209,6 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 |---|---|
 | `forgejo/v2` | `86ba349` — product tip; the stack below merges into it oldest-first |
 | `main` / `v1-fallback` | `535f58b` |
-| Open PRs | #25 PR-A → #26 PR-B → PR-D → PR-C, each gated by `just ci` before push; agents never merge |
+| Open PRs | `v2 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E (draft)`, each gated by `just ci` before push; merge A → B → D → C → E oldest-first; agents never merge |
 
 Merge style: `tea pulls merge <n> --style rebase`. No force-push to `v2`/`main`.

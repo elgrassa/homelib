@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual = Mon publish/Cloud/submit/peer×3).
+Last updated: 2026-09-05 (`just drill` PASSED on the train tip `ee0f318`; readiness train #25→#26→#27→#28→#29 open into `v2` @ `86ba349`, nothing merged; WP11 residual = Mon merge train / publish / Cloud / submit / peer×3).
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual 
 | 6 | **Ingestion pipeline** — automated, e.g. **dlt** | 2 | ✅ done | Real dlt source/resources, ELT into the canonical schema for both stores; `just seed` (Postgres) + `just seed-sqlite` (`python -m apps.ingest.sqlite_pipeline`, exit 1 on an empty seed); 18/729/9168/9168 |
 | 7 | **Monitoring** — feedback **and** dashboard ≥5 charts | 2 | ✅ done | Observatory door: six charts over SQLite `query_log` + 👍/👎 → `feedback`; the drill asserts the ask it made appears in `queries_over_time` (PR-B). Grafana is v1 and empty on the tip path (ADR-005 addendum) |
 | 8 | **Containerization** — everything in docker-compose | 2 | ✅ done | postgres, ollama, api, ui, grafana + `seed`-profile ingest, digest-pinned, healthchecked; api pinned `APP_MODE=selfhosted`; seeds run `--build` so a stale image can never pass (PR-A) |
-| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | 🟡 done on `d6f9946`; re-run pending | Exact pins ✅, snapshot ✅, digests ✅, context window pinned ✅. **`just drill` PASSED** on `v2` @ `d6f9946` (2026-09-04, quiet box: cold clone → seed 18/729/9168/9168 → grounded citation attempt 1/5, arm=`hybrid_rerank`). Re-run on `ae83d51` (2026-09-05, PR-A follow-up): clone, `--build` seeds and `/health` 18/9168 **passed**, then the ask step **FAILED** — 3 of 5 asks hit the drill's 300 s client timeout and the other two came back uncited/degraded, host load 340–410 (CPU Ollama). Recorded as infra in [`docs/evidence.md`](docs/evidence.md); a quiet-box re-run is the GO/NO-GO input. The drill now asserts the Observatory (`queries_over_time`) instead of counting Grafana panels. |
+| 9 | **Reproducibility** — runs as described, data available, versions pinned | 2 | ✅ done (train tip `ee0f318`) | Exact pins ✅, snapshot ✅, digests ✅, context window pinned ✅. **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory 6 charts / 5 populated, `queries_over_time` 1 point). History: PASSED on `v2` @ `d6f9946` (2026-09-04, quiet box, attempt 1/5); re-run #1 on `ae83d51` (2026-09-05) passed clone/`--build` seeds/health and **failed** the ask step under load 340–410 (3/5 timeouts) — infra, recorded in [`docs/evidence.md`](docs/evidence.md). `v2` itself is not re-drilled until the train merges. The drill asserts the Observatory (`queries_over_time`), not Grafana panel counts. |
 | 10 | **Best practices** — hybrid (1) + rerank (1) + rewrite (1) | 3 | ✅ done | All three implemented **and measured**. Rewrite compared on a matched sample and rejected on evidence — a recorded negative result |
 | 11 | **Bonus: cloud deployment** | 2 | ⬜ optional | Buffer-day only. Never at the cost of 1–10 |
 | 12 | **Bonus: extras** | 3 | 🟡 partial | Eval regression gate ✅ built; audiobook + Obsidian BookShelf are buffer-day |
@@ -45,7 +45,7 @@ Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual 
 - [x] Grafana on a read-only DB role — verified `INSERT` is refused
 - [x] Schema created by `initdb/`; ivfflat index deferred until after load
 - [x] `docker compose up` verified all-healthy **end to end** — `homelib-{api,ui,grafana,postgres,ollama}-1` healthy; API `:8010/health` 200 (2026-09-04)
-- [x] Cold-clone drill green (`just drill`) — PASSED @ `d6f9946` (~9 min this run; log `/tmp/homelib-drill-run.log`)
+- [x] Cold-clone drill green (`just drill`) — PASSED @ `d6f9946` (2026-09-04, ~9 min, quiet box) **and @ `ee0f318`** (2026-09-05, ~68 min under load, attempt 2/5 — the readiness-train tip); the 2026-09-05 re-run on `ae83d51` failed the ask step under load (evidence)
 - [ ] Reviewer path timed end to end on a clean machine
 
 ## C. Engineering quality (the "maintainable, extendable" half)
@@ -105,12 +105,13 @@ Last updated: 2026-09-04 (`just drill` green on `v2` @ `d6f9946`; WP11 residual 
    are the model returning a bare `{}` or quoting text that appears in no
    passage. Both are correctly rejected rather than passed off as grounded.
    This is what the prompt-variant bake-off exists to move.
-9. **The last drill on the tip did not pass.** `just drill` is green on `d6f9946`
-   (2026-09-04) and red on `ae83d51` (2026-09-05): everything up to and including
-   `/health` 18/9168 passed, then 3 of 5 asks hit the 300 s timeout under host
-   load 340–410 with a CPU Ollama. Not a code change on the request path, but
-   not a pass either — it is re-run on a quiet box before GO/NO-GO, and the
-   result goes into `docs/evidence.md` whichever way it lands.
+9. **Two drills on the readiness train, one red, one green — both recorded.** Re-run #1
+   on `ae83d51` (2026-09-05) passed clone, `--build` seeds and `/health` 18/9168, then
+   3 of 5 asks hit the 300 s timeout under host load 340–410 with a CPU Ollama:
+   infra, not a request-path change, and not waved through. Re-run #2 on the train
+   tip `ee0f318` **PASSED** the same evening (attempt 2/5, one load timeout). The
+   lesson stays: a loaded box turns a 7B CPU model into timeouts; drill on a quiet
+   box or read the attempt count, never the verdict alone.
 
 ---
 
@@ -131,11 +132,13 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Roadmap/Coffee Table/Shelf/Observatory/Projection (`DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`); rotunda PR-D |
 | **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save; rotunda shipped in PR-D (inline `st.html`, static grid kept beneath) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill PASSED on `d6f9946` (2026-09-04); re-run on `ae83d51` (2026-09-05) FAILED at the ask step under host load (see §E.9) — quiet-box re-run pending. **Residual owner Mon:** `just publish`, Streamlit Cloud (Python 3.13, Groq secrets), submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ on the train tip `ee0f318` (2026-09-05; #1 on `ae83d51` failed under load, see §E.9); docs synced on #28. **Residual owner Mon:** merge the train #25→#26→#27→#28→#29 oldest-first, `just publish`, Streamlit Cloud (Python 3.13, Groq secrets; PR-B2 only on owner GO), submit, peer×3 |
 
 **Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 
-**GO/NO-GO** Sun Sep 6 18:00 (product §12.4; **local gate per addendum** — not live public URL). Pass requires local `APP_MODE=demo` rehearsal green (fresh session-isolated state, resettable seed, RSS within Community Cloud limits), cited answer resolves, both evals committed, ingest repeatable, feedback+≥5 charts, Compose healthy, drill plausible for Monday, no rights/secret/isolation blocker. Live logged-out URL check moves to **Mon Sep 7** after owner deploy. NO-GO ⇒ submit v1 Monday (`v1-fallback`). Never trade a scored 2-point row for polish / Home/Pro / rotunda / TTS.
+**Progress (2026-09-05):** readiness train open into `v2` @ `86ba349`, nothing merged: #25 PR-A (H1/H3/H2) → #26 PR-B (Roadmap door, Observatory drill assert) → #27 PR-D (rotunda) → #28 PR-C (docs) → #29 PR-E (graphify jobs, draft). Local `just ci` green on every head; `just drill` PASSED on `ee0f318`. Merge order A → B → D → C → E; restack after each merge.
+
+**GO/NO-GO** Sun Sep 6 18:00 (product §12.4; **local gate per addendum** — not live public URL). **One definition — the compose reviewer path on the train tip:** `just up && just seed && just seed-sqlite` → `/health` ok 18/9168, ask → cited answer that opens → 👍 → the ask is a point on the Observatory, Coffee Table add → rerun → still there in selfhosted, seven doors + rotunda; both evals committed; ingest repeatable; `just drill` green on the tip (it is: `ee0f318`). The `APP_MODE=demo` rehearsal (fresh session-isolated state, resettable seed, RSS within Community Cloud limits, cited answer via Groq) is the **bonus-#11 gate for PR-B2 and the owner's Cloud deploy — it is not GO/NO-GO** and never blocks rows 1–10. NO-GO ⇒ submit v1 (`v1-fallback` @ `535f58b`) Monday.
 
 ### Cut order (HTML prototype first)
 
@@ -199,7 +202,7 @@ Pavlo merges **oldest → newest** (~10 PRs into `v2`). Agents do **not** merge 
   equivalent). Restack downstream feature branches after each merge.
 - **Draft newer PRs** until their base PR lands; avoid parallel review of
   dependent stacks.
-- **`v2` → `main`:** cold-clone drill green on `d6f9946` — merge when you’re ready (owner call).
+- **`v2` → `main`:** cold-clone drill green on `d6f9946` and on the train tip `ee0f318` — land the train into `v2` first (A → B → D → C → E), then merge when you’re ready (owner call).
 - **PR #4** is closed history (WP00 landed via that merge).
 - **Sep 2 gate (addendum):** no public canary until Mon Sep 7 owner deploy;
   rehearse `APP_MODE=demo` locally instead (see [`docs/evidence.md`](docs/evidence.md)

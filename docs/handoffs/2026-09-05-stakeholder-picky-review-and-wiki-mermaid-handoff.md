@@ -1,6 +1,6 @@
 # Stakeholder picky review + wiki/mermaid handoff — 2026-09-05
 
-**Product tip at start:** `v2` @ `86ba349`. **Stack produced:** PR-A #25 (`ae83d51`) → PR-B #26 (`c2675e3`) → PR-D `feat/crossroads-rotunda` (`ee0f318`) → PR-C `docs/stakeholder-review-wiki-mermaid-sync`, all into `v2`, stacked oldest-first, rebase-merge only. **Nothing merged by agents.** Deadline Tue 2026-09-08 01:00; submission Mon Sep 7; GO/NO-GO Sun Sep 6 18:00.
+**Product tip at start:** `v2` @ `86ba349`. **Stack produced:** PR-A #25 (`ae83d51`) → PR-B #26 (`c2675e3`) → PR-D #27 `feat/crossroads-rotunda` (`ee0f318`) → PR-C #28 `docs/stakeholder-review-wiki-mermaid-sync` → PR-E #29 `chore/graphify-out` (draft, owner-opened), all into `v2`, stacked oldest-first (`v2 ← #25 ← #26 ← #27 ← #28 ← #29`, strict ancestry), rebase-merge only, merge order A → B → D → C → E. **Nothing merged by agents.** Deadline Tue 2026-09-08 01:00; submission Mon Sep 7; GO/NO-GO Sun Sep 6 18:00.
 
 ## 0. Live snapshot (read-only, start of session)
 
@@ -24,7 +24,7 @@
 | 6 | Ingestion (dlt) | 2 | 2 | `just seed` + `just seed-sqlite` (CLI, exit 1 on empty) |
 | 7 | Monitoring | 2 claimed / **vacuous drill check** | 2 | Observatory asserted by the drill; Grafana honesty |
 | 8 | Containerization | 2 | 2 | `--build` on seeds; api pinned selfhosted |
-| 9 | Reproducibility | 2 (`d6f9946`, 2026-09-04) | **2 on `d6f9946`; re-run on `ae83d51` FAILED under load** | `just drill` @ `ae83d51`: clone/seed/health 18/9168 passed, ask step 3/5 timeouts (300 s) at host load 340–410 — infra, quiet-box re-run pending before GO/NO-GO |
+| 9 | Reproducibility | 2 (`d6f9946`, 2026-09-04) | **2 — `just drill` PASSED on the train tip `ee0f318`** (22:01, attempt 2/5, one 300 s load timeout) | re-run #1 on `ae83d51` failed the ask step under load 340–410 (3/5 timeouts) — infra, recorded; `v2` @ `86ba349` itself is undrilled until the train merges |
 | 10 | Best practices | 3 | 3 | unchanged |
 | 11 | Cloud (bonus) | 0 | 0 — **not deployed**; PR-B2 files drafted, held until the drill re-run passes | owner creates the app Mon (Python 3.13, Groq secrets) |
 | 12 | Extras (bonus) | partial | partial | Mentor agent, eval gate |
@@ -47,7 +47,7 @@
 
 - **Streamlit iframes cannot navigate the page.** The plan's rotunda Enter (`<a target="_parent">` from `components.v1.html`) is a `SecurityError`: Streamlit's iframe sandbox has no `allow-top-navigation` (and `components.v1.html` is deprecated in 1.62 in favour of `st.iframe`, same sandbox). PR-D renders the room inline with `st.html(unsafe_allow_javascript=True)` — safe because the HTML is built only from `CROSSROADS_DOORS`/`DOOR_COPY` — and Enter is a same-document `?door=` link.
 - **DOMPurify eats scripts that look like markup.** With `SAFE_FOR_XML`, one `<name` in a JS comment removed the whole `<script>` and the room silently lost its doors. Pinned: no `<` in the script text, injected JSON escapes `<` as `\u003c`.
-- **Drill re-run red under load.** See scoreboard row 9; the failing attempts are timeouts and a CPU model declining to cite, not a request-path change. The PASS on `d6f9946` stands; the quiet-box re-run is owner/next-agent P0.
+- **Drill under load: one red, one green.** Re-run #1 on `ae83d51` failed the ask step (3/5 timeouts, a CPU model declining to cite — not a request-path change). Re-run #2 on `ee0f318` PASSED the same evening (attempt 2/5). Both are evidence rows; read attempt counts, not verdicts.
 
 - **Stale seed image.** The first drill on PR-A failed: `up --build` never builds the `seed`-profile ingest service, so `run --rm ingest` reused a five-day-old image. Fixed on PR-A (`--build` on every seed one-shot) with a hygiene pin. `just seed` on any host with an old `homelib-ingest` image had the same hole.
 - **Forgejo quick lane timeouts.** Runs 13120 (`9e280cd`), 13125 (`ae83d51`) and 13126 (`c2675e3`) all died at the quick lane's 20-min limit — ruff, format and gitleaks green, then `context deadline exceeded` during mypy/pytest — with host load 340–410 (local gates, the drill's builds and the heavy lane at once). The heavy lane on `ae83d51` passed in 44 of its 45 minutes. Infra, not code (every local `just ci` on the same commits is green); the quick lane's limit is an owner call, not changed here.
@@ -68,8 +68,9 @@
 | A #25 | `fix/h1-h3-h2-sqlite-demo-path` @ `ae83d51` | `v2` | `just ci` 650 passed / 90.34% | run 13125: **heavy lane PASSED** (44 min); quick lane hit its 20-min limit after gitleaks (infra, load 340–410) |
 | B #26 | `fix/roadmap-door-monitoring-honesty` @ `c2675e3` | A | `just ci` 661 passed / 90.39% | run 13126: quick lane hit the 20-min limit after gitleaks (infra); heavy lane running at hand-off |
 | D #27 | `feat/crossroads-rotunda` @ `ee0f318` | B | `just ci` 675 passed / 90.45% | run 13129 running at hand-off |
-| C | `docs/stakeholder-review-wiki-mermaid-sync` | D | docs + 3 hygiene tests | opened after `just ci` |
-| B2 | `feat/streamlit-cloud-groq-files` | — | **not opened** — drafted, held until the drill re-run passes (plan: best-effort after drill PASS) | — |
+| C #28 | `docs/stakeholder-review-wiki-mermaid-sync` | D | `just ci` 678 passed / 90.45%; 23/23 mermaid render | pushed; drill-#2 docs added as a follow-up commit |
+| E #29 | `chore/graphify-out` @ `48a74fd` (owner-opened draft) | C | graph-guard + graph-refresh (`HEAD:${ref}` for `main`/`v2`), `.graphifyignore`, `CLAUDE.md` step 1bis, 4 hygiene tests; **no `graphify-out/` in the PR** | restacked onto the #28 head after the docs commit |
+| B2 | `feat/streamlit-cloud-groq-files` | train tip when opened | **not opened** — drafted; drill now PASSED, so it waits only on **owner GO** (bonus #11, never blocks rows 1–10) | — |
 
 ## 3. Talk track (5–8 min)
 
@@ -92,4 +93,4 @@ curl -fsS localhost:8010/health; curl -fsS localhost:8010/v1/observatory | pytho
 
 ## 5. Pasteable prompt for the next model
 
-> Repo `elgrassa/homelib` on Forgejo (never GitHub). Read `docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md`, then `CHECKLIST.md`, `docs/evidence.md` (last 8 rows), `docs/wiki/README.md`. The stack PR-A #25 → PR-B #26 → PR-C → PR-D into `v2` is open; agents do not merge. Verify with `just ci` and `just drill` before any claim. Owner-only: `just publish`, Streamlit Cloud app (Python 3.13, Groq secrets), licence, peers. Do not add a provider chain, server TTS, WebGL, or touch LICENSE.
+> Repo `elgrassa/homelib` on Forgejo (never GitHub). Read `docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md`, then `CHECKLIST.md`, `docs/evidence.md` (last 10 rows), `docs/wiki/README.md`. The readiness train `v2 @ 86ba349 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E` is open with strict ancestry; merge order A → B → D → C → E, oldest-first, rebase-merge, restack after each merge; agents do not merge. Remote `v2` does not contain the stack until #25 merges. `just drill` PASSED on `ee0f318`; drill #1 on `ae83d51` failed under load (recorded). Verify with `just ci` before any claim. Base new work on the train tip, never on raw `v2`. Owner-only: merging, `just publish`, Streamlit Cloud app (Python 3.13, Groq secrets — PR-B2 only on owner GO), licence, peers. Do not add a provider chain, server TTS, WebGL, `requirements.txt`/`runtime.txt`, or a tracked `graphify-out/`; do not touch LICENSE.
