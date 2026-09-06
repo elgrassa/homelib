@@ -169,7 +169,13 @@ corpus (`just eval-rrf-k`, hybrid arm, k=5, `evals/results/retrieval.md` §"RRF
 k sweep"), hit-rate@5/MRR@5/hit@5(book) came back **identical to three
 decimal places at every k** (0.638 / 0.483 / 0.906) — zero spread, so **k
 stays 60**, the RRF paper's default, since nothing in this corpus rewards
-moving it.
+moving it. The mechanism is visible in the arms themselves: the constant only
+changes the fused order when a chunk appears in *both* lists, and with the
+lexical arm at 0.064 hit-rate the two top-10 lists typically share one chunk
+or none (spot-checked on the seed: 1 of 10, identical fused order at
+`rrf_k=1` and `rrf_k=200`), so fusion degenerates to "vector order, lexical
+tail" whatever `k` is. A corpus with a competitive lexical arm would need the
+sweep re-run.
 
 ## Verification
 
