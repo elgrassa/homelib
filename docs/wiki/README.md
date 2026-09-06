@@ -51,7 +51,7 @@ and [`docs/reviewer-handoff-v2.md`](../reviewer-handoff-v2.md)):
 | WP09 Projection reader | same | Done (one-page reader + progress; Listen planned, `specs/audio.md`) |
 | WP10 Observatory ≥5 charts + feedback | same | Done — six charts; the drill asserts on it since PR-B |
 | WP11 docs / drill / publish | #25..#29 → `v2` | `just drill` **PASSED on the train tip `ee0f318`** (2026-09-05; the run on `ae83d51` failed under load — evidence); **owner Mon:** merge the train A→B→D→C→E, `just publish`, Cloud secrets, submit, peers ×3 |
-| Readiness train 2026-09-05 (merged 2026-09-06, + #30 PR-B2 Cloud files) | #25 PR-A · #26 PR-B · #27 PR-D · #28 PR-C · #29 PR-E (graphify jobs, draft) | H1/H3/H2 fixed with named tests; M1/M2 fixed; M3/M4 recorded as owner decisions — [handoff](../handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md) |
+| Readiness train 2026-09-05 (merged 2026-09-06) | Stacked PRs, oldest-first, into `main` | H1/H3/H2 fixed with named tests; M1/M2 fixed; M3/M4 recorded as owner decisions |
 | v1 fallback | `main` / tag `v1-fallback` | Complete (Postgres + Grafana) |
 
 When a page marks something **implemented** vs **spec-only**, trust [`docs/evidence.md`](../evidence.md) over this table if they diverge.

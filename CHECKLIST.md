@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-09-05 (`just drill` PASSED on the train tip `ee0f318`; readiness train #25→#26→#27→#28→#29 open into `v2` @ `86ba349`, nothing merged; WP11 residual = Mon merge train / publish / Cloud / submit / peer×3).
+Last updated: 2026-09-06 (`just drill` PASSED on the merged tip; the readiness stack has landed on `main`; WP11 residual = public snapshot + Cloud deploy, owner step, pending).
 
 ---
 
@@ -80,7 +80,7 @@ Last updated: 2026-09-05 (`just drill` PASSED on the train tip `ee0f318`; readin
 ## E. Known gaps, stated plainly
 
 1. ~~No Forgejo remote~~ **Resolved 2026-08-30.** `elgrassa/homelib` is live;
-   36 commits pushed, CI green first try (run 12254), `main` seeded from that
+   36 commits pushed, CI green on the first push, `main` seeded from that
    verified commit and set as default. PR #1 open.
 2. ~~dlt pipeline is red~~ **Resolved 2026-08-30** via exactly that ELT
    shape. 37 tests, 0 skipped, against a live Postgres.
@@ -132,7 +132,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Roadmap/Coffee Table/Shelf/Observatory/Projection (`DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`); rotunda PR-D |
 | **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save; rotunda shipped in PR-D (inline `st.html`, static grid kept beneath) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ on the train tip `ee0f318` (2026-09-05; #1 on `ae83d51` failed under load, see §E.9); docs synced on #28. **Train #25→#30 merged ff-only into `v2` = `02a26ba` (2026-09-06 ~05:00, every head green on Forgejo, smoke PASSED on the tip). Follow-up #31 (graph-refresh bootstrap) merged ff-only; the bot committed the first `graphify-out/` graph as `eb4a4ff`; `main` fast-forwarded to `v2` = `eb4a4ff` on 2026-09-06 ~09:00 (owner ask), first push run 13289 lost to a runner-disk permission failure, re-run via the docs push.** Residual owner Mon: `just publish`, Streamlit Cloud (Python 3.13, `GROQ_API_KEY` or `LLM_*` + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` secrets; **PR-B2 #30 opened 2026-09-06 on owner GO**, stacked on #29 — rehearsed cold-start + degraded ask, not with a key), submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ (2026-09-05; one earlier re-run failed under host load, see §E.9); docs synced. The readiness stack has since merged into `main`, every head green in CI, smoke PASSED on the tip. **2026-09-06: public snapshot + Cloud deploy: owner step, pending.** Residual: `just publish`, Streamlit Cloud (Python 3.13, `GROQ_API_KEY` or `LLM_*` + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` secrets — rehearsed cold-start + degraded ask, not with a real key), submit, peer×3 |
 
 **Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 
@@ -156,29 +156,6 @@ Problem description; KB+LLM flow; multiple retrieval evals; multiple LLM evals; 
 
 ---
 
-## G. Never commit before public GitHub (`just publish`)
-
-Paid tier lands in the **same Forgejo repo after** the public snapshot and Forgejo is private (ADR-010). Until then, do **not** commit:
-
-- [ ] arbitrary personal-book ingestion
-- [ ] hardened EPUB/PDF/OCR pipelines (beyond v1 parsers already public)
-- [ ] persistent private conversations/artifacts beyond demo-session / single-principal capstone paths
-- [ ] LM Studio discovery and model-management UI
-- [ ] production local TTS/STT
-- [ ] Silver Memory generation
-- [ ] polished sphere and rotunda assets
-- [ ] household profiles and LAN authentication
-- [ ] backup, restore and migration
-- [ ] Obsidian plugin
-- [ ] native Apple companion
-- [ ] installers, signed releases and automatic updates
-- [ ] offline commercial licence verification
-- [ ] signing keys or proprietary visual assets
-
-Public showcase copy (HomeLib Home blurb + waitlist link) on the Streamlit demo is allowed.
-
----
-
 ## H. WP00 landing checklist (this PR)
 
 - [x] `v1-fallback` tag at PR #3 merge (`535f58b1a47d3545c1e4b6a36e75c06b58f5a640`)
@@ -198,8 +175,8 @@ Public showcase copy (HomeLib Home blurb + waitlist link) on the Streamlit demo 
 Pavlo merges **oldest → newest** (~10 PRs into `v2`). Agents do **not** merge to
 `v2` or `main`.
 
-- **Merge style:** rebase-merge only (`tea pr merge --rebase` or Forgejo UI
-  equivalent). Restack downstream feature branches after each merge.
+- **Merge style:** rebase-merge only (Forgejo UI or an equivalent CLI).
+  Restack downstream feature branches after each merge.
 - **Draft newer PRs** until their base PR lands; avoid parallel review of
   dependent stacks.
 - **`v2` → `main`:** DONE 2026-09-06 — `main` = `v2` = `eb4a4ff` (fast-forward, no merge commit); re-synced after #32 (MagicLib design-sync inputs, `5881157` + bot graph `96b3967`) — `main` follows every `v2` bot commit. Protocol from now on: push to `v2` first, wait for the `graph-refresh` bot commit (its push does not trigger a run), then fast-forward `main` to that tip. `main` never refreshes its own graph (a rebuild is not byte-stable — community ids, manifest mtimes, cache paths — so a main-side refresh forked `main` from `v2` on every fast-forward until `ci/graph-refresh-v2-only` landed 2026-09-06).

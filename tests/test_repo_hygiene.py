@@ -596,8 +596,10 @@ def _run_graph_refresh(tmp_path: Path, ref: str) -> tuple[int, str, bool, str]:
         f"touch '{marker}'\n"
         "mkdir -p graphify-out\n"
         "sha=$(git rev-parse HEAD)\n"
-        'printf \'{"built_at_commit": "%s", "nodes": []}\n\' "$sha" '
-        "> graphify-out/graph.json\n"
+        # Real graphify writes absolute source paths (the runner's private
+        # workdir); the stub does the same so the step's relativising is tested.
+        'printf \'{"built_at_commit": "%s", "nodes": [{"source_file": "%s/README.md"}]}\n\' '
+        '"$sha" "$PWD" > graphify-out/graph.json\n'
     )
     stub.chmod(0o755)
     env = {**base_env, "PATH": f"{bindir}:{base_env['PATH']}", "GITHUB_REF_NAME": ref}
@@ -632,6 +634,33 @@ def test_ci_graph_refresh_commits_on_main(tmp_path: Path) -> None:
     assert code == 0, out
     assert called, "graph-refresh must invoke graphify on main"
     assert tip == "chore(graph): refresh main post-merge", out
+
+
+def test_ci_graph_refresh_relativises_source_paths(tmp_path: Path) -> None:
+    """Behavioural: the committed graph never carries the runner's workdir.
+
+    graphify writes absolute ``source_file`` paths and cache keys; on the
+    runner that is a private host path, and it leaked into main's
+    ``graphify-out/`` (859 hits in graph.json on 2026-09-06) — straight into
+    the public snapshot. The step must strip the workdir prefix before the
+    freshness check and the commit.
+    """
+    import subprocess
+
+    code, out, _called, tip = _run_graph_refresh(tmp_path, "main")
+    assert code == 0, out
+    assert tip == "chore(graph): refresh main post-merge", out
+    committed = subprocess.run(
+        ["git", "show", "main:graphify-out/graph.json"],
+        cwd=tmp_path / "remote.git",
+        env={"GIT_CONFIG_GLOBAL": str(tmp_path / "gitconfig-empty"), "PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    work = tmp_path / "work"
+    assert str(work) not in committed and str(work.resolve()) not in committed, committed
+    assert '"source_file": "README.md"' in committed, committed
 
 
 def test_ci_graph_refresh_refuses_the_retired_v2_ref(tmp_path: Path) -> None:

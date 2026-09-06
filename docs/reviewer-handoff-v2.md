@@ -8,12 +8,9 @@ Cold-start pack for a separate review session. Prefer this file +
 `fix/h1-h3-h2-sqlite-demo-path` (`ae83d51`) → PR-B #26
 `fix/roadmap-door-monitoring-honesty` (`c2675e3`) → PR-D
 `feat/crossroads-rotunda` (`ee0f318`) → PR-C `docs/stakeholder-review-wiki-mermaid-sync`.
-Nothing merged by agents. The picky-review findings, scoreboard and talk track
-live in [`handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md`](handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md);
-this file keeps the cold-start map. WP11 publish/Cloud remain owner Mon.
-
-Forgejo: http://localhost:3000/elgrassa/homelib · remote
-`ssh://git@localhost:2222/elgrassa/homelib.git`
+Nothing merged by agents. Session handoffs are local working notes and are
+not part of the public snapshot. This file keeps the cold-start map. WP11
+publish/Cloud remain owner Mon.
 
 ---
 
@@ -208,9 +205,8 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 
 | Ref | SHA / note |
 |---|---|
-| `forgejo/main` | **`99428a5`** (2026-09-06) — the single branch: `94eae69` collapse PR #35 + its graph-refresh bot commit. `v2` deleted on Forgejo (was `8a0c6fc` = `main` at the time) |
-| `forgejo/v2` (historical) | `86ba349` — product tip before the train; the stack below merged into it oldest-first |
-| `main` / `v1-fallback` | `535f58b` |
-| Merged 2026-09-06 | `v2 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E ← #30 PR-B2`, each green on Forgejo at its head and merged fast-forward-only; `v2` = `02a26ba`, linear. Then #31 (graph-refresh bootstrap) ff-merged and the bot committed the first graph: `main` = `v2` = `eb4a4ff`. Nothing is open. |
+| `main` | **`99428a5`** (2026-09-06) — the single long-lived branch; the earlier `v2` integration branch was collapsed into it and deleted |
+| `v1-fallback` (tag) | `535f58b` |
+| Merge history | A stack of readiness PRs merged fast-forward-only, oldest-first, each green in CI at its head; nothing is open |
 
-Merge style: fast-forward-only (`POST /pulls/{n}/merge` `Do: fast-forward-only`) into `main`. No force-push to `main`.
+Merge style: fast-forward-only into `main`. No force-push to `main`.

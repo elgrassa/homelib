@@ -46,8 +46,10 @@ test-fast:
 
 # Local code-graph refresh for inspection. Never commit the output — branches
 # that touch graphify-out/ hard-fail graph-guard; graph-refresh owns the
-# committed graph on main after merge (studio-kit ci/graphify/).
+# committed graph on main after merge (see the shared CI template this project adapts).
+[private]
 graph:
+    command -v graphify >/dev/null || { echo "graphify not installed (owner-only tooling)"; exit 0; }
     PYTHONHASHSEED=0 graphify update .
 
 # What the pre-push hook runs. Everything cheap, nothing slow: the integration
@@ -159,6 +161,10 @@ drill TARGET="/tmp/homelib-drill":
 #   * Status 1 is SUCCESS in Forgejo's enum (1 success, 2 failure, 3 cancelled,
 #     4 skipped, 5 waiting, 6 running, 7 blocked). Verified against the live
 #     table: 8.5k rows at 1, and every job under a status=1 run is itself 1.
+#
+# The Forgejo database path is owner-machine-specific — set HOMELIB_FORGEJO_DB
+# to it locally, or verify CI green in the web UI and skip this recipe.
+[private]
 publish:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -174,13 +180,9 @@ publish:
        && [[ "$(git rev-parse "forgejo/$branch" 2>/dev/null || echo none)" != "$sha" ]]; then
       echo "✗ $sha is not on forgejo/$branch — push there first, CI runs on that"; exit 1
     fi
-    DB=""
-    for candidate in "$HOME/CI/Forgejo/data/forgejo.db" \
-                     /Volumes/ExternalSSDMini/CI/Forgejo/data/forgejo.db; do
-      [[ -f "$candidate" ]] && { DB="$candidate"; break; }
-    done
+    DB="${HOMELIB_FORGEJO_DB:-}"
     if [[ -z "$DB" ]]; then
-      echo "⚠ Forgejo DB not found — verify CI in the web UI before continuing"; exit 1
+      echo "⚠ Forgejo DB not found — set HOMELIB_FORGEJO_DB or verify CI in the web UI before continuing"; exit 1
     fi
     repo_id=$(sqlite3 "$DB" "SELECT id FROM repository WHERE lower_name='homelib' LIMIT 1")
     if [[ -z "$repo_id" ]]; then
@@ -200,6 +202,7 @@ publish:
 # Build the committed Cloud seed from a seeded data/homelib.sqlite: checkpoint
 # the WAL so the copy is self-contained, then gzip deterministically (-n drops
 # the timestamp so an unchanged seed produces an identical artefact).
+[private]
 seed-gz:
     sqlite3 data/homelib.sqlite "PRAGMA wal_checkpoint(TRUNCATE);"
     mkdir -p data/seed

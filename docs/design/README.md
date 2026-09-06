@@ -2,6 +2,8 @@
 
 The stills in [`docs/mockups/`](../mockups/) are the UX source of truth; this page says how they become shipped UI, which skills gate it, and what is deliberately not built.
 
+Mockups in `docs/mockups/` are design references generated for this project from the specs; they are not screenshots of the running app and are licensed CC BY-NC-SA 4.0 (see `LICENSE-docs.md`).
+
 ## Path from mockup to screen
 
 ```mermaid

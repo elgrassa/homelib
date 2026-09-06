@@ -95,8 +95,8 @@ jobs:
       - name: Test (fast subset)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          # Hostexecutor runners also inject a lane-shared TMPDIR
-          # (/Volumes/.../CI/tmp/quick). Job-level env does not always win, and
+          # Hostexecutor runners also inject a lane-shared TMPDIR under a
+          # runner-managed path. Job-level env does not always win, and
           # when that shared parent is missing mid-run pytest dies with
           # FileNotFoundError on pytest-of-* (PR #18 run 87). Force the
           # workspace path in-step and pin --basetemp so basetemps never land
@@ -161,10 +161,10 @@ jobs:
           export TMPDIR="${GITHUB_WORKSPACE:-$PWD}/.pytest-tmp"
           rm -rf "$TMPDIR"
 
-  # Canonical PR-side graph guard — see studio-kit ci/graphify/graph-guard.yml.
+  # Canonical PR-side graph guard, adapted from a shared CI template.
   # PRs must NOT touch graphify-out/: the committed graph is refreshed on
   # main by graph-refresh after each merge. Homelib adaptations vs the
-  # studio-kit template (documented here; do not silent-edit the template):
+  # upstream template (documented here; do not silent-edit the template):
   # runs-on uses this repo's [macos-arm64, quick] labels (not `native`);
   # graph-refresh pushes HEAD:$GITHUB_REF_NAME for main only (kept keyed on
   # the ref rather than a literal HEAD:main so a future integration branch is
@@ -203,7 +203,7 @@ jobs:
           PYTHONHASHSEED=0 graphify update . >/dev/null || { echo "::warning::graphify update failed on this tree — the post-merge refresh will fail the same way"; exit 0; }
           echo "graph generation OK"
 
-  # Canonical post-merge graph refresh — see studio-kit ci/graphify/graph-refresh.yml.
+  # Canonical post-merge graph refresh, adapted from a shared CI template.
   # Homelib: the graph is refreshed on main only. Until 2026-09-06 it was
   # refreshed on the `v2` integration branch and main was a pure fast-forward
   # of it (rebuilds are not byte-stable, so refreshing on both forked them —
@@ -236,6 +236,16 @@ jobs:
           esac
           command -v graphify >/dev/null || { echo "::warning::graphify not installed on runner — graph not refreshed"; exit 0; }
           PYTHONHASHSEED=0 graphify update . >/dev/null || { echo "::warning::graphify update failed — graph not refreshed"; exit 0; }
+          # graphify records every source_file (and its cache index keys) as an
+          # ABSOLUTE path — i.e. the runner's private workdir. Strip the
+          # workdir prefix before the freshness check so the committed graph
+          # is host-neutral (the public snapshot must not leak runner paths)
+          # and byte-stable across runner workdirs. Both the logical and the
+          # physical cwd are stripped: macOS tmp/volume paths can differ.
+          for prefix in "$PWD" "$(pwd -P)"; do
+            find graphify-out -type f -name '*.json' -exec \
+              perl -pi -e 's{\Q'"$prefix"'\E/}{}g' {} +
+          done
           # built_at_commit records the rebuilding HEAD; filter it. Textual
           # diff because --quiet short-circuits on blob identity BEFORE -I
           # applies (git 2.50) and would always report drift.
