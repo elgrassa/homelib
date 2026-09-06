@@ -1,16 +1,16 @@
 # Graph Report - hostexecutor  (2026-09-06)
 
 ## Corpus Check
-- 192 files · ~227,105 words
+- 192 files · ~227,745 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3085 nodes · 5638 edges · 384 communities (168 shown, 216 thin omitted)
+- 3093 nodes · 5651 edges · 378 communities (162 shown, 216 thin omitted)
 - Extraction: 76% EXTRACTED · 24% INFERRED · 0% AMBIGUOUS · INFERRED: 1336 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `03242aad`
+- Built from commit: `ecca18a6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -53,6 +53,7 @@
 - sqlite_index.py
 - chunk.py
 - test_rotunda.py
+- test_models.py
 - v2 target — product.md §8 (markdown this WP; not in the snapshot yet)
 - bump_index_revision
 - write_report
@@ -208,10 +209,6 @@
 - test_specs_ui_door_list_matches_crossroads_doors
 - test_no_dotenv_file_is_tracked
 - test_ci_graph_guard_job_exists
-- test_ci_graph_refresh_pushes_to_current_protected_branch
-- test_ci_graph_refresh_commits_the_bootstrap_graph
-- test_graphifyignore_excludes_generated_and_data_paths
-- test_just_ci_includes_the_secret_scan
 - Any
 - AskResponse
 - Block
@@ -391,8 +388,6 @@
 - MonkeyPatch
 - Path
 - NOTES.md
-- _PerQuestionClient
-- _default_retrieve
 - design-sync notes — HomeLib / MagicLib
 
 ## God Nodes (most connected - your core abstractions)
@@ -422,15 +417,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (384 total, 216 thin omitted)
+## Communities (378 total, 216 thin omitted)
 
 ### Community 0 - "v2_routes.py"
-Cohesion: 0.14
-Nodes (21): _install_fake_baseline(), Tests for evals/judge.py and evals/llm_eval.py — see specs/evals-llm.md.  Nothin, A variant that drops the JSON/verbatim-quote instructions would score     0 for, Budget is a parameter with a documented default, not a magic number., Repo convention: every Pydantic model tolerates unexpected keys., Taking the first N lines would sample one book; round-robin must not., _stub_run(), test_default_question_budget_is_within_the_documented_live_run_bound() (+13 more)
+Cohesion: 0.13
+Nodes (9): Hit, Shared retrieval hit model — see specs/indexing.md.  `Hit` is defined once, here, A single ranked retrieval result from one search arm or rerank pass., SQLite dispatch on homelib_rag.index when HOMELIB_SQLITE_PATH is set., The reviewer-visible symptom: with only SQLite reachable, a grounded     answer, `agent.search_catalog` is bound in three places (API deps, the roadmap     wrapp, _ScriptedClient, test_agent_search_catalog_uses_sqlite_when_path_set() (+1 more)
 
 ### Community 1 - "test_judge.py"
-Cohesion: 0.11
-Nodes (35): answer(), Synthesize an `AskResponse` for `question` from already-retrieved `hits`.      N, _llm_json(), A fabricated quote not present in the cited chunk's text causes a     degraded f, For each citation in a non-degraded response, `quote` is a substring     of the, A citation to a source absent from `hits` never reaches the caller as     trustw, Sanity: this module's own scripted-client pattern (used across the     agent-too, A scripted fake `OpenAICompatibleClient`. No network. (+27 more)
+Cohesion: 0.06
+Nodes (74): answer(), _book_metadata(), _build_context_prompt(), _dsn(), OpenAIClient, `(base_url, api_key, model)` from the environment, in this order:      1. `LLM_A, Default `OpenAICompatibleClient`, backed by the `openai` SDK against     an Open, `book_id -> (title, authors)` for every id in `book_ids`.      Test seam: monkey (+66 more)
 
 ### Community 2 - "test_api.py"
 Cohesion: 0.11
@@ -438,79 +433,79 @@ Nodes (34): append_history(), Baseline, compare_to_baseline(), _current_git_sha(
 
 ### Community 3 - "ApiClient"
 Cohesion: 0.11
-Nodes (20): FixtureRequest, MockTransport, HomelibClient, client(), demo_client(), _inprocess(), WP08 HomelibClient InProcess/Http conformance — specs/client.md named reds., Server forgot our session (restart/TTL): mint once, resend once. (+12 more)
+Nodes (22): FixtureRequest, MockTransport, HomelibClient, HttpClient, Selfhosted edition — FastAPI over HTTP with per-call timeouts., client(), demo_client(), _inprocess() (+14 more)
 
 ### Community 4 - "BaseModel"
-Cohesion: 0.15
-Nodes (39): BaseModel, NamedTuple, OkResponse, Deps, get_health(), post_feedback(), post_ingest(), post_roadmap() (+31 more)
+Cohesion: 0.23
+Nodes (28): OkResponse, Deps, get_health(), post_ask(), post_feedback(), post_ingest(), post_roadmap(), QueryLogRow (+20 more)
 
 ### Community 5 - "ChatMessage"
 Cohesion: 0.22
 Nodes (20): ApiClientError, ApiUnavailableError, Raised for a 4xx/5xx response from the API.      ``detail`` carries the API's er, Raised when the API cannot be reached at all (timeout/connection)., _cast_vote(), main(), Streamlit UI. Talks only to the public API, never to the database.  Rendering sh, WP09 one-page projection mode — large type, chrome-light reader stage. (+12 more)
 
 ### Community 6 - "test_answer.py"
-Cohesion: 0.14
-Nodes (38): Compose mounts a pipeline-seeded DB that never ran store.seed().      After HOME, sqlite_env(), test_playlist_current_ok_on_migrate_only_sqlite_without_seed(), _create_minimal_staging(), test_sync_staging_rolls_back_on_catalog_error(), connect(), current_index_revision(), migrate() (+30 more)
+Cohesion: 0.15
+Nodes (36): Compose mounts a pipeline-seeded DB that never ran store.seed().      After HOME, sqlite_env(), test_playlist_current_ok_on_migrate_only_sqlite_without_seed(), connect(), migrate(), _fresh(), Red tests for WP02 SQLite store — must fail until apps.store is implemented.  Ex, test_bump_index_revision_noop_before_v4() (+28 more)
 
 ### Community 7 - "test_view_model.py"
-Cohesion: 0.05
-Nodes (65): AST, _imported_modules(), _make_ask_response(), _make_book(), _make_citation(), _make_step(), Behavioural tests for apps/ui/view_model.py.  These drive the pure helper functi, Named red from specs/client.md — alias of the AST walk above. (+57 more)
+Cohesion: 0.04
+Nodes (67): AST, _imported_modules(), _make_ask_response(), _make_book(), _make_citation(), _make_step(), Behavioural tests for apps/ui/view_model.py.  These drive the pure helper functi, Named red from specs/client.md — alias of the AST walk above. (+59 more)
 
 ### Community 8 - "test_fetch_corpus.py"
 Cohesion: 0.07
 Nodes (28): ApiClient, Block, Thin synchronous client over the homelib public API., Mint a demo principal via `POST /v1/demo/session` and use it from now on., Adopt an existing demo session id (e.g. one kept in Streamlit session         st, RoadmapResponse, client(), Behavioural tests for apps/ui/api_client.py against a stubbed transport.  Every (+20 more)
 
 ### Community 9 - "models.py"
-Cohesion: 0.06
-Nodes (50): What the LLM itself is asked to produce.      Deliberately has no `judge_model`, _RawJudgeScore, Provenance, Where a `Block` came from in the original source file., AgentResult, build_roadmap(), _connect(), _dsn() (+42 more)
+Cohesion: 0.07
+Nodes (43): Provenance, Where a `Block` came from in the original source file., AgentResult, build_roadmap(), _connect(), _dsn(), get_block(), _parse_arguments() (+35 more)
 
 ### Community 10 - "hybrid_search"
-Cohesion: 0.05
-Nodes (40): A. Rubric — the graded criteria (26 points), B. Self-hosted Docker readiness, C. Engineering quality (the "maintainable, extendable" half), Cut order (HTML prototype first), D. Nice to have — extendability, E. Known gaps, stated plainly, F. v2 work packages (WP00–WP11), G. Never commit before public GitHub (`just publish`) (+32 more)
+Cohesion: 0.07
+Nodes (26): 0. Live snapshot (read-only, start of session), 1. Scoreboard (rubric, cold re-score on the stack), 2. Findings, 3. Talk track (5–8 min), 4. Re-verify (next agent or owner), 5. Pasteable prompt for the next model, Fixed in this stack (each with named tests — see PR bodies for the regression matrix), Found while verifying (not in the review brief) (+18 more)
 
 ### Community 11 - "test_index.py"
-Cohesion: 0.10
-Nodes (31): LLMUsage, SQLite dispatch on homelib_rag.index when HOMELIB_SQLITE_PATH is set., The reviewer-visible symptom: with only SQLite reachable, a grounded     answer, `agent.search_catalog` is bound in three places (API deps, the roadmap     wrapp, _ScriptedClient, test_agent_search_catalog_uses_sqlite_when_path_set(), test_answer_end_to_end_not_degraded_on_sqlite_only_host(), _catalog_returning() (+23 more)
+Cohesion: 0.12
+Nodes (36): LLMUsage, _build_prompt(), build_roadmap(), _candidate_line(), _parse_and_validate(), Personalized reading roadmap generation — see specs/roadmap.md.  Turns a user's, Parse+validate one LLM roadmap response. Raises `RoadmapParseError`.      Trunca, Build a `RoadmapResponse` grounded only in retrieved catalog candidates.      `L (+28 more)
 
 ### Community 12 - "LLMResponse"
-Cohesion: 0.20
-Nodes (23): CatalogEntry, A catalog record (e.g. Open Library) used to enrich, never to replace, our copy., CitationValidationError, LLMUnreachableError, OpenAICompatibleClient, Raised by an `OpenAICompatibleClient` on any connection/timeout/     transport f, The minimal surface `answer.py`/`roadmap.py`/`agent.py` need from an     OpenAI-, Raised when a citation cites a chunk_id absent from `hits`, or a     `quote` is (+15 more)
+Cohesion: 0.14
+Nodes (58): BaseModel, AddPlaylistItemRequest, AudioCapabilities, OkResponse, PatchPlaylistItem, PatchPlaylistItemsRequest, PlaylistAcceptRequest, post_mentor_intake() (+50 more)
 
 ### Community 13 - "connect"
-Cohesion: 0.15
-Nodes (19): _default_rewriter(), Production query rewrite. Imported lazily — see `_default_retrieve`., Ask an LLM to rewrite `q` for retrieval; fall back to `q` on failure.      Alway, rewrite_query(), _FakeClient, Red tests for `homelib_rag.rewrite` — see specs/rewrite.md.  `_call_llm` (the on, A totally generic exception from `_call_llm` still degrades to `q`., test_call_llm_raises_on_empty_content() (+11 more)
+Cohesion: 0.07
+Nodes (46): _call_llm(), _client(), _model_name(), LLM query rewriter — see specs/rewrite.md.  Asks an LLM to turn a user's natural, Internal typed shape the LLM is asked to produce.      Not exposed publicly — `r, Call the configured LLM and return its raw response content.      Raises on any, Ask an LLM to rewrite `q` for retrieval; fall back to `q` on failure.      Alway, rewrite_query() (+38 more)
 
 ### Community 14 - "test_pipeline.py"
-Cohesion: 0.18
-Nodes (37): get_deps(), FastAPI dependency. `apps/api/tests/test_api.py` overrides this     wholesale vi, AddPlaylistItemRequest, AudioCapabilities, delete_playlist_item(), get_audio_capabilities(), get_observatory(), get_playlist_current() (+29 more)
+Cohesion: 0.23
+Nodes (14): delete_playlist_item(), get_audio_capabilities(), get_observatory(), get_playlist_current(), get_resources(), patch_playlist_items(), post_demo_session(), post_playlist_accept() (+6 more)
 
 ### Community 15 - "test_gate.py"
-Cohesion: 0.12
-Nodes (33): fetch_one(), FetchOutcome, load_manifest(), main(), ManifestEntry, Shelf fetcher — see specs/corpus.md.  Downloads the public-domain books listed i, Download, hash-verify, and (for txt) boilerplate-strip one manifest entry., Fetch every manifest entry, continuing past individual failures. (+25 more)
+Cohesion: 0.06
+Nodes (54): build_book(), build_snapshot(), _clean_text_path(), main(), Build the committed corpus snapshot — see specs/corpus.md.  Parses every manifes, Path to the boilerplate-stripped text `fetch_corpus.py --fetch` wrote., Parse one manifest entry into a `BookDoc` carrying its manifest metadata.      `, Parse every manifest entry and write the gzipped snapshot. Returns book count. (+46 more)
 
 ### Community 16 - "test_rewrite.py"
 Cohesion: 0.12
 Nodes (21): _is_substantial(), Skip chunks too short, or too table-of-contents-like, to ask about., _fake_chunk(), fixture_chunks(), _load_committed_rows(), _make_book(), Tests for evals/ground_truth.py — see specs/evals-retrieval.md.  No test in this, A tiny synthetic book with enough sentence-delimited text for a few     substant (+13 more)
 
 ### Community 17 - "test_format_pdf.py"
-Cohesion: 0.09
-Nodes (37): PdfReader, _extract_authors(), _extract_title(), _is_likely_scanned(), _ocr_extract(), parse_pdf(), PDF format handler — see specs/formats.md.  Two extraction paths, chosen per doc, Run PyMuPDF's OCR text extraction over every page of `path`.      Raises `Runtim (+29 more)
+Cohesion: 0.10
+Nodes (35): PdfReader, _extract_authors(), _extract_title(), _is_likely_scanned(), _ocr_extract(), parse_pdf(), PDF format handler — see specs/formats.md.  Two extraction paths, chosen per doc, Run PyMuPDF's OCR text extraction over every page of `path`.      Raises `Runtim (+27 more)
 
 ### Community 18 - "decision-log.md"
 Cohesion: 0.40
 Nodes (4): HomeLib v2 — Developer Wiki, Implementation status (v2 branch stack), Pages, Quick links
 
 ### Community 19 - "test_metrics.py"
-Cohesion: 0.12
-Nodes (36): ChunkId, GroundTruth, RankedResults, _first_relevant_rank(), hit_rate_at_k(), mrr_at_k(), Retrieval-quality metrics — see specs/evals-retrieval.md.  Reimplemented from fi, 1-based rank of the first id in `topk` that is in `relevant_set`, or None. (+28 more)
+Cohesion: 0.13
+Nodes (34): ChunkId, GroundTruth, RankedResults, _first_relevant_rank(), hit_rate_at_k(), mrr_at_k(), Retrieval-quality metrics — see specs/evals-retrieval.md.  Reimplemented from fi, 1-based rank of the first id in `topk` that is in `relevant_set`, or None. (+26 more)
 
 ### Community 20 - "connectors.py"
-Cohesion: 0.11
-Nodes (31): Protocol, _can_merge(), CatalogConnector, ConnectorHit, ConnectorName, ConnectorTimeout, DiscoverResult, _edition_ambiguous() (+23 more)
+Cohesion: 0.10
+Nodes (32): Protocol, StrEnum, _can_merge(), CatalogConnector, ConnectorHit, ConnectorName, ConnectorTimeout, DiscoverResult (+24 more)
 
 ### Community 21 - "coffee_table.py"
-Cohesion: 0.16
-Nodes (32): LookupError, StrEnum, accept_proposed(), add_item(), get_playlist(), _parse_ts(), patch_items(), Playlist (+24 more)
+Cohesion: 0.21
+Nodes (27): LookupError, accept_proposed(), add_item(), get_playlist(), _parse_ts(), patch_items(), Playlist, PlaylistItem (+19 more)
 
 ### Community 22 - "InProcessClient"
 Cohesion: 0.11
@@ -521,20 +516,20 @@ Cohesion: 0.15
 Nodes (21): LogCaptureFixture, build_ground_truth(), generate_questions(), load_corpus_chunks(), Recompute every chunk in the committed corpus snapshot.      Deterministic given, Stratified, seeded sample of up to `n` chunks spread across all books.      Chun, One LLM call generating up to `n` specific, retrieval-shaped questions.      Ret, Generate ground-truth rows for `chunks`, one LLM call per chunk.      A chunk th (+13 more)
 
 ### Community 24 - "sqlite_pipeline.py"
-Cohesion: 0.15
-Nodes (22): _connect(), _default_counts(), _default_db_reachable(), _default_ingest(), _default_list_books(), _default_log_query(), _default_record_feedback(), _dsn() (+14 more)
+Cohesion: 0.09
+Nodes (33): _build_default_deps(), _connect(), _default_counts(), _default_db_reachable(), _default_ingest(), _default_list_books(), _default_llm_reachable(), _default_log_query() (+25 more)
 
 ### Community 25 - "test_sqlite_ingest.py"
-Cohesion: 0.14
-Nodes (30): TempPathFactory, expected_chunk_ids_from_snapshot(), manifest_rights_by_book_id(), run_sqlite_pipeline(), _book(), _corpus_counts(), _fake_embeddings(), _fresh_db() (+22 more)
+Cohesion: 0.15
+Nodes (28): TempPathFactory, run_sqlite_pipeline(), staging_db_path(), _book(), _corpus_counts(), _create_minimal_staging(), _fake_embeddings(), _fresh_db() (+20 more)
 
 ### Community 26 - "sqlite.py"
 Cohesion: 0.09
-Nodes (29): _book(), clean_corpus_tables(), _drop_staging_schemas(), live_database_url(), Tests for apps/ingest/pipeline.py — see specs/ingestion.md named red tests.  Uni, This process's throwaway database — never the application's., Drop dlt's staging dataset (and the `_staging` merge dataset dlt makes     along, Empty the canonical tables and drop dlt's staging schemas. (+21 more)
+Nodes (31): _book(), clean_corpus_tables(), _drop_staging_schemas(), live_database_url(), Tests for apps/ingest/pipeline.py — see specs/ingestion.md named red tests.  Uni, This process's throwaway database — never the application's., Drop dlt's staging dataset (and the `_staging` merge dataset dlt makes     along, Empty the canonical tables and drop dlt's staging schemas. (+23 more)
 
 ### Community 27 - "test_format_djvu.py"
-Cohesion: 0.12
-Nodes (18): Exception, books_default_rights_status(), create_demo_session(), _current_reset_generation(), DemoSession, DemoSessionExpired, _enforce_active_demo_session(), _ensure_local_user() (+10 more)
+Cohesion: 0.11
+Nodes (30): books_default_rights_status(), create_demo_session(), current_index_revision(), _current_reset_generation(), DemoSession, DemoSessionExpired, _enforce_active_demo_session(), _ensure_local_user() (+22 more)
 
 ### Community 28 - "HttpClient"
 Cohesion: 0.12
@@ -550,19 +545,19 @@ Nodes (29): DrawFn, test_sampling_skips_short_chunks(), chunk_book(), Chunk `doc
 
 ### Community 31 - "test_fetch_catalog.py"
 Cohesion: 0.07
-Nodes (52): Cursor, _fuse(), _hybrid(), hybrid_search(), Reciprocal Rank Fusion over the lexical and vector search arms — see specs/hybri, Reciprocal-Rank-Fuse two arms' hits, dedup by `chunk_id`, top `k`.      Each arm, Search `q`, returning `(hits, mode_used)`.      `mode="lexical"` or `mode="vecto, _connect() (+44 more)
+Nodes (51): Cursor, _fuse(), _hybrid(), hybrid_search(), Reciprocal Rank Fusion over the lexical and vector search arms — see specs/hybri, Reciprocal-Rank-Fuse two arms' hits, dedup by `chunk_id`, top `k`.      Each arm, Search `q`, returning `(hits, mode_used)`.      `mode="lexical"` or `mode="vecto, _connect() (+43 more)
 
 ### Community 32 - "view_model.py"
-Cohesion: 0.19
-Nodes (14): Universal in-memory book representation — see specs/core-models.md.  One data mo, _build_prompt(), build_roadmap(), _candidate_line(), _parse_and_validate(), Personalized reading roadmap generation — see specs/roadmap.md.  Turns a user's, Parse+validate one LLM roadmap response. Raises `RoadmapParseError`.      Trunca, Build a `RoadmapResponse` grounded only in retrieved catalog candidates.      `L (+6 more)
+Cohesion: 0.12
+Nodes (14): A. Rubric — the graded criteria (26 points), B. Self-hosted Docker readiness, C. Engineering quality (the "maintainable, extendable" half), Cut order (HTML prototype first), D. Nice to have — extendability, E. Known gaps, stated plainly, F. v2 work packages (WP00–WP11), G. Never commit before public GitHub (`just publish`) (+6 more)
 
 ### Community 33 - "app.py"
-Cohesion: 0.07
-Nodes (26): can_index_text(), Full-text indexing is allowed only for explicit bundle/public-domain rights., test_can_index_text_allows_only_bundle_and_public_domain(), _book_rights(), _canonical_text(), _chapter_section(), _chunk_in_chapter(), _context_window() (+18 more)
+Cohesion: 0.08
+Nodes (7): _insert_block(), _insert_book(), _insert_chunk(), WP04 scene-search red tests — see specs/scene-search.md.  Cross-encoder rerank a, scene_db(), test_metadata_only_resource_raises_not_searchable(), test_unknown_resource_raises_not_found()
 
 ### Community 34 - "test_retrieval_eval.py"
 Cohesion: 0.10
-Nodes (32): Rewriter, ArmMetrics, _connect(), _coverage_lines(), _degradation_section(), _dsn(), _gate_metrics(), load_questions() (+24 more)
+Nodes (33): ArmMetrics, _connect(), _coverage_lines(), _default_retrieve(), _default_rewriter(), _degradation_section(), _dsn(), _gate_metrics() (+25 more)
 
 ### Community 35 - "sqlite_index.py"
 Cohesion: 0.14
@@ -576,45 +571,49 @@ Nodes (22): _atomic_unit_spans(), _chapter_key(), _make_chunk_id(), _pack_indice
 Cohesion: 0.07
 Nodes (27): Contract-drift guard, `DELETE /v1/playlists/current/items/{item_id}`, Endpoints — live v1 (OpenAPI snapshot), Error and degradation behavior, `GET /health`, `GET /v1/areas` / `POST /v1/areas`, `GET /v1/audio/capabilities`, `GET /v1/blocks/{id}` (+19 more)
 
+### Community 38 - "test_models.py"
+Cohesion: 0.20
+Nodes (4): ADR-004 — SQLite replaces Postgres, Consequences, Context, Decision
+
 ### Community 39 - "v2 target — product.md §8 (markdown this WP; not in the snapshot yet)"
 Cohesion: 0.06
 Nodes (30): _connect_never_called(), _connect_returning(), _FakeConnection, _FakeCursor, Red tests for `homelib_rag.index` — see specs/indexing.md.  Unit tests (the defa, Undo whatever a test left in the lazy embedder singleton.      The unit tests ab, Runs right after the three tests that install fakes; red without the     autouse, Seed the fixture book/blocks/chunks/embeddings using the SAME embedder     `sear (+22 more)
 
 ### Community 40 - "bump_index_revision"
-Cohesion: 0.10
-Nodes (9): _base_deps(), _missing_block(), Behavioural tests for `apps/api` — see specs/api.md.  No live Postgres, no live, test_get_block_endpoint_not_found(), test_get_deps_returns_same_singleton(), test_roadmap_llm_unreachable_maps_to_503(), test_roadmap_parse_error_maps_to_502(), test_roadmap_success() (+1 more)
+Cohesion: 0.06
+Nodes (43): _base_deps(), _hit(), _llm_json(), _make_deps(), _missing_block(), Behavioural tests for `apps/api` — see specs/api.md.  No live Postgres, no live, `/health` reports booleans only about the LLM — no substring of the     configur, Vector search "raises" (simulated at the retrieve seam): response is     200 wit (+35 more)
 
 ### Community 41 - "write_report"
-Cohesion: 0.15
-Nodes (21): _judge_metrics(), load_questions(), _machine_snapshot(), main(), _parse_args(), Prompt-variant bake-off with an LLM judge — see specs/evals-llm.md.  Picks which, Judge means for one variant. `n` counts only successfully judged cases., The winning variant, or `None` when the comparison is not sound.      Refuses in (+13 more)
+Cohesion: 0.13
+Nodes (24): _judge_metrics(), load_questions(), _machine_snapshot(), main(), _mean(), _parse_args(), Prompt-variant bake-off with an LLM judge — see specs/evals-llm.md.  Picks which, Judge means for one variant. `n` counts only successfully judged cases. (+16 more)
 
 ### Community 42 - "answer.py"
 Cohesion: 0.13
 Nodes (18): bump_index_revision(), compute_index_revision(), Rebuild the FTS5 mirror from canonical `chunks` rows (WP04)., Stable revision id for the cached embedding matrix (product §7.5)., Recompute and persist `index_revision` after ingest or FTS rebuild., rebuild_chunks_fts(), _reset_caches_for_tests(), sqlite_dispatch_db() (+10 more)
 
 ### Community 43 - "retrieval_eval.py"
-Cohesion: 0.17
-Nodes (23): _book_id_in_clause(), _default_db_path(), _default_manifest_path(), _embedding_json_to_blob(), main(), manifest_rights_from_path(), _purge_non_indexable_corpus(), dlt ingestion into SQLite — WP03; see specs/ingestion.md and ADR-004. (+15 more)
+Cohesion: 0.19
+Nodes (21): _book_id_in_clause(), _default_db_path(), _default_manifest_path(), _embedding_json_to_blob(), main(), manifest_rights_from_path(), _purge_non_indexable_corpus(), dlt ingestion into SQLite — WP03; see specs/ingestion.md and ADR-004. (+13 more)
 
 ### Community 44 - "parse_txt"
-Cohesion: 0.12
-Nodes (30): judge(), JudgeParseError, JudgeScore, LLM-as-judge scoring for answer-synthesis prompt variants — see specs/evals-llm., One judged case. `suggested_score` is the judge's own overall rating and     is, A compact `name:type,...` description of what the judge must return.      Derive, The judge system prompt as it will actually be sent, for `variant`.      `str.re, Score one answered case, with exactly one bounded repair retry.      Raises `Jud (+22 more)
+Cohesion: 0.05
+Nodes (75): GroundTruthRow, One `question -> chunk_id` ground-truth pair., judge(), JudgeParseError, JudgeScore, LLM-as-judge scoring for answer-synthesis prompt variants — see specs/evals-llm., One judged case. `suggested_score` is the judge's own overall rating and     is, A compact `name:type,...` description of what the judge must return.      Derive (+67 more)
 
 ### Community 45 - "parse_epub"
-Cohesion: 0.18
-Nodes (19): Element, _check_not_zip_bomb(), _element_text(), _localname(), parse_epub(), EPUB format handler — see specs/formats.md.  Block granularity: each `h1`-`h6`,, Extract a `BookDoc` from an EPUB file., _build_epub_bytes() (+11 more)
+Cohesion: 0.15
+Nodes (22): Element, _check_not_zip_bomb(), _element_text(), _localname(), parse_epub(), EPUB format handler — see specs/formats.md.  Block granularity: each `h1`-`h6`,, Extract a `BookDoc` from an EPUB file., make_block_id() (+14 more)
 
 ### Community 46 - "ground_truth.py"
-Cohesion: 0.13
-Nodes (21): build_book(), build_snapshot(), _clean_text_path(), main(), Build the committed corpus snapshot — see specs/corpus.md.  Parses every manifes, Path to the boilerplate-stripped text `fetch_corpus.py --fetch` wrote., Parse one manifest entry into a `BookDoc` carrying its manifest metadata.      `, Parse every manifest entry and write the gzipped snapshot. Returns book count. (+13 more)
+Cohesion: 0.18
+Nodes (14): build_inprocess_client(), inflate_seed_if_missing(), _inside_data_dir(), Wire InProcessClient for APP_MODE=demo (outside apps/ui AST boundary).  Streamli, One loop thread per app object per process: Streamlit builds a client     on eve, Build an InProcessClient backed by the FastAPI app over ASGI., True only for paths under the repo's `data/` directory, with no `..`.      The s, Inflate the committed seed to `target` when `target` is absent.      Returns Tru (+6 more)
 
 ### Community 47 - "test_rerank.py"
 Cohesion: 0.12
 Nodes (22): _call_llm(), _clean_questions(), _client(), _echoes_opening(), _is_self_referential(), main(), _model_name(), _normalize_words() (+14 more)
 
 ### Community 48 - "test_v2_routes.py"
-Cohesion: 0.13
-Nodes (22): _load_json_line(), make_block_id(), Compute a `Block.block_id`.      Stable across runs and processes: same `(book_i, Deserialize from `to_jsonl` output.          Raises `ValueError` naming the offe, _make_block(), _make_book_doc(), _make_provenance(), Red-first tests for `homelib_core.models` — see specs/core-models.md.  These tes (+14 more)
+Cohesion: 0.09
+Nodes (30): NamedTuple, _QuestionsResult, Internal typed shape the LLM is asked to produce for one chunk., A chunk's data before its final, position-dependent `chunk_id`., _RawChunk, BookDoc, Chunk, _load_json_line() (+22 more)
 
 ### Community 50 - "test_inprocess_bridge.py"
 Cohesion: 0.10
@@ -625,16 +624,16 @@ Cohesion: 0.16
 Nodes (18): _markdown_heading(), parse_txt(), _plaintext_heading(), TXT/Markdown format handler — see specs/formats.md.  Heading inference: a Markdo, An all-caps / Title-Case line under 80 chars, followed by a blank line., Extract a `BookDoc` from a plain-text or Markdown file., _assert_offsets_dense_and_stable(), Red-first tests for `homelib_core.formats.txt` — see specs/formats.md.  Written (+10 more)
 
 ### Community 52 - "sqlite_deps.py"
-Cohesion: 0.20
-Nodes (11): Edition / runtime flags from the environment.  `APP_MODE` and timeout defaults., read_app_mode(), read_llm_max_output_tokens(), read_llm_timeout_seconds(), APP_MODE / demo-timeout config skeleton (WP00).  Behaviour: the process can read, test_app_mode_defaults_to_selfhosted_when_unset(), test_demo_mode_reads_app_mode_env(), test_llm_max_output_tokens_defaults_to_product_doc() (+3 more)
+Cohesion: 0.14
+Nodes (16): Edition / runtime flags from the environment.  `APP_MODE` and timeout defaults., read_app_mode(), read_llm_max_output_tokens(), read_llm_timeout_seconds(), build_observatory(), ObservatoryChart, ObservatoryPoint, ObservatoryResponse (+8 more)
 
 ### Community 53 - "3. Proposed SQLite tables"
-Cohesion: 0.19
-Nodes (17): blocks_resource(), books_resource(), catalog_resource(), chunk_embeddings_resource(), chunks_resource(), _embed_batch(), embed_texts(), _get_model() (+9 more)
+Cohesion: 0.13
+Nodes (25): blocks_resource(), books_resource(), catalog_resource(), chunk_embeddings_resource(), chunks_resource(), _embed_batch(), embed_texts(), _ensure_ivfflat_index() (+17 more)
 
 ### Community 54 - "parse_djvu"
-Cohesion: 0.12
-Nodes (19): _ensure_ivfflat_index(), main(), _make_pipeline(), A token unique to this process, for namespacing shared-host resources.      The, Move dlt's staged rows into the canonical `public` tables.      One `INSERT ..., Build the pgvector cosine index AFTER data is loaded.      ivfflat centroids are, Load books/blocks/chunks/chunk_embeddings/catalog into dlt's staging     schema,, run_pipeline() (+11 more)
+Cohesion: 0.22
+Nodes (9): Move dlt's staged rows into the canonical `public` tables.      One `INSERT ..., _sync_staging_to_public(), _make_pipeline(), Row counts for every canonical table., Idempotency proof: load again over an existing load, counts identical.      Buil, The ELT transform is idempotent on its own, independent of dlt's merge.      Re-, _table_counts(), test_second_run_adds_no_duplicates() (+1 more)
 
 ### Community 55 - "Data model and schemas"
 Cohesion: 0.11
@@ -645,12 +644,12 @@ Cohesion: 0.11
 Nodes (19): Degradation tests, Documentation improvements, Editions and entitlements, Eval before default changes, Extension points, Import boundaries, Improving the system, New API routes (v2 §8) (+11 more)
 
 ### Community 57 - "Local development"
-Cohesion: 0.16
-Nodes (10): _FakeCursor, _patch_connect(), Scripted cursor for exercising `main._connect()` production helpers., test_default_counts_returns_table_totals(), test_default_db_reachable_true_when_select_one_succeeds(), test_default_list_books_maps_rows_to_summaries(), test_default_log_query_inserts_monitoring_row(), test_default_log_query_swallows_db_errors() (+2 more)
+Cohesion: 0.14
+Nodes (11): _FakeConnection, _FakeCursor, _patch_connect(), Scripted cursor for exercising `main._connect()` production helpers., test_default_counts_returns_table_totals(), test_default_db_reachable_true_when_select_one_succeeds(), test_default_list_books_maps_rows_to_summaries(), test_default_log_query_inserts_monitoring_row() (+3 more)
 
 ### Community 58 - "HomeLib v2 — reviewer handoff"
-Cohesion: 0.05
-Nodes (52): CrossEncoder, Request, build_inprocess_client(), inflate_seed_if_missing(), _inside_data_dir(), Wire InProcessClient for APP_MODE=demo (outside apps/ui AST boundary).  Streamli, Sync façade over ``httpx.ASGITransport`` for a blocking ``httpx.Client``.      `, One loop thread per app object per process: Streamlit builds a client     on eve (+44 more)
+Cohesion: 0.21
+Nodes (19): Reorder `hits` by cross-encoder relevance to `q`.      Returns the reordered hit, rerank(), _FakeCrossEncoder, _hit(), _RaisingCrossEncoder, Red tests for `homelib_rag.rerank` — see specs/rerank.md.  The cross-encoder its, Stand-in whose construction always fails, like a missing-weights load., Deterministic stand-in: scores a pair 1.0 if `text` mentions "bees". (+11 more)
 
 ### Community 59 - "Debugging and troubleshooting"
 Cohesion: 0.16
@@ -665,28 +664,28 @@ Cohesion: 0.12
 Nodes (7): API tests for observatory + Coffee Table routes (WP07/WP10)., WP10 live feedback path: POST /v1/feedback updates query_log (UI→API→DB)., WP10: demo_traffic.py --n 40 leaves Observatory with ≥5 non-empty chart ids., The server-side contract the client fix (H3) relies on: a minted     `X-Demo-Ses, test_demo_mode_same_header_shares_principal_and_missing_header_does_not(), test_demo_traffic_populates_observatory_charts(), test_feedback_ui_to_db_roundtrip()
 
 ### Community 62 - "HomeLib — improved product and build plan v2"
-Cohesion: 0.14
-Nodes (15): RuntimeError, _decode_djvu_string(), djvu_available(), _djvutxt_version(), _extract_page_texts(), _first_quoted_string(), _iter_top_level_forms(), DJVU format handler — see specs/formats.md.  Extracts the hidden text layer via (+7 more)
+Cohesion: 0.16
+Nodes (14): _decode_djvu_string(), djvu_available(), _djvutxt_version(), _extract_page_texts(), _first_quoted_string(), _iter_top_level_forms(), DJVU format handler — see specs/formats.md.  Extracts the hidden text layer via, Yield each top-level parenthesized S-expression in `text`, in order. (+6 more)
 
 ### Community 63 - "SyncASGITransport"
-Cohesion: 0.18
-Nodes (23): Score one arm over `rows`.      `rewrite=True` routes every question through `ho, run_arm(), _fixed_retriever(), Tests for evals/retrieval_eval.py — the retrieval-arm bake-off.  Every test here, A fake `Retriever` returning a canned ranking per question., _row(), test_default_run_never_calls_the_rewriter(), test_degraded_hybrid_is_reported_as_the_arm_that_actually_ran() (+15 more)
+Cohesion: 0.17
+Nodes (25): Retriever, Rewriter, Run one query through one arm, recording what actually happened.      A retrieva, Score one arm over `rows`.      `rewrite=True` routes every question through `ho, Score every arm in `arms` over the same `rows`, in `ARMS` order., _retrieve_one(), run_all_arms(), run_arm() (+17 more)
 
 ### Community 64 - "12.3 Work packages"
-Cohesion: 0.13
-Nodes (20): _degraded_response(), OpenAIClient, Default `OpenAICompatibleClient`, backed by the `openai` SDK against     an Open, Behavioural tests for `homelib_rag.answer` — see specs/answer.md.  No live Postg, `_TIMEOUT_SECONDS` (module constant) is read from `LLM_TIMEOUT_SECONDS`     at i, Bounds worst-case CPU generation time — a runaway completion should     not turn, A blank `LLM_API_KEY` (empty Cloud secret) must construct like an absent     one, The public demo sets one secret. With `LLM_API_KEY` blank or absent and     `GRO (+12 more)
+Cohesion: 0.14
+Nodes (13): Guards on the gates themselves.  A config file that looks like a guarantee but i, The pre-push gate must not grow into the full suite.      Quality gates live on, Streamlit runs `apps/ui/app.py` as a script, not as `python -m`.      Without PY, Hygiene pin (string-match, not behavioural): on the tip path the API     logs as, Only `.env.example` may be tracked; a real `.env*` carries keys., Indexer excludes: do not confuse with .gitignore — graphify-out/ is committed., `just ci` is documented as "what CI runs"; it must actually match., test_drill_verifies_monitoring_via_observatory_not_grafana_panel_count() (+5 more)
 
 ### Community 65 - "homelib — submission checklist"
-Cohesion: 0.19
-Nodes (15): _hit(), Hit, Shared retrieval hit model — see specs/indexing.md.  `Hit` is defined once, here, _catalog_entry(), _hit(), _intake_json(), Behavioural tests for mentor intake — specs/api.md, product §5.5., Port v1: scripted fake LLM dispatches real tool functions in order. (+7 more)
+Cohesion: 0.26
+Nodes (11): _catalog_entry(), _hit(), _intake_json(), Behavioural tests for mentor intake — specs/api.md, product §5.5., Port v1: scripted fake LLM dispatches real tool functions in order., _ScriptedClient, test_abstention_on_no_evidence(), test_citations_resolve() (+3 more)
 
 ### Community 66 - "Stakeholder picky review + wiki/mermaid handoff — 2026-09-05"
-Cohesion: 0.17
-Nodes (16): HttpClient, Selfhosted edition — FastAPI over HTTP with per-call timeouts., Demo-mode HomelibClient factory — APP_MODE=demo selects InProcessClient.  Regres, Compose injects API_URL — stay HTTP so the UI talks to the api service., test_api_url_keeps_compose_on_http_even_if_app_mode_demo(), test_apply_streamlit_secrets_copies_demo_keys_into_environ(), test_demo_mode_selects_inprocess_with_sqlite(), test_demo_mode_without_sqlite_path_fails_closed() (+8 more)
+Cohesion: 0.19
+Nodes (13): RuntimeError, Demo-mode HomelibClient factory — APP_MODE=demo selects InProcessClient.  Regres, Compose injects API_URL — stay HTTP so the UI talks to the api service., test_api_url_keeps_compose_on_http_even_if_app_mode_demo(), test_apply_streamlit_secrets_copies_demo_keys_into_environ(), test_demo_mode_selects_inprocess_with_sqlite(), test_demo_mode_without_sqlite_path_fails_closed(), test_selfhosted_selects_http_client() (+5 more)
 
 ### Community 67 - "HomeLib v2.1 — final merged execution plan (capstone rebuild + product)"
-Cohesion: 0.13
-Nodes (15): _make_deps(), `/health` reports booleans only about the LLM — no substring of the     configur, SQLite creates the file on first connect, so a never-seeded clone has a     reac, test_feedback_success(), test_feedback_unknown_request_id_returns_404(), test_get_block_endpoint_found(), test_get_books(), test_health_degraded_when_db_down() (+7 more)
+Cohesion: 0.24
+Nodes (10): _graph_refresh_script(), Path, Homelib refreshes on main AND v2 — never a literal HEAD:main only.      The stud, Execute the graph-refresh step script in a scratch repo with a stub graphify., Behavioural: a push to main must not rebuild or commit the graph.      Rebuilds, Behavioural: the v2 push still rebuilds, commits and pushes the graph., _run_graph_refresh(), test_ci_graph_refresh_pushes_to_current_protected_branch() (+2 more)
 
 ### Community 68 - "Architecture overview"
 Cohesion: 0.13
@@ -701,8 +700,8 @@ Cohesion: 0.13
 Nodes (15): APP_MODE behaviour, Canonical commands, Common debug commands, Compose profiles, Demo smoke (Sep 2 gate per evidence addendum), Environment, First-time setup, LM Studio (Mac home edition) (+7 more)
 
 ### Community 71 - "test_index_sqlite_dispatch.py"
-Cohesion: 0.16
-Nodes (15): GroundTruthRow, One `question -> chunk_id` ground-truth pair., An `OpenAICompatibleClient` that substitutes the system prompt.      `answer()`, Answer every question in `questions` under `variant`'s system prompt.      Alway, run_variant(), _VariantClient, _hit(), A failed case is kept with `answer=""` so the judge scores the failure     on it (+7 more)
+Cohesion: 0.29
+Nodes (4): An `OpenAICompatibleClient` that substitutes the system prompt.      `answer()`, _VariantClient, LLMResponse, The normalized result of one `OpenAICompatibleClient.chat` call.
 
 ### Community 72 - "5. Signature product experience"
 Cohesion: 0.14
@@ -725,8 +724,8 @@ Cohesion: 0.15
 Nodes (13): 12.3 Work packages, WP00 — Freeze, fallback and canary, WP01 — Contracts and acceptance tests, WP02 — SQLite and principals, WP03 — Ingestion and rights, WP04 — Retrieval and evaluation, WP05 — Lawful connectors, WP06 — Mentor and artifacts (+5 more)
 
 ### Community 77 - "homelib"
-Cohesion: 0.24
-Nodes (11): _llm_json(), Vector search "raises" (simulated at the retrieve seam): response is     200 wit, ADR-001 (docs/adrs/ADR-001-retrieval-arm.md) measured query rewriting     agains, A scripted fake `OpenAICompatibleClient`. No network., _ScriptedClient, test_ask_arm_none_uses_default_arm(), test_ask_degrades_to_200_when_vector_backend_down(), test_ask_explicit_arm_is_honored() (+3 more)
+Cohesion: 0.28
+Nodes (5): Request, Sync façade over ``httpx.ASGITransport`` for a blocking ``httpx.Client``.      `, SyncASGITransport, The in-process edition must degrade like the HTTP one: a stalled route     becom, test_sync_asgi_transport_maps_a_stalled_app_to_a_read_timeout()
 
 ### Community 78 - "test_coffee_table.py"
 Cohesion: 0.17
@@ -745,8 +744,8 @@ Cohesion: 0.18
 Nodes (11): Architecture, Course map, Data, Development, Evaluation results, homelib, License, Quickstart (+3 more)
 
 ### Community 82 - "cold_clone_drill.sh"
-Cohesion: 0.16
-Nodes (14): Raise `CitationValidationError` unless every citation is genuine.      Two check, _validate_citations(), _hit(), The client raises a connection error; `answer()` returns a degraded     `AskResp, The prompt sent to the LLM must carry the book's authors, not just its     title, `Citation.book_title` always comes from `_book_metadata`, never from     anythin, A citation nobody can open is not a citation.      Found by the cold-clone drill, test_citation_book_title_never_taken_from_model_output() (+6 more)
+Cohesion: 0.29
+Nodes (6): CLAUDE.md — HomeLib, Module map, Read-first order (token discipline), Skill routing, Standing rules, What this is
 
 ### Community 83 - "test_repo_hygiene.py"
 Cohesion: 0.24
@@ -757,15 +756,15 @@ Cohesion: 0.20
 Nodes (7): Streamlit Community Cloud edition: the files Cloud reads and the seed it needs., `streamlit_app.py` is a shim over `apps/ui/app.py`, not a second UI., Cloud resolves from uv.lock; GPU torch wheels would blow its disk/RSS., `.python-version` (uv, pyenv, Cloud reviewers) agrees with pyproject., test_cloud_entrypoint_runs_the_same_ui_main(), test_python_version_file_matches_requires_python(), test_uv_lock_pins_cpu_torch_index()
 
 ### Community 85 - "Decision"
-Cohesion: 0.20
-Nodes (9): Guards on the gates themselves.  A config file that looks like a guarantee but i, Hygiene pin. `compose up --build` builds only the services it starts; the     in, Purchased ebooks never leave this machine: `data/books/` and     `data/private/`, Without 1bis, a committed graph is dead weight — sessions still crawl., A branch push plus an open PR must not fire two runs of the same commit.      Wi, test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request(), test_claude_md_routes_named_symbols_through_graphify_explain(), test_personal_books_dir_is_untracked_and_ignored() (+1 more)
+Cohesion: 0.29
+Nodes (6): CrossEncoder, _load_model(), Cross-encoder reranker — see specs/rerank.md.  Improves ranking quality on top o, Return the process-wide `CrossEncoder` singleton, loading it if needed.      Ret, Reset the lazy singleton. Test-only — not part of the public API., _reset_singleton_for_tests()
 
 ### Community 86 - "Repo structure"
 Cohesion: 0.22
 Nodes (3): Crossroads doors rendered through Streamlit's own test harness.  `streamlit.test, The rotunda's Enter reloads the page on `?door=X`; the app must open X     and d, test_door_query_param_opens_that_door_and_is_consumed()
 
 ### Community 87 - "write_ground_truth"
-Cohesion: 0.22
+Cohesion: 0.20
 Nodes (9): ADR-001 — Retrieval arm: hybrid + rerank, with query rewrite off, Consequences, Context, Decision, Evidence, Query rewrite: measured, and rejected, v2 SQLite re-measurement (2026-09-03), Verification (+1 more)
 
 ### Community 88 - "spec: answer — `homelib_rag.answer`"
@@ -785,8 +784,8 @@ Cohesion: 0.25
 Nodes (6): _normalize_openapi(), Contract-drift guard — see specs/api.md.  Asserts the generated OpenAPI schema (, Reduce a full OpenAPI document to the slice specs/api.md's     contract-drift gu, A cheap independent check that the snapshot itself is not stale: every     endpo, test_openapi_snapshot_matches(), test_snapshot_covers_every_endpoint_in_api_md()
 
 ### Community 92 - "spec: core-models — `homelib_core.models`"
-Cohesion: 0.29
-Nodes (7): parse_file(), Format dispatcher — see specs/formats.md.  `parse_file` is the single entry poin, Derive a `book_id` slug from a file stem (e.g. `"Moby Dick!" -> "moby-dick"`)., Dispatch `path` to the right format handler by its suffix.      Dispatches on `p, _slugify(), test_parse_file_dispatches_txt_and_md(), test_parse_file_unknown_extension_raises_value_error()
+Cohesion: 0.22
+Nodes (9): parse_file(), Format dispatcher — see specs/formats.md.  `parse_file` is the single entry poin, Derive a `book_id` slug from a file stem (e.g. `"Moby Dick!" -> "moby-dick"`)., Dispatch `path` to the right format handler by its suffix.      Dispatches on `p, _slugify(), The dispatcher doesn't swallow the encrypted-PDF refusal either., test_parse_file_dispatches_encrypted_pdf_and_raises(), test_parse_file_dispatches_txt_and_md() (+1 more)
 
 ### Community 93 - "spec: corpus — `data/` + `apps/ingest/fetch_corpus.py` + `apps/ingest/fetch_catalog.py`"
 Cohesion: 0.31
@@ -861,7 +860,7 @@ Cohesion: 0.25
 Nodes (7): Data contracts (field-level), Error / degradation behavior, Named red tests (write before the code), Public interface, Purpose, spec: formats — `homelib_core.formats` + `homelib_core.normalize`, Verify
 
 ### Community 111 - "spec: provider — `LLMProvider` seam"
-Cohesion: 0.25
+Cohesion: 0.22
 Nodes (8): Data contracts (field-level), Error / degradation behavior, Named red tests (write before the code), Public interface, Purpose, spec: ingestion — `apps/ingest/pipeline.py` (dlt), SQLite seed CLI (2026-09-05), Verify
 
 ### Community 112 - "spec: rerank — `homelib_rag.rerank`"
@@ -909,23 +908,23 @@ Cohesion: 0.25
 Nodes (8): Data contracts (field-level), Error/degradation behavior, Named tests (all present), Public interface, Purpose, spec: ui — `apps/ui` (Streamlit Crossroads), The doors, Verify
 
 ### Community 123 - "spec: observatory — in-app monitoring (replaces Grafana)"
-Cohesion: 0.29
-Nodes (6): CLAUDE.md — HomeLib, Module map, Read-first order (token discipline), Skill routing, Standing rules, What this is
+Cohesion: 0.33
+Nodes (6): expected_chunk_ids_from_snapshot(), manifest_rights_by_book_id(), test_chunk_ids_match_v1_snapshot(), test_expected_chunk_ids_match_canonical_count(), test_manifest_rights_maps_explicit_public_domain(), test_manifest_rights_skips_non_dict_entries()
 
 ### Community 124 - "spec: principals — demo sessions and local-user identity"
 Cohesion: 0.29
 Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red tests, Public interface, Purpose, spec: editions — `APP_MODE` and the capability matrix, Verify
 
 ### Community 125 - "4. Editions and deployment model"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red tests (write before the code), Public interface, Purpose, spec: hybrid — `homelib_rag.hybrid`, Verify
 
 ### Community 126 - "Commercial split and product ladder (owner 2026-09-01; evening pivot)"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red tests (write before the code), Public interface, Purpose, spec: indexing — `homelib_rag.index`, Verify
 
 ### Community 127 - "spec: rights — fail-closed gate before index and audio"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red tests, Public interface, Purpose, spec: observatory — in-app monitoring (replaces Grafana), Verify
 
 ### Community 128 - "test_packaging.py"
@@ -948,21 +947,17 @@ Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red t
 Cohesion: 0.29
 Nodes (7): Data contracts (field-level), Error/degradation behavior, Named red tests, Public interface, Purpose, spec: scene-search — within-book exact/keyword/semantic/smart/ask, Verify
 
-### Community 133 - "15. Post-capstone roadmap"
-Cohesion: 0.17
-Nodes (5): _FakeChat, _FakeChoice, _FakeCompletion, _FakeCompletions, _FakeMessage
-
 ### Community 134 - "ADR-005 — Observatory replaces Grafana"
-Cohesion: 0.33
-Nodes (6): _hit(), test_ask_writes_query_log_row(), test_default_retrieve_applies_rerank_for_hybrid_rerank(), test_default_retrieve_keeps_hybrid_order_when_rerank_unavailable(), test_default_retrieve_marks_degraded_when_search_falls_back(), test_default_retrieve_single_arms()
+Cohesion: 0.40
+Nodes (5): _compose(), `.env.example` ships `APP_MODE=demo` for the Community Cloud path. The     api s, Hygiene (string/structure match, not behavioural). The api service reads     `/d, test_compose_api_pins_selfhosted_like_ui(), test_compose_ingest_can_write_sqlite_seed()
 
 ### Community 135 - "ADR-007 — Licence (provisional)"
 Cohesion: 0.33
 Nodes (5): Packaging invariants.  These are cheap to assert and expensive to discover later, PEP 561: without this file, installed type hints are invisible to mypy.      hom, The documented surface must be importable from the package root., test_package_ships_py_typed_marker(), test_public_names_are_exported()
 
 ### Community 136 - "ADR-009 — Audio deferred"
-Cohesion: 0.11
-Nodes (19): _book_metadata(), _build_context_prompt(), _collapse_whitespace(), default_llm_client(), _dsn(), Citation-checked answer synthesis — see specs/answer.md.  Synthesizes an `AskRes, `(base_url, api_key, model)` from the environment, in this order:      1. `LLM_A, The shape the LLM is asked to produce for one citation.      Deliberately has NO (+11 more)
+Cohesion: 0.33
+Nodes (6): _collapse_whitespace(), The shape the LLM is asked to produce for one citation.      Deliberately has NO, Whitespace-insensitive form for quote comparison.      Book text is hard-wrapped, The passage a quote actually came from, or `None` if it came from none.      The, _RawCitation, _resolve_quote()
 
 ### Community 137 - "Design — how the magic-library look reaches the product"
 Cohesion: 0.33
@@ -993,28 +988,24 @@ Cohesion: 0.60
 Nodes (4): main(), _parse_args(), _print_result(), Demo CLI: `POST /v1/roadmap` against a running homelib API — see specs/api.md.
 
 ### Community 144 - "HomeLib v2 — Developer Wiki"
-Cohesion: 0.18
-Nodes (10): _build_default_deps(), _default_llm_reachable(), _default_retrieve(), _infer_provider(), post_ask(), _query_sha256_prefix(), First 16 hex chars of `sha256(query)` — see specs/monitoring.md.      Written un, Best-effort human-readable provider name for `/health`, from the     configured (+2 more)
-
-### Community 145 - "12. Delivery plan"
-Cohesion: 0.40
-Nodes (5): _compose(), `.env.example` ships `APP_MODE=demo` for the Community Cloud path. The     api s, Hygiene (string/structure match, not behavioural). The api service reads     `/d, test_compose_api_pins_selfhosted_like_ui(), test_compose_ingest_can_write_sqlite_seed()
-
-### Community 146 - "6. Data and rights model"
 Cohesion: 0.40
 Nodes (5): _gate_steps(), The scan is a CI step, not just a file sitting in the repo., A shallow clone would make the history scan vacuous.      `gitleaks git` reads t, test_ci_checks_out_full_history_for_the_secret_scan(), test_gitleaks_runs_in_ci()
 
-### Community 147 - "9. Evaluation and monitoring"
-Cohesion: 0.32
-Nodes (7): _call_llm(), _client(), _model_name(), LLM query rewriter — see specs/rewrite.md.  Asks an LLM to turn a user's natural, Internal typed shape the LLM is asked to produce.      Not exposed publicly — `r, Call the configured LLM and return its raw response content.      Raises on any, RewriteResult
+### Community 145 - "12. Delivery plan"
+Cohesion: 0.50
+Nodes (4): _all_job_commands(), Every `run:` command in the workflow, keyed by job name., Whatever the hook defers must actually be enforced somewhere.      The fast loca, test_some_ci_job_runs_the_full_suite_the_hook_skips()
+
+### Community 146 - "6. Data and rights model"
+Cohesion: 0.67
+Nodes (3): get_progress(), ProgressKind, Read/listen progress — specs/progress.md (WP07).
 
 ### Community 148 - "_all_job_commands"
-Cohesion: 0.24
-Nodes (10): _answer_one(), AnsweredCase, _mean(), One question answered under one prompt variant., Answer one question, retrying once, then recording the failure honestly.      `a, Judge every case and reduce to one `VariantScore` per variant.      A case whose, score_variants(), _answered_case() (+2 more)
+Cohesion: 0.67
+Nodes (3): can_index_text(), Full-text indexing is allowed only for explicit bundle/public-domain rights., test_can_index_text_allows_only_bundle_and_public_domain()
 
 ### Community 149 - "pre-push"
-Cohesion: 0.19
-Nodes (22): insert_playlist(), insert_read_progress(), list_areas(), list_bookmarks(), list_conversations(), list_playlist_items(), list_read_progress(), logical_checksum() (+14 more)
+Cohesion: 0.23
+Nodes (14): logical_checksum(), Resolve manifest rights — explicit `rights_status` only; else fail closed., reset_demo(), rights_status_from_manifest(), row_counts(), seed(), _table_exists(), SQLite files are not byte-reproducible; counts + checksum must be. (+6 more)
 
 ### Community 150 - "homelib"
 Cohesion: 1.00
@@ -1033,8 +1024,8 @@ Cohesion: 0.50
 Nodes (3): Crossroads and doors, Door map, How a door opens
 
 ### Community 154 - "__init__.py"
-Cohesion: 0.17
-Nodes (11): Retriever, BookMetrics, _per_book(), QueryOutcome, What one arm actually returned for one ground-truth question., True when the arm that ran is not the arm that was asked for., One book's slice of an arm's score., Run one query through one arm, recording what actually happened.      A retrieva (+3 more)
+Cohesion: 0.25
+Nodes (8): _per_book(), QueryOutcome, What one arm actually returned for one ground-truth question., True when the arm that ran is not the arm that was asked for., hit-rate@k and MRR@k over `outcomes`, via `evals.metrics`.      Both mappings ar, Break the same outcomes down by book, using the same two metrics., _score(), test_query_outcome_degraded_is_derived_from_the_arm_actually_used()
 
 ### Community 155 - "__init__.py"
 Cohesion: 0.50
@@ -1048,14 +1039,6 @@ Nodes (4): 6.1 Capstone datasets, 6.2 Rights manifest, 6.3 Deduplication, 6. Dat
 Cohesion: 0.50
 Nodes (4): 9.1 Retrieval evaluation, 9.2 LLM evaluation, 9.3 Observatory, 9. Evaluation and monitoring
 
-### Community 158 - "Build evidence log"
-Cohesion: 0.50
-Nodes (4): _all_job_commands(), Every `run:` command in the workflow, keyed by job name., Whatever the hook defers must actually be enforced somewhere.      The fast loca, test_some_ci_job_runs_the_full_suite_the_hook_skips()
-
-### Community 161 - "llm_eval.md"
-Cohesion: 0.53
-Nodes (5): build_observatory(), ObservatoryChart, ObservatoryPoint, ObservatoryResponse, Observatory aggregates from query_log — specs/observatory.md (WP10).
-
 ### Community 171 - "test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve"
 Cohesion: 0.33
 Nodes (6): Data contracts (field-level), Named red tests, Public interface, Purpose, spec: client — `HomelibClient` in-process vs HTTP seam, Verify
@@ -1064,17 +1047,9 @@ Nodes (6): Data contracts (field-level), Named red tests, Public interface, Purp
 Cohesion: 0.33
 Nodes (5): MagicLib — HomeLib's magic-library look, Setup, Snippet, Styling idiom: CSS custom properties, serif reading surfaces, Where the truth lives
 
-### Community 175 - "test_ci_pytest_forces_workspace_basetemp"
-Cohesion: 0.50
-Nodes (4): ADR-004 — SQLite replaces Postgres, Consequences, Context, Decision
-
 ### Community 380 - "NOTES.md"
-Cohesion: 0.23
-Nodes (12): _arm_metrics(), _four_arms(), test_models_allow_extra_fields(), test_report_caveats_a_winner_that_partially_degraded(), test_report_includes_a_per_book_breakdown(), test_report_lists_the_arm_actually_used_per_arm(), test_report_marks_the_best_arm_as_winner(), test_report_refuses_a_winner_when_an_arm_fully_degraded() (+4 more)
-
-### Community 382 - "_default_retrieve"
-Cohesion: 0.50
-Nodes (4): Resolve manifest rights — explicit `rights_status` only; else fail closed., rights_status_from_manifest(), test_rights_status_rejects_unknown_explicit_value(), test_rights_status_requires_explicit_manifest_field()
+Cohesion: 0.16
+Nodes (17): _arm_metrics(), _four_arms(), _hit(), Tests for evals/retrieval_eval.py — the retrieval-arm bake-off.  Every test here, test_load_questions_budget_spreads_across_books_instead_of_truncating(), test_load_questions_default_budget_takes_every_row(), test_load_questions_skips_blank_lines(), test_models_allow_extra_fields() (+9 more)
 
 ## Knowledge Gaps
 - **566 isolated node(s):** `API_PORT`, `UI_PORT`, `GRAFANA_PORT`, `POSTGRES_PORT`, `OLLAMA_PORT` (+561 more)
@@ -1084,12 +1059,12 @@ Nodes (4): Resolve manifest rights — explicit `rights_status` only; else fail 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Universal in-memory book representation — see specs/core-models.md.  One data mo` connect `view_model.py` to `BaseModel`, `models.py`, `test_index.py`, `LLMResponse`, `test_rewrite.py`, `test_format_pdf.py`, `InProcessClient`, `sqlite_pipeline.py`, `test_sqlite_ingest.py`, `sqlite.py`, `chunk_book`, `sqlite_index.py`, `chunk.py`, `bump_index_revision`, `retrieval_eval.py`, `parse_epub`, `ground_truth.py`, `test_rerank.py`, `test_v2_routes.py`, `Extension points`, `3. Proposed SQLite tables`, `Debugging and troubleshooting`, `HomeLib — improved product and build plan v2`, `homelib — submission checklist`, `spec: core-models — `homelib_core.models``, `spec: corpus — `data/` + `apps/ingest/fetch_corpus.py` + `apps/ingest/fetch_catalog.py``?**
-  _High betweenness centrality (0.268) - this node is a cross-community bridge._
+- **Why does `Universal in-memory book representation — see specs/core-models.md.  One data mo` connect `test_v2_routes.py` to `BaseModel`, `models.py`, `test_index.py`, `LLMResponse`, `test_gate.py`, `test_rewrite.py`, `test_format_pdf.py`, `InProcessClient`, `sqlite_pipeline.py`, `test_sqlite_ingest.py`, `sqlite.py`, `chunk_book`, `sqlite_index.py`, `chunk.py`, `bump_index_revision`, `retrieval_eval.py`, `parse_epub`, `test_rerank.py`, `Extension points`, `3. Proposed SQLite tables`, `Debugging and troubleshooting`, `HomeLib — improved product and build plan v2`, `homelib — submission checklist`, `spec: core-models — `homelib_core.models``, `spec: corpus — `data/` + `apps/ingest/fetch_corpus.py` + `apps/ingest/fetch_catalog.py``?**
+  _High betweenness centrality (0.271) - this node is a cross-community bridge._
 - **Why does `Error/degradation behavior` connect `ChatMessage` to `test_fetch_corpus.py`, `Debugging and troubleshooting`, `test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve`, `test_gate.py`?**
-  _High betweenness centrality (0.258) - this node is a cross-community bridge._
+  _High betweenness centrality (0.264) - this node is a cross-community bridge._
 - **Why does `spec: client — `HomelibClient` in-process vs HTTP seam` connect `test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve` to `ChatMessage`, `test_models.py`?**
-  _High betweenness centrality (0.241) - this node is a cross-community bridge._
+  _High betweenness centrality (0.245) - this node is a cross-community bridge._
 - **Are the 60 inferred relationships involving `connect()` (e.g. with `open_store()` and `sqlite_env()`) actually correct?**
   _`connect()` has 60 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 7 inferred relationships involving `ApiClient` (e.g. with `build_inprocess_client()` and `SyncASGITransport`) actually correct?**
