@@ -145,13 +145,13 @@
     },
     {
       "id": 5,
-      "title": "Token usage",
+      "title": "Token usage / cost estimate",
       "type": "timeseries",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "homelib-postgres"
       },
-      "description": "Prompt and completion split \u2014 cost is dominated by whichever grows.",
+      "description": "Prompt and completion split \u2014 cost is dominated by whichever grows. cost_usd is 0 (and the field carries no data) unless LLM_PRICE_PER_1K_* is set.",
       "gridPos": {
         "x": 16,
         "y": 8,
@@ -167,14 +167,27 @@
           },
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT date_trunc('hour', ts) AS time,\n  sum(tokens_prompt)     AS prompt_tokens,\n  sum(tokens_completion) AS completion_tokens\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
+          "rawSql": "SELECT date_trunc('hour', ts) AS time,\n  sum(tokens_prompt)     AS prompt_tokens,\n  sum(tokens_completion) AS completion_tokens,\n  sum(cost_usd)          AS cost_usd\nFROM query_log WHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
       }
     },
     {

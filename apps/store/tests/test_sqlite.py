@@ -80,7 +80,7 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2, 3, 4}
+    assert versions == {1, 2, 3, 4, 5}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -391,17 +391,45 @@ def test_migration_is_transactional_on_failure(
 
     conn = connect(_fresh(tmp_path))
     migrate(conn)
-    broken = ((5, "CREATE TABLE broken_v5 (id TEXT PRIMARY KEY); INVALID SQL;"),)
     original = sqlite_mod.MIGRATIONS
+    # Computed rather than hardcoded: a version number that collides with a
+    # real migration is silently skipped as "already applied" instead of
+    # ever running, which would make this test pass for the wrong reason as
+    # soon as a later commit's migration reused that number.
+    baseline_versions = {version for version, _ in original}
+    broken_version = max(baseline_versions) + 1
+    broken = ((broken_version, "CREATE TABLE broken_vN (id TEXT PRIMARY KEY); INVALID SQL;"),)
     try:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original + broken)
         with pytest.raises(sqlite3.OperationalError):
-            sqlite_mod.migrate(conn, target_version=5)
+            sqlite_mod.migrate(conn, target_version=broken_version)
         versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-        assert versions == {1, 2, 3, 4}
-        assert not sqlite_mod._table_exists(conn, "broken_v5")
+        assert versions == baseline_versions
+        assert not sqlite_mod._table_exists(conn, "broken_vN")
     finally:
         monkeypatch.setattr(sqlite_mod, "MIGRATIONS", original)
+    conn.close()
+
+
+def test_migration_5_adds_cost_usd_column(tmp_path: Path) -> None:
+    """C1 (specs/monitoring.md): `query_log.cost_usd` exists after migrating
+    a fresh store to latest, defaults to 0, and an upgrade from version 4
+    (the pre-C1 schema) preserves existing rows while adding the column."""
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=4)
+    conn.execute(
+        "INSERT INTO query_log (request_id, ts, latency_ms, arm, k, query_sha256_prefix) "
+        "VALUES ('r-pre-c1', 't', 1, 'hybrid', 5, 'abc')"
+    )
+    conn.commit()
+
+    migrate(conn, target_version=None)
+
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(query_log)")}
+    assert "cost_usd" in columns
+    row = conn.execute("SELECT cost_usd FROM query_log WHERE request_id = 'r-pre-c1'").fetchone()
+    assert row is not None
+    assert row[0] == 0
     conn.close()
 
 

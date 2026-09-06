@@ -343,6 +343,46 @@ def test_ask_validation_rejects_unknown_field() -> None:
     assert resp.status_code == 422
 
 
+# ── C1: cost in $ (specs/monitoring.md) ─────────────────────────────────
+
+
+def test_cost_usd_zero_under_local_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neither `LLM_PRICE_PER_1K_*` var set (the compose/Ollama default):
+    `query_log.cost_usd` is 0 even though real tokens were spent."""
+    monkeypatch.delenv("LLM_PRICE_PER_1K_PROMPT", raising=False)
+    monkeypatch.delenv("LLM_PRICE_PER_1K_COMPLETION", raising=False)
+    logged: list[QueryLogRow] = []
+    fake_llm = _ScriptedClient([_llm_json("ok", [])])
+    deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "q"})
+
+    assert resp.status_code == 200
+    assert logged[0].cost_usd == 0.0
+
+
+def test_cost_usd_computed_from_prices(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With both prices set, `cost_usd` is
+    `tokens_prompt/1000 * prompt_price + tokens_completion/1000 * completion_price`
+    — the `_llm_json` fake above always reports 10 prompt / 5 completion tokens
+    (see `_llm_json`), so the expected value is computed the same way here."""
+    monkeypatch.setenv("LLM_PRICE_PER_1K_PROMPT", "2.0")
+    monkeypatch.setenv("LLM_PRICE_PER_1K_COMPLETION", "4.0")
+    logged: list[QueryLogRow] = []
+    fake_llm = _ScriptedClient([_llm_json("ok", [])])
+    deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "q"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    expected = (body["tokens"]["prompt"] / 1000) * 2.0 + (body["tokens"]["completion"] / 1000) * 4.0
+    assert logged[0].cost_usd == pytest.approx(expected)
+    assert logged[0].cost_usd > 0.0
+
+
 # ── /v1/roadmap ──────────────────────────────────────────────────────────
 
 

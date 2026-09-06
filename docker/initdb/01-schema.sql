@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS query_log (
     model               text NOT NULL DEFAULT '',
     tokens_prompt       int  NOT NULL DEFAULT 0,
     tokens_completion   int  NOT NULL DEFAULT 0,
+    -- USD cost estimate: tokens * LLM_PRICE_PER_1K_* (apps/api/main.py). 0 on
+    -- a local/Ollama run where no price is configured (specs/monitoring.md).
+    cost_usd            double precision NOT NULL DEFAULT 0,
     -- Privacy default: only a 16-char sha256 prefix of the query is stored.
     -- Plaintext is opt-in and NULL unless the caller explicitly asked for it.
     query_sha256_prefix text NOT NULL,

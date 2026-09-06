@@ -111,22 +111,39 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
         )
     )
 
-    # 6. token_or_cost_estimate
-    tokens = conn.execute(
-        "SELECT COALESCE(SUM(tokens_prompt + tokens_completion), 0) FROM query_log"
-    ).fetchone()
-    charts.append(
-        ObservatoryChart(
-            id="token_or_cost_estimate",
-            title="Token estimate",
-            points=[
-                ObservatoryPoint(
-                    bucket="total_tokens",
-                    value=float(tokens[0] if tokens else 0),
-                )
-            ],
+    # 6. token_or_cost_estimate — cost when any row has been priced
+    # (query_log.cost_usd > 0, C1/specs/monitoring.md), else the token sum
+    # that shipped before pricing existed. A local/Ollama run never sets
+    # LLM_PRICE_PER_1K_*, so cost_usd is 0 on every row and this falls back
+    # to the original token chart rather than showing a fake $0 total.
+    total_cost = conn.execute("SELECT COALESCE(SUM(cost_usd), 0) FROM query_log").fetchone()
+    priced = float(total_cost[0] if total_cost else 0) > 0
+    if priced:
+        charts.append(
+            ObservatoryChart(
+                id="token_or_cost_estimate",
+                title="Cost estimate (USD)",
+                points=[
+                    ObservatoryPoint(bucket="total_cost_usd", value=float(total_cost[0])),
+                ],
+            )
         )
-    )
+    else:
+        tokens = conn.execute(
+            "SELECT COALESCE(SUM(tokens_prompt + tokens_completion), 0) FROM query_log"
+        ).fetchone()
+        charts.append(
+            ObservatoryChart(
+                id="token_or_cost_estimate",
+                title="Token estimate",
+                points=[
+                    ObservatoryPoint(
+                        bucket="total_tokens",
+                        value=float(tokens[0] if tokens else 0),
+                    )
+                ],
+            )
+        )
 
     return ObservatoryResponse(
         generated_at=datetime.now(UTC),

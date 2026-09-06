@@ -274,11 +274,20 @@ CREATE TABLE index_state (
 INSERT INTO index_state (singleton, index_revision, updated_at) VALUES (1, '', '');
 """
 
+# C1 (specs/monitoring.md): USD cost estimate alongside the token counts
+# already on query_log. Computed server-side from LLM_PRICE_PER_1K_* env vars
+# at request time (apps/api/main.py); defaults to 0 so a local/Ollama run
+# (no configured price) never shows a fake cost.
+_SQL_V5 = """
+ALTER TABLE query_log ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0;
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
     (3, _SQL_V3),
     (4, _SQL_V4),
+    (5, _SQL_V5),
 )
 
 

@@ -107,6 +107,33 @@ def _query_sha256_prefix(query: str) -> str:
     return hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
 
 
+def _price_per_1k(env_var: str) -> float:
+    """A `LLM_PRICE_PER_1K_*` env var as a float, defaulting to 0.0.
+
+    0 is the correct default, not a placeholder: a local Ollama run has no
+    per-token price, and query_log.cost_usd (specs/monitoring.md) must read
+    as "unpriced", not as a fabricated cost. Same read-env-at-call-time
+    pattern as `_dsn()` above — no settings object, matching every other
+    `LLM_*` var in this module and in `homelib_rag.answer`.
+    """
+    raw = os.environ.get(env_var, "").strip()
+    if not raw:
+        return 0.0
+    return float(raw)
+
+
+def _compute_cost_usd(tokens_prompt: int, tokens_completion: int) -> float:
+    """USD estimate for one `/v1/ask` call from `LLM_PRICE_PER_1K_*` env vars.
+
+    Both default to 0 (see `_price_per_1k`), so this is 0.0 for every caller
+    that has not configured a price — the common case, since the compose
+    default is a local Ollama model with no per-token cost.
+    """
+    prompt_price = _price_per_1k("LLM_PRICE_PER_1K_PROMPT")
+    completion_price = _price_per_1k("LLM_PRICE_PER_1K_COMPLETION")
+    return (tokens_prompt / 1000) * prompt_price + (tokens_completion / 1000) * completion_price
+
+
 def _infer_provider(base_url: str) -> str:
     """Best-effort human-readable provider name for `/health`, from the
     configured `LLM_BASE_URL` — never the key, never anything secret."""
@@ -134,6 +161,7 @@ class QueryLogRow(BaseModel):
     tokens_completion: int
     query_sha256_prefix: str
     degraded: bool
+    cost_usd: float = 0.0
 
 
 # ── Dependency bundle ────────────────────────────────────────────────────────
@@ -278,8 +306,9 @@ def _default_log_query(row: QueryLogRow) -> None:
                 """
                 INSERT INTO query_log
                     (request_id, latency_ms, arm, k, rerank, rewrite, model,
-                     tokens_prompt, tokens_completion, query_sha256_prefix, degraded)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     tokens_prompt, tokens_completion, query_sha256_prefix, degraded,
+                     cost_usd)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (request_id) DO NOTHING
                 """,
                 (
@@ -294,6 +323,7 @@ def _default_log_query(row: QueryLogRow) -> None:
                     row.tokens_completion,
                     row.query_sha256_prefix,
                     row.degraded,
+                    row.cost_usd,
                 ),
             )
     except Exception:
@@ -592,6 +622,7 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
             tokens_completion=result.tokens.completion,
             query_sha256_prefix=_query_sha256_prefix(req.query),
             degraded=result.degraded,
+            cost_usd=_compute_cost_usd(result.tokens.prompt, result.tokens.completion),
         )
     )
     return result
