@@ -23,22 +23,29 @@ from apps.ui.api_client import (
 from apps.ui.rotunda import build_rotunda_html, door_from_query
 from apps.ui.view_model import (
     CROSSROADS_DOORS,
+    DEFAULT_OFFICIAL_LANGUAGE,
+    DEFAULT_PROJECTION_SOURCE,
     LEVELS,
     apply_streamlit_secrets_to_environ,
     block_id_for_citation,
     build_homelib_client,
+    clean_read_url,
     ensure_demo_session,
     format_api_error_message,
     format_citation_label,
     format_degraded_banner,
     has_voted,
     library_summary,
+    load_official_preview_books,
     normalize_door,
     normalize_level,
+    normalize_official_language,
+    normalize_projection_source,
     observatory_chart_titles,
     parse_interests,
     persist_demo_session,
     playlist_visible_items,
+    projection_wants_chrome_hidden,
     record_vote,
     resolve_prerequisite_titles,
     steps_in_order,
@@ -255,9 +262,87 @@ def render_observatory_tab(client: Client) -> None:
 
 
 def render_projection_tab(client: Client) -> None:
-    """WP09 one-page projection mode — large type, chrome-light reader stage."""
-    st.header("Projection")
+    """WP09 projection: This shelf pages or Official Pottermore preview (demo default)."""
+    if "projection_source" not in st.session_state:
+        st.session_state["projection_source"] = DEFAULT_PROJECTION_SOURCE
+    if "official_language" not in st.session_state:
+        st.session_state["official_language"] = DEFAULT_OFFICIAL_LANGUAGE
+
+    source = normalize_projection_source(str(st.session_state.get("projection_source", "")))
+    st.session_state["projection_source"] = source
+
+    source_label = st.radio(
+        "Projector source",
+        options=("official", "shelf"),
+        format_func=lambda v: "Official preview" if v == "official" else "This shelf",
+        index=0 if source == "official" else 1,
+        horizontal=True,
+        key="projection_source_radio",
+    )
+    st.session_state["projection_source"] = normalize_projection_source(source_label)
+    source = st.session_state["projection_source"]
+
     projector = st.toggle("Enter projector mode", key="projector_mode")
+    if projection_wants_chrome_hidden(
+        projector_mode=projector,
+        query_projection=st.query_params.get("projection"),
+    ):
+        st.markdown(
+            "<style>"
+            "header[data-testid='stHeader']{display:none!important}"
+            "[data-testid='stToolbar']{display:none!important}"
+            "#MainMenu{visibility:hidden}"
+            "footer{visibility:hidden}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
+
+    if source == "official":
+        _render_official_preview(projector)
+        return
+    _render_shelf_projection(client, projector)
+
+
+def _render_official_preview(projector: bool) -> None:
+    st.caption("Preview on Pottermore Publishing — not on this shelf. Metadata only.")
+    lang = st.selectbox(
+        "Language",
+        options=("uk", "en"),
+        format_func=lambda v: "Ukrainian" if v == "uk" else "English",
+        index=0 if st.session_state.get("official_language") == "uk" else 1,
+        key="official_lang_select",
+    )
+    st.session_state["official_language"] = normalize_official_language(lang)
+    books = load_official_preview_books(st.session_state["official_language"])
+    if not books:
+        st.info("No official previews in English yet. Switch to Ukrainian for Pottermore HP.")
+        return
+    book = st.selectbox(
+        "Book",
+        options=books,
+        format_func=lambda b: b.title,
+        key="official_book",
+    )
+    st.link_button("Open lawful source (Safari Listen to Page)", book.reader_url)
+    font = "1.4rem" if projector else "1.05rem"
+    # iframe the official PDF; if framing is blocked the browser shows empty —
+    # Open lawful source is the reliable path.
+    st.markdown(
+        f"<div style='aspect-ratio:16/9;width:100%;border:1px solid #cab995;"
+        f"border-radius:12px;overflow:hidden;background:#fffaf0'>"
+        f"<iframe title='{book.title}' src='{book.pdf_url}' "
+        f"style='width:100%;height:100%;border:0;font-size:{font}'></iframe>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "AirPlay mirrors video to the projector. For Ukrainian speech use Safari "
+        "Listen to Page on the official reader link (iframe text is often skipped)."
+    )
+
+
+def _render_shelf_projection(client: Client, projector: bool) -> None:
+    st.header("Projection" if not projector else "")
     try:
         books = client.list_books()
     except (ApiClientError, ApiUnavailableError) as exc:
@@ -266,27 +351,66 @@ def render_projection_tab(client: Client) -> None:
     if not books:
         st.write("No books on the shelf.")
         return
+    # Never mix Pottermore titles into the shelf picker.
     book = st.selectbox(
         "Book",
         options=books,
         format_func=lambda b: b.title,
         key="proj_book",
     )
-    offset = st.number_input("Character offset", min_value=0, value=0, key="proj_offset")
+    ordinal = int(st.session_state.get("proj_ordinal", 0))
+    cols = st.columns([1, 1, 2])
+    with cols[0]:
+        if st.button("Previous", key="proj_prev", use_container_width=True) and ordinal > 0:
+            ordinal -= 1
+    with cols[1]:
+        if st.button("Next", key="proj_next", use_container_width=True):
+            ordinal += 1
+    st.session_state["proj_ordinal"] = ordinal
+
+    try:
+        block = client.get_book_block(book.book_id, ordinal=ordinal)
+    except (ApiClientError, ApiUnavailableError) as exc:
+        if ordinal > 0:
+            st.session_state["proj_ordinal"] = max(0, ordinal - 1)
+            st.warning("End of book — stepped back one page.")
+            try:
+                block = client.get_book_block(
+                    book.book_id, ordinal=st.session_state["proj_ordinal"]
+                )
+            except (ApiClientError, ApiUnavailableError) as exc2:
+                st.error(format_api_error_message(exc2))
+                return
+        else:
+            st.error(format_api_error_message(exc))
+            return
+
     if st.button("Save progress", key="proj_save"):
         try:
-            client.save_progress(book.book_id, char_offset=int(offset))
+            client.save_progress(
+                book.book_id, char_offset=block.char_start, block_id=block.block_id
+            )
             st.success("Progress saved.")
         except (ApiClientError, ApiUnavailableError) as exc:
             st.error(format_api_error_message(exc))
-    font = "2.2rem" if projector else "1.1rem"
+
+    font = "2.2rem" if projector else "1.15rem"
+    section = " / ".join(block.section_path) if block.section_path else ""
     st.markdown(
-        f"<div style='font-size:{font}; line-height:1.6; max-width:48rem;'>"
-        f"<p><strong>{book.title}</strong></p>"
-        f"<p>Projection stage (16:9). Open a citation from Ask or Scene search "
-        f"to fill this page. Offset {int(offset)}.</p>"
+        f"<div style='font-size:{font};line-height:1.65;max-width:48rem;"
+        f"aspect-ratio:16/9;padding:1.5rem;background:#fffaf0;border:1px solid #cab995;"
+        f"border-radius:12px;overflow:auto'>"
+        f"<p><strong>{book.title}</strong>"
+        f"{(' — ' + section) if section else ''}</p>"
+        f"<p>{block.text}</p>"
+        f"<p style='font-size:0.85rem;color:#756758'>Page {block.ordinal + 1}</p>"
         f"</div>",
         unsafe_allow_html=True,
+    )
+    read_hint = clean_read_url(book.book_id, ordinal=block.ordinal)
+    st.caption(
+        f"Speak Screen works on this stage. For Safari Listen to Page open the clean "
+        f"article at the same host{read_hint} (UI container port 8502)."
     )
 
 
@@ -343,8 +467,7 @@ DOOR_RENDERERS: dict[str, Callable[[Client], None]] = {
 
 
 def main() -> None:
-    st.set_page_config(page_title="HomeLib — Library Crossroads", page_icon="📚", layout="wide")
-    st.title("HomeLib")
+    st.set_page_config(page_title="MagicLib — HomeLib", page_icon="📚", layout="wide")
     # Community Cloud puts LLM_*/APP_MODE in st.secrets, not os.environ.
     with contextlib.suppress(Exception):
         apply_streamlit_secrets_to_environ(dict(st.secrets))
@@ -367,31 +490,58 @@ def main() -> None:
             st.query_params.to_dict(), st.session_state["door"], CROSSROADS_DOORS
         )
         del st.query_params["door"]
-
-    st.caption(
-        f"Library Crossroads — {len(CROSSROADS_DOORS)} doors into a private academic library. "
-        "Ask across the shelf, follow a Roadmap, walk a Coffee Table path, or project a chapter."
-    )
-    # The rotating room (specs/rotunda.md), rendered inline: Streamlit's
-    # iframe sandbox blocks parent navigation, so the fragment shares this
-    # page and Enter is a plain `?door=` link. The button grid beneath stays
-    # the accessible path. The slot is reserved above the grid but filled
-    # after it, so a grid click and the room agree within the same run.
-    rotunda_slot = st.empty()
-    cols = st.columns(len(CROSSROADS_DOORS))
-    for col, door in zip(cols, CROSSROADS_DOORS, strict=True):
-        if col.button(door, key=f"door_{door}"):
-            st.session_state["door"] = normalize_door(door)
-    # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
-    # and DOOR_COPY only — never from user input.
-    rotunda_slot.html(
-        build_rotunda_html(CROSSROADS_DOORS, normalize_door(st.session_state["door"])),
-        unsafe_allow_javascript=True,
-    )
+    if "source" in st.query_params:
+        st.session_state["projection_source"] = normalize_projection_source(
+            st.query_params.get("source")
+        )
+        del st.query_params["source"]
+    if st.query_params.get("projection") in {"1", "true", "yes"}:
+        st.session_state["door"] = "Projection"
+        st.session_state["projector_mode"] = True
 
     door = normalize_door(st.session_state["door"])
-    st.caption(f"Open door: {door}")
-    st.divider()
+    projector_active = bool(st.session_state.get("projector_mode")) and door == "Projection"
+    hide_nav = projection_wants_chrome_hidden(
+        projector_mode=projector_active,
+        query_projection=st.query_params.get("projection"),
+    )
+
+    if not hide_nav:
+        st.title("MagicLib")
+        st.caption(
+            "HomeLib — a private academic shelf you can ask, with citations that open the page. "
+            f"{len(CROSSROADS_DOORS)} Crossroads doors."
+        )
+        # The rotating room (specs/rotunda.md), rendered inline: Streamlit's
+        # iframe sandbox blocks parent navigation, so the fragment shares this
+        # page and Enter is a plain `?door=` link. The button grid beneath stays
+        # the accessible path. The slot is reserved above the grid but filled
+        # after it, so a grid click and the room agree within the same run.
+        rotunda_slot = st.empty()
+        cols = st.columns(len(CROSSROADS_DOORS))
+        for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
+            if col.button(door_label, key=f"door_{door_label}"):
+                st.session_state["door"] = normalize_door(door_label)
+        # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
+        # and DOOR_COPY only — never from user input.
+        rotunda_slot.html(
+            build_rotunda_html(CROSSROADS_DOORS, normalize_door(st.session_state["door"])),
+            unsafe_allow_javascript=True,
+        )
+        door = normalize_door(st.session_state["door"])
+        st.caption(f"Open door: {door}")
+        st.divider()
+    else:
+        st.markdown(
+            "<style>"
+            "header[data-testid='stHeader']{display:none!important}"
+            "[data-testid='stToolbar']{display:none!important}"
+            "#MainMenu{visibility:hidden}"
+            "footer{visibility:hidden}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
+
     try:
         DOOR_RENDERERS[door](client)
     finally:

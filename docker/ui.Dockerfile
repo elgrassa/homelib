@@ -38,9 +38,10 @@ COPY apps/ apps/
 COPY .streamlit/ .streamlit/
 RUN uv sync --frozen --no-dev
 
-EXPOSE 8501
+EXPOSE 8501 8502
+COPY docker/ui-entrypoint.sh /ui-entrypoint.sh
+RUN chmod +x /ui-entrypoint.sh
 HEALTHCHECK --interval=10s --timeout=5s --retries=10 \
     CMD curl -fs http://localhost:8501/_stcore/health || exit 1
 
-CMD ["streamlit", "run", "apps/ui/app.py", \
-     "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+CMD ["/ui-entrypoint.sh"]

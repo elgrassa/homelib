@@ -195,6 +195,27 @@ def search_catalog(query: str, subjects: list[str] | None = None) -> list[Catalo
     ]
 
 
+def _block_from_pg_row(row: Any) -> Block:
+    bid, book_id, ordinal, section_path, text, char_start, char_end = row[:7]
+    fmt, page, spine_index, anchor = row[7:]
+    return Block(
+        block_id=bid,
+        book_id=book_id,
+        ordinal=ordinal,
+        section_path=list(section_path),
+        text=text,
+        char_start=char_start,
+        char_end=char_end,
+        provenance=Provenance(
+            format=fmt,
+            page=page,
+            spine_index=spine_index,
+            anchor=anchor,
+            source_sha256="",
+        ),
+    )
+
+
 def get_block(block_id: str) -> Block:
     """Fetch one `Block` by id. Raises `KeyError` if `block_id` is unknown —
     `apps/api`'s `GET /v1/blocks/{block_id}` maps that to a 404.
@@ -218,24 +239,25 @@ def get_block(block_id: str) -> Block:
         row = cur.fetchone()
     if row is None:
         raise KeyError(f"block not found: {block_id!r}")
-    bid, book_id, ordinal, section_path, text, char_start, char_end = row[:7]
-    fmt, page, spine_index, anchor = row[7:]
-    return Block(
-        block_id=bid,
-        book_id=book_id,
-        ordinal=ordinal,
-        section_path=list(section_path),
-        text=text,
-        char_start=char_start,
-        char_end=char_end,
-        provenance=Provenance(
-            format=fmt,
-            page=page,
-            spine_index=spine_index,
-            anchor=anchor,
-            source_sha256="",
-        ),
-    )
+    return _block_from_pg_row(row)
+
+
+def get_book_block(book_id: str, ordinal: int) -> Block:
+    """One block of ``book_id`` at dense ``ordinal``. Raises ``KeyError`` if missing."""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT block_id, book_id, ordinal, section_path, text, char_start, char_end,
+                   format, page, spine_index, anchor
+            FROM blocks
+            WHERE book_id = %s AND ordinal = %s
+            """,
+            (book_id, ordinal),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise KeyError(f"block not found: {book_id!r}@{ordinal}")
+    return _block_from_pg_row(row)
 
 
 def build_roadmap(interests: list[str], level: Level, goal: str) -> RoadmapResponse:

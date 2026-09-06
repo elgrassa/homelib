@@ -13,3 +13,7 @@ font = "serif"
 # ModuleNotFoundError traceback per module on every page run.
 [server]
 fileWatcherType = "none"
+
+# Projection / AirPlay: keep chrome light so Speak Screen reads the book.
+[client]
+toolbarMode = "minimal"

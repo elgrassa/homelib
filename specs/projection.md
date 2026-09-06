@@ -18,6 +18,8 @@ class ProjectionLayout(StrEnum):
 
 # UI flags, not API this week unless a query param is needed:
 # ?projection=1 hides Streamlit chrome / ordinary nav
+# ?source=official|shelf — Projector submenu (default official for demo)
+# Official preview language default: uk (Pottermore Ukrainian HP)
 ```
 
 Anchors (`open_anchor` / `block_id` + offsets) must survive font-size and

@@ -1,0 +1,58 @@
+{
+  "_provenance": "Pottermore Publishing Ukrainian ebooks — metadata-only official preview URLs. Not ingested; not on the HomeLib shelf. https://www.pottermorepublishing.com/ukrainian-ebooks/ retrieved 2026-09-06.",
+  "language": "uk",
+  "rights_status": "metadata_only",
+  "can_index_text": false,
+  "host_allowlist": ["www.pottermorepublishing.com"],
+  "books": [
+    {
+      "id": "hp-uk-1",
+      "title": "Гаррі Поттер і філософський камінь",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book1/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391725_HP1_Ukrainian_v5.pdf"
+    },
+    {
+      "id": "hp-uk-2",
+      "title": "Гаррі Поттер і таємна кімната",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book2/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391381_HP2_Ukrainian_v2.pdf"
+    },
+    {
+      "id": "hp-uk-3",
+      "title": "Гаррі Поттер і в’язень Азкабану",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book3/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391848_HP3_Ukrainian_v2.pdf"
+    },
+    {
+      "id": "hp-uk-4",
+      "title": "Гаррі Поттер і Келих вогню",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book4/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391800_HP4_Ukrainian_v2.pdf"
+    },
+    {
+      "id": "hp-uk-5",
+      "title": "Гаррі Поттер і орден фенікса",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book5/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391817_HP5_Ukrainian_v3.pdf"
+    },
+    {
+      "id": "hp-uk-6",
+      "title": "Гаррі Поттер і Напівкровний Принц",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book6/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391824_HP6_Ukrainian_v2.pdf"
+    },
+    {
+      "id": "hp-uk-7",
+      "title": "Гаррі Поттер і смертельні реліквії",
+      "authors": ["Дж. К. Ролінг"],
+      "reader_url": "https://www.pottermorepublishing.com/ukrainian-ebooks/book7/",
+      "pdf_url": "https://www.pottermorepublishing.com/wp-content/uploads/9781789391831_HP7_Ukrainian_v3.pdf"
+    }
+  ]
+}

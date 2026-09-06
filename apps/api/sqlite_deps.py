@@ -19,6 +19,7 @@ __all__ = [
     "sqlite_counts",
     "sqlite_db_reachable",
     "sqlite_get_block",
+    "sqlite_get_book_block",
     "sqlite_list_books",
     "sqlite_log_query",
     "sqlite_path",
@@ -93,21 +94,11 @@ def sqlite_list_books() -> list[BookSummary]:
     return out
 
 
-def sqlite_get_block(block_id: str) -> Block:
-    with open_store() as conn:
-        row = conn.execute(
-            "SELECT block_id, book_id, ordinal, section_path, text, char_start, char_end, "
-            "format, page, spine_index, anchor FROM blocks WHERE block_id = ?",
-            (block_id,),
-        ).fetchone()
-    if row is None:
-        raise LookupError(block_id)
+def _block_from_row(row: Any) -> Block:
     section = json.loads(str(row[3]))
-
     fmt_raw = str(row[7] or "txt")
     allowed: set[str] = {"epub", "pdf", "txt", "md", "djvu"}
     fmt = fmt_raw if fmt_raw in allowed else "txt"
-
     return Block(
         block_id=str(row[0]),
         book_id=str(row[1]),
@@ -124,6 +115,32 @@ def sqlite_get_block(block_id: str) -> Block:
             source_sha256="",
         ),
     )
+
+
+def sqlite_get_block(block_id: str) -> Block:
+    with open_store() as conn:
+        row = conn.execute(
+            "SELECT block_id, book_id, ordinal, section_path, text, char_start, char_end, "
+            "format, page, spine_index, anchor FROM blocks WHERE block_id = ?",
+            (block_id,),
+        ).fetchone()
+    if row is None:
+        raise LookupError(block_id)
+    return _block_from_row(row)
+
+
+def sqlite_get_book_block(book_id: str, ordinal: int) -> Block:
+    """One page of a book by dense ordinal (Projection Prev/Next)."""
+    with open_store() as conn:
+        row = conn.execute(
+            "SELECT block_id, book_id, ordinal, section_path, text, char_start, char_end, "
+            "format, page, spine_index, anchor FROM blocks "
+            "WHERE book_id = ? AND ordinal = ?",
+            (book_id, ordinal),
+        ).fetchone()
+    if row is None:
+        raise LookupError(f"{book_id}@{ordinal}")
+    return _block_from_row(row)
 
 
 def sqlite_log_query(row: Any) -> None:

@@ -139,7 +139,13 @@ services:
       # `streamlit run` only (InProcessClient); do not inherit .env demo here.
       API_URL: http://api:8000
       APP_MODE: selfhosted
-    ports: ["127.0.0.1:${UI_PORT:-8501}:8501"]
+      # Clean /read HTML for iPad Safari Listen to Page (same container).
+      READ_API_URL: http://api:8000
+    # LAN opt-in: MiniPS sets HOMELIB_UI_BIND=0.0.0.0 in .env (Forgejo-style
+    # http://minips.local:8501). Default stays loopback for reviewer compose.
+    ports:
+      - "${HOMELIB_UI_BIND:-127.0.0.1}:${UI_PORT:-8501}:8501"
+      - "${HOMELIB_UI_BIND:-127.0.0.1}:${READ_PORT:-8502}:8502"
     depends_on:
       api: {condition: service_healthy}
     healthcheck:

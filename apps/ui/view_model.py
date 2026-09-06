@@ -14,9 +14,11 @@ guarantee a comment cannot give.
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from apps.runtime_settings import AppMode, read_app_mode
@@ -275,3 +277,85 @@ def observatory_chart_titles(payload: dict[str, Any]) -> list[str]:
     """Titles for Observatory charts, in API order."""
     charts = payload.get("charts") or []
     return [str(chart.get("title") or chart.get("id") or "") for chart in charts]
+
+
+# Projection — This shelf vs Official preview (not a Crossroads door).
+ProjectionSource = Literal["shelf", "official"]
+ProjectionLanguage = Literal["en", "uk"]
+# Demo default: Official preview + Ukrainian Pottermore HP (publisher-hosted).
+DEFAULT_PROJECTION_SOURCE: ProjectionSource = "official"
+DEFAULT_OFFICIAL_LANGUAGE: ProjectionLanguage = "uk"
+POTTERMORE_HOST = "www.pottermorepublishing.com"
+_POTTERMORE_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
+
+
+def normalize_projection_source(value: str | None) -> ProjectionSource:
+    """Unknown / missing → shelf (fail-closed), except empty uses the demo default."""
+    if value is None or value == "":
+        return DEFAULT_PROJECTION_SOURCE
+    if value == "official":
+        return "official"
+    if value == "shelf":
+        return "shelf"
+    return "shelf"
+
+
+def normalize_official_language(value: str | None) -> ProjectionLanguage:
+    """Official-preview language; unknown → Ukrainian (demo default)."""
+    if value == "en":
+        return "en"
+    return "uk"
+
+
+@dataclass(frozen=True)
+class OfficialPreviewBook:
+    id: str
+    title: str
+    authors: tuple[str, ...]
+    reader_url: str
+    pdf_url: str
+
+
+def load_official_preview_books(
+    language: ProjectionLanguage,
+    *,
+    fixture_path: Path | None = None,
+) -> list[OfficialPreviewBook]:
+    """Metadata-only publisher previews. English has none yet; Ukrainian = Pottermore HP."""
+    if language != "uk":
+        return []
+    path = fixture_path if fixture_path is not None else _POTTERMORE_FIXTURE
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    books: list[OfficialPreviewBook] = []
+    for entry in raw.get("books") or []:
+        reader = str(entry["reader_url"])
+        pdf = str(entry["pdf_url"])
+        if POTTERMORE_HOST not in reader or POTTERMORE_HOST not in pdf:
+            raise ValueError(f"official preview URL host must be {POTTERMORE_HOST}")
+        authors = entry.get("authors") or []
+        books.append(
+            OfficialPreviewBook(
+                id=str(entry["id"]),
+                title=str(entry["title"]),
+                authors=tuple(str(a) for a in authors),
+                reader_url=reader,
+                pdf_url=pdf,
+            )
+        )
+    return books
+
+
+def projection_wants_chrome_hidden(
+    *,
+    projector_mode: bool,
+    query_projection: str | None,
+) -> bool:
+    """Explicit projector only — never infer from viewport (AirPlay reports iPad size)."""
+    if projector_mode:
+        return True
+    return query_projection in {"1", "true", "yes"}
+
+
+def clean_read_url(book_id: str, *, ordinal: int = 0, read_port: int = 8502) -> str:
+    """Relative hint for the clean article page (LAN host is the Streamlit host)."""
+    return f":{read_port}/read/{book_id}?ordinal={int(ordinal)}"

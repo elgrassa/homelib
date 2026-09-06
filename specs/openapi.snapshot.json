@@ -15,6 +15,9 @@
     "/v1/books": [
       "get"
     ],
+    "/v1/books/{book_id}/blocks": [
+      "get"
+    ],
     "/v1/demo/session": [
       "post"
     ],

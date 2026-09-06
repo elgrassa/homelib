@@ -33,6 +33,7 @@ These paths are what `test_openapi_snapshot_matches` pins today.
 | `POST /v1/ingest` | `IngestRequest {path: str} \| {source: "snapshot"}` | `IngestResponse {book_id, blocks: int, chunks: int, extraction: ExtractionResult}` |
 | `POST /v1/feedback` | `FeedbackRequest {request_id: str, feedback: "up"\|"down", comment: str\|None}` | `{ok: true}` |
 | `GET /v1/books` | — | `list[BookSummary {book_id, title, authors, blocks, chunks, format}]` |
+| `GET /v1/books/{book_id}/blocks` | `ordinal: int = 0` | `Block` (Projection page by dense ordinal) |
 | `GET /v1/blocks/{block_id}` | — | `Block` |
 
 Supporting shapes:
@@ -220,6 +221,11 @@ k: int = 5
 
 Response `SceneSearchResponse`: `{request_id, resource_id, hits: list[SceneHit],
 mode_used, degraded, latency_ms}`.
+
+### `GET /v1/books/{book_id}/blocks`
+
+Query `ordinal` (default `0`, must be ≥ 0). Returns the `Block` at that dense
+ordinal for Projection Prev/Next. Unknown book/ordinal → **404**.
 
 ### `GET /v1/blocks/{id}`
 

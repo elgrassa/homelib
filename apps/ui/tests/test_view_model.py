@@ -167,6 +167,8 @@ def test_crossroads_doors_cover_thin_e2e_journey() -> None:
     app_src = (Path(__file__).resolve().parent.parent / "app.py").read_text()
     assert "render_projection_tab" in app_src
     assert "Enter projector mode" in app_src
+    assert "Official preview" in app_src
+    assert "MagicLib" in app_src
 
 
 def test_every_door_has_a_renderer_and_vice_versa() -> None:

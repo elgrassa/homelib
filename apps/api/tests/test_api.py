@@ -66,6 +66,10 @@ def _missing_block(block_id: str) -> Block:
     raise KeyError(block_id)
 
 
+def _missing_book_block(book_id: str, ordinal: int) -> Block:
+    raise KeyError(f"{book_id}@{ordinal}")
+
+
 def _unimplemented_ingest(req: Any) -> IngestResponse:
     raise NotImplementedError("test did not configure deps.ingest")
 
@@ -82,6 +86,7 @@ def _base_deps() -> Deps:
         catalog_search=lambda query, subjects=None: [],
         list_books=lambda: [],
         get_block=_missing_block,
+        get_book_block=_missing_book_block,
         log_query=lambda row: None,
         record_feedback=lambda request_id, feedback, comment: True,
         ingest=_unimplemented_ingest,
@@ -509,6 +514,38 @@ def test_get_block_endpoint_found() -> None:
     assert resp.status_code == 200
     assert resp.json()["block_id"] == "b1"
     assert resp.json()["book_id"] == "bk1"
+
+
+def test_books_block_by_ordinal_returns_page() -> None:
+    block = Block(
+        block_id="b1",
+        book_id="walden",
+        ordinal=2,
+        section_path=["Ch"],
+        text="page two",
+        char_start=10,
+        char_end=18,
+        provenance=Provenance(format="txt", source_sha256=""),
+    )
+    deps = _make_deps(get_book_block=lambda book_id, ordinal: block)
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.get("/v1/books/walden/blocks", params={"ordinal": 2})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["book_id"] == "walden"
+    assert body["ordinal"] == 2
+    assert body["text"] == "page two"
+
+
+def test_books_block_by_ordinal_not_found() -> None:
+    deps = _make_deps(get_book_block=_missing_book_block)
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.get("/v1/books/missing/blocks", params={"ordinal": 0})
+
+    assert resp.status_code == 404
 
 
 # ── Deps production wiring sanity ───────────────────────────────────────────

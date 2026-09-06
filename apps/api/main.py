@@ -159,6 +159,7 @@ class Deps:
     catalog_search: Callable[[str, list[str] | None], list[CatalogEntry]]
     list_books: Callable[[], list[BookSummary]]
     get_block: Callable[[str], Block]
+    get_book_block: Callable[[str, int], Block]
     log_query: Callable[[QueryLogRow], None]
     record_feedback: Callable[[str, str, str | None], bool]
     ingest: Callable[[IngestRequest], IngestResponse]
@@ -493,6 +494,14 @@ def _build_default_deps() -> Deps:
                 raise KeyError(block_id) from exc
         return agent_module.get_block(block_id)
 
+    def _get_book_block(book_id: str, ordinal: int) -> Block:
+        if use_sqlite:
+            try:
+                return sqlite_deps.sqlite_get_book_block(book_id, ordinal)
+            except LookupError as exc:
+                raise KeyError(f"{book_id}@{ordinal}") from exc
+        return agent_module.get_book_block(book_id, ordinal)
+
     return Deps(
         llm_client=client,
         llm_provider=_infer_provider(client.base_url),
@@ -504,6 +513,7 @@ def _build_default_deps() -> Deps:
         catalog_search=agent_module.search_catalog,
         list_books=sqlite_deps.sqlite_list_books if use_sqlite else _default_list_books,
         get_block=_get_block,
+        get_book_block=_get_book_block,
         log_query=sqlite_deps.sqlite_log_query if use_sqlite else _default_log_query,
         record_feedback=(
             sqlite_deps.sqlite_record_feedback if use_sqlite else _default_record_feedback
@@ -633,6 +643,21 @@ def get_books(deps: Deps = Depends(get_deps)) -> list[BookSummary]:
 def get_block_endpoint(block_id: str, deps: Deps = Depends(get_deps)) -> Block:
     try:
         return deps.get_block(block_id)
+    except (KeyError, LookupError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/v1/books/{book_id}/blocks", response_model=Block)
+def get_book_block_endpoint(
+    book_id: str,
+    ordinal: int = 0,
+    deps: Deps = Depends(get_deps),
+) -> Block:
+    """Projection page: one block of ``book_id`` at dense ``ordinal`` (default 0)."""
+    if ordinal < 0:
+        raise HTTPException(status_code=422, detail="ordinal must be >= 0")
+    try:
+        return deps.get_book_block(book_id, ordinal)
     except (KeyError, LookupError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

@@ -254,6 +254,10 @@ class ApiClient:
         data = self._request("GET", f"/v1/blocks/{block_id}")
         return Block.model_validate(data)
 
+    def get_book_block(self, book_id: str, *, ordinal: int = 0) -> Block:
+        data = self._request("GET", f"/v1/books/{book_id}/blocks?ordinal={int(ordinal)}")
+        return Block.model_validate(data)
+
     def submit_feedback(
         self,
         request_id: str,
@@ -458,6 +462,9 @@ class InProcessClient:
 
     def get_block(self, block_id: str) -> Block:
         return self._require_delegate().get_block(block_id)
+
+    def get_book_block(self, book_id: str, *, ordinal: int = 0) -> Block:
+        return self._require_delegate().get_book_block(book_id, ordinal=ordinal)
 
     def submit_feedback(
         self,

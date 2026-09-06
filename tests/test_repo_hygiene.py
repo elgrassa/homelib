@@ -287,6 +287,31 @@ def test_compose_api_wires_homelib_sqlite_path_for_v2_doors() -> None:
     )
 
 
+def test_compose_ui_bind_defaults_to_loopback() -> None:
+    """Reviewer compose must not silently publish Streamlit on the LAN.
+
+    MiniPS opts in with HOMELIB_UI_BIND=0.0.0.0 in .env; the committed default
+    stays 127.0.0.1. API / Ollama / Postgres / Grafana stay loopback-only.
+    """
+    text = (REPO_ROOT / "docker/docker-compose.yml").read_text()
+    assert "${HOMELIB_UI_BIND:-127.0.0.1}" in text
+    assert "${UI_PORT:-8501}:8501" in text
+    assert "${READ_PORT:-8502}:8502" in text
+    compose = yaml.safe_load(text)
+    for name in ("api", "postgres", "ollama", "grafana"):
+        ports = compose["services"][name]["ports"]
+        joined = " ".join(str(p) for p in ports)
+        assert "127.0.0.1" in joined, f"{name} must stay loopback-bound: {ports}"
+
+
+def test_streamlit_page_title_is_magiclib() -> None:
+    app_src = (REPO_ROOT / "apps/ui/app.py").read_text()
+    assert 'page_title="MagicLib — HomeLib"' in app_src
+    assert 'st.title("MagicLib")' in app_src
+    config = (REPO_ROOT / ".streamlit/config.toml").read_text()
+    assert 'toolbarMode = "minimal"' in config
+
+
 def test_ci_pytest_forces_workspace_basetemp() -> None:
     """Hostexecutor lane TMPDIR is shared and can vanish mid-job.
 

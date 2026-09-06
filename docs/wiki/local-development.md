@@ -83,9 +83,18 @@ Default ports (override in `.env`):
 
 | Service | URL |
 |---|---|
-| UI | http://localhost:8501 |
-| API | http://localhost:8000/docs |
+| UI (MagicLib) | http://localhost:8501 — on MiniPS set `HOMELIB_UI_BIND=0.0.0.0` and open **http://minips.local:8501** (same pattern as Forgejo `:3000`) |
+| Clean read HTML | http://localhost:8502/read/{book_id} — Safari Listen to Page |
+| API | http://localhost:8000/docs (stay loopback; UI reaches it on Docker network) |
 | Grafana | http://localhost:3001 |
+
+### iPad / AirPlay / Speak Screen
+
+1. MiniPS `.env`: `HOMELIB_UI_BIND=0.0.0.0`, recreate UI (`just up`).
+2. iPad Safari → `http://minips.local:8501` → MagicLib.
+3. **Projection** defaults to **Official preview** / Ukrainian (Pottermore HP) for the wall demo; switch to **This shelf** for seeded books.
+4. **Enter projector mode**, then Screen Mirroring to the projector.
+5. Speak Screen on the chrome-free stage; Listen to Page on `:8502/read/...` (shelf) or Pottermore `bookN/` (official).
 
 Quickstart also in [`README.md`](../../README.md).
 
