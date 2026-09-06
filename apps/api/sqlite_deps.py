@@ -151,8 +151,8 @@ def sqlite_log_query(row: Any) -> None:
                 "INSERT OR REPLACE INTO query_log ("
                 "request_id, ts, latency_ms, arm, k, rerank, rewrite, model, "
                 "tokens_prompt, tokens_completion, query_sha256_prefix, degraded, "
-                "cost_usd, trace_id, feedback"
-                ") VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+                "cost_usd, trace_id, cache_hit, feedback"
+                ") VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
                 (
                     row.request_id,
                     row.latency_ms,
@@ -167,6 +167,7 @@ def sqlite_log_query(row: Any) -> None:
                     1 if row.degraded else 0,
                     row.cost_usd,
                     row.trace_id,
+                    1 if row.cache_hit else 0,
                 ),
             )
             conn.commit()

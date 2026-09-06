@@ -318,6 +318,18 @@ CREATE TABLE spans (
 CREATE INDEX ix_spans_trace_id ON spans (trace_id);
 """
 
+# C4b (specs/monitoring.md "Demo answer cache"): read-through cache, demo
+# mode only — apps/api/main.py never reads this table in selfhosted mode.
+_SQL_V8 = """
+ALTER TABLE query_log ADD COLUMN cache_hit INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE answer_cache (
+    key TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    answer TEXT NOT NULL
+);
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
@@ -326,6 +338,7 @@ MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (5, _SQL_V5),
     (6, _SQL_V6),
     (7, _SQL_V7),
+    (8, _SQL_V8),
 )
 
 

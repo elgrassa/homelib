@@ -143,3 +143,30 @@ def test_observatory_time_per_stage_chart_empty_when_no_spans(tmp_path: Path) ->
 
     chart = next(c for c in response.charts if c.id == "time_per_stage")
     assert chart.points == []
+
+
+def _insert_query_log_with_cache_hit(conn: sqlite3.Connection, *, cache_hit: bool) -> None:
+    conn.execute(
+        "INSERT INTO query_log ("
+        "request_id, ts, latency_ms, arm, k, rerank, rewrite, model, "
+        "tokens_prompt, tokens_completion, query_sha256_prefix, degraded, cache_hit"
+        ") VALUES (?, datetime('now'), 100, 'hybrid', 5, 0, 0, 'm', 10, 5, ?, 0, ?)",
+        (str(uuid.uuid4()), "a" * 16, 1 if cache_hit else 0),
+    )
+    conn.commit()
+
+
+def test_observatory_cache_hits_vs_live_chart(tmp_path: Path) -> None:
+    """C4b: `cache_hits_vs_live` counts query_log rows by cache_hit,
+    labelled "cache_hit"/"live" rather than raw 0/1."""
+    conn = _db(tmp_path)
+    _insert_query_log_with_cache_hit(conn, cache_hit=False)
+    _insert_query_log_with_cache_hit(conn, cache_hit=False)
+    _insert_query_log_with_cache_hit(conn, cache_hit=True)
+
+    response = build_observatory(conn)
+
+    chart = next(c for c in response.charts if c.id == "cache_hits_vs_live")
+    assert chart.title == "Cache hits vs live"
+    points = {p.bucket: p.value for p in chart.points}
+    assert points == {"live": 2.0, "cache_hit": 1.0}

@@ -3,6 +3,12 @@
 
 Usage:
   HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python scripts/demo_traffic.py --n 40
+
+  # C4b (specs/monitoring.md "Demo answer cache"): fire each of a small set of
+  # real questions once against a RUNNING API in APP_MODE=demo, so its
+  # answer_cache is warm before reviewers/visitors arrive. Requires a live
+  # server (this hits the network), unlike the synthetic --n path above.
+  uv run python scripts/demo_traffic.py --warm-cache --api-url http://localhost:8000
 """
 
 from __future__ import annotations
@@ -14,6 +20,31 @@ from pathlib import Path
 
 from apps.store.sqlite import connect, migrate
 
+# A small, representative set of demo questions — not the full eval set,
+# just enough that a Community Cloud visitor's first few asks are usually
+# already warm. Kept short deliberately: --warm-cache makes one real LLM
+# call per entry.
+_WARM_CACHE_QUESTIONS = (
+    "What is the division of labour?",
+    "How does specialization increase productivity?",
+    "What did Adam Smith say about markets?",
+)
+
+
+def _warm_cache(api_url: str) -> None:
+    import httpx
+
+    base = api_url.rstrip("/")
+    with httpx.Client(timeout=300.0) as client:
+        for question in _WARM_CACHE_QUESTIONS:
+            try:
+                resp = client.post(f"{base}/v1/ask", json={"query": question})
+                resp.raise_for_status()
+                body = resp.json()
+                print(f"warmed {question!r} (cache_hit={body.get('cache_hit')})")
+            except httpx.HTTPError as exc:
+                print(f"failed to warm {question!r}: {exc}")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -24,7 +55,23 @@ def main() -> None:
         default=None,
         help="SQLite path (default: HOMELIB_SQLITE_PATH or data/homelib.sqlite)",
     )
+    parser.add_argument(
+        "--warm-cache",
+        action="store_true",
+        help="ask each of a small fixed question set once against a running API "
+        "(APP_MODE=demo) instead of inserting synthetic query_log rows",
+    )
+    parser.add_argument(
+        "--api-url",
+        default="http://localhost:8000",
+        help="API base URL for --warm-cache (default: http://localhost:8000)",
+    )
     args = parser.parse_args()
+
+    if args.warm_cache:
+        _warm_cache(args.api_url)
+        return
+
     import os
 
     path = args.db or Path(os.environ.get("HOMELIB_SQLITE_PATH", "data/homelib.sqlite"))

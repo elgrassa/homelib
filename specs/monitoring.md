@@ -209,3 +209,40 @@ restriction as `/v1/observatory`. Observatory's `time_per_stage` chart is the
 aggregate view: mean duration per span name over the most-recently-active
 `_TIME_PER_STAGE_TRACE_LIMIT` (200) traces.
 
+## Demo answer cache (C4b)
+
+Read-through cache over `answer_cache` (`key`, `created_at`, `answer` — the
+full cached `AskResponse` as JSON), read and written **only** when
+`APP_MODE=demo`. `apps/api/main.py`'s `_demo_cache_enabled` is the single
+gate: a selfhosted deployment never reads or writes this table, so a
+self-hosted reader always gets a live retrieve+LLM answer, and
+`test_selfhosted_ask_never_reads_answer_cache` pins that.
+
+`key = sha256(normalised_question | resolved_arm | model | answer_prompt_hash)`
+(`apps/store/answer_cache.cache_key`) — normalised (whitespace-collapsed,
+lower-cased) so trivial rephrasing of the same question still hits, and
+`resolved_arm` (the arm the REQUEST resolved to, before retrieval) rather
+than the arm that ultimately served it, so lookup and store always agree on
+the key even when retrieval degrades. `answer_prompt_hash` reuses
+`evals.judge.prompt_hash` (imported, not copied) against
+`homelib_rag.answer._SYSTEM_PROMPT`, so a changed answer prompt moves every
+key and a stale cached answer from a retired prompt can never match again.
+
+A cache hit skips retrieval and the LLM call entirely — `query_log.cache_hit`
+(migration 8 / Postgres) is `1`, `tokens_prompt`/`tokens_completion` are
+whatever the ORIGINAL cached call reported (informational only — no new
+tokens were spent), and `cost_usd` is forced to `0` for that row regardless
+of `LLM_PRICE_PER_1K_*`, since no new LLM spend happened. A **degraded**
+answer is never written to the cache (`post_ask` checks `result.degraded`
+before storing) — caching a fallback response would otherwise poison that
+key for every future asker of the same question, even once a live run would
+succeed. `AskResponse.cache_hit` (always `False` outside demo mode) is how
+the Ask door renders its "served from cache" caption.
+
+`scripts/demo_traffic.py --warm-cache` asks a small fixed set of real
+questions once each against a **running** API in `APP_MODE=demo` (a real
+network call, unlike the synthetic `--n` path), so a Community Cloud
+visitor's first few asks are often already warm. It does not touch
+`data/seed/homelib.sqlite.gz` — the committed seed stays cache-free; warming
+is a runtime action against a live deployment, not a build step.
+

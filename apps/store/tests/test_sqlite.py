@@ -80,7 +80,7 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2, 3, 4, 5, 6, 7}
+    assert versions == {1, 2, 3, 4, 5, 6, 7, 8}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -492,6 +492,33 @@ def test_migration_7_adds_spans_table_and_trace_id_column(tmp_path: Path) -> Non
         "end_ns",
         "attributes",
     }
+    conn.close()
+
+
+def test_migration_8_adds_cache_hit_column_and_answer_cache_table(tmp_path: Path) -> None:
+    """C4b (specs/monitoring.md "Demo answer cache"): `query_log.cache_hit`
+    exists and defaults to 0, `answer_cache` exists with the expected
+    columns, and an upgrade from version 7 preserves existing `query_log`
+    rows."""
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=7)
+    conn.execute(
+        "INSERT INTO query_log (request_id, ts, latency_ms, arm, k, query_sha256_prefix) "
+        "VALUES ('r-pre-c4b', 't', 1, 'hybrid', 5, 'abc')"
+    )
+    conn.commit()
+
+    migrate(conn, target_version=None)
+
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(query_log)")}
+    assert "cache_hit" in columns
+    row = conn.execute("SELECT cache_hit FROM query_log WHERE request_id = 'r-pre-c4b'").fetchone()
+    assert row[0] == 0
+
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "answer_cache" in tables
+    cache_columns = {row[1] for row in conn.execute("PRAGMA table_info(answer_cache)")}
+    assert cache_columns == {"key", "created_at", "answer"}
     conn.close()
 
 

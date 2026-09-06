@@ -19,6 +19,7 @@ import logging
 import os
 import threading
 import time
+import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,6 +59,7 @@ from apps.api.schemas import (
     RoadmapResponse,
 )
 from apps.api.tracing import TraceResponse, build_span_tree, get_tracer, read_trace_spans
+from apps.runtime_settings import AppMode, read_app_mode
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -196,6 +198,51 @@ def _retrieve_with_spans(
     return hits, arm_used, degraded
 
 
+def _demo_cache_enabled() -> bool:
+    """C4b (specs/monitoring.md "Demo answer cache"): the cache is read and
+    written ONLY in `APP_MODE=demo` with a configured SQLite store — never
+    in selfhosted mode, so a self-hosted reader always gets a live answer.
+    """
+    if read_app_mode() is not AppMode.DEMO:
+        return False
+    from apps.api import sqlite_deps
+
+    return sqlite_deps.sqlite_path() is not None
+
+
+def _maybe_cache_lookup(query: str, arm: str, model: str) -> AskResponse | None:
+    """Demo-only read-through cache lookup. Any failure here (a missing
+    table, corrupt JSON) is treated as a miss, never a 500 — the same
+    best-effort contract every other sqlite helper in this module follows.
+    """
+    if not _demo_cache_enabled():
+        return None
+    from apps.api import sqlite_deps
+    from apps.store import answer_cache
+
+    key = answer_cache.cache_key(query, arm=arm, model=model)
+    try:
+        with sqlite_deps.open_store() as conn:
+            return answer_cache.lookup(conn, key)
+    except Exception:
+        logger.warning("answer_cache lookup failed; treating as a miss", exc_info=True)
+        return None
+
+
+def _maybe_cache_store(query: str, arm: str, model: str, result: AskResponse) -> None:
+    if not _demo_cache_enabled():
+        return
+    from apps.api import sqlite_deps
+    from apps.store import answer_cache
+
+    key = answer_cache.cache_key(query, arm=arm, model=model)
+    try:
+        with sqlite_deps.open_store() as conn:
+            answer_cache.store(conn, key, result)
+    except Exception:
+        logger.warning("answer_cache store failed", exc_info=True)
+
+
 def _infer_provider(base_url: str) -> str:
     """Best-effort human-readable provider name for `/health`, from the
     configured `LLM_BASE_URL` — never the key, never anything secret."""
@@ -225,6 +272,7 @@ class QueryLogRow(BaseModel):
     degraded: bool
     cost_usd: float = 0.0
     trace_id: str | None = None
+    cache_hit: bool = False
 
 
 # ── Dependency bundle ────────────────────────────────────────────────────────
@@ -376,8 +424,8 @@ def _default_log_query(row: QueryLogRow) -> None:
                 INSERT INTO query_log
                     (request_id, latency_ms, arm, k, rerank, rewrite, model,
                      tokens_prompt, tokens_completion, query_sha256_prefix, degraded,
-                     cost_usd, trace_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     cost_usd, trace_id, cache_hit)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (request_id) DO NOTHING
                 """,
                 (
@@ -394,6 +442,7 @@ def _default_log_query(row: QueryLogRow) -> None:
                     row.degraded,
                     row.cost_usd,
                     row.trace_id,
+                    row.cache_hit,
                 ),
             )
     except Exception:
@@ -663,6 +712,10 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
     start = time.monotonic()
     tracer = get_tracer()
     query_hash = _query_sha256_prefix(req.query)
+    resolved_arm = _resolve_arm(req.arm)
+    cost_usd = 0.0
+    rewrite_used = False
+    arm_used = resolved_arm
 
     with tracer.start_as_current_span("homelib.ask") as root_span:
         span_ctx = root_span.get_span_context()
@@ -671,30 +724,54 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
         if _trace_questions_enabled():
             root_span.set_attribute("question", req.query)
 
-        query_for_retrieval, rewrite_used = _maybe_rewrite(deps, req, tracer)
-        resolved_arm = _resolve_arm(req.arm)
-        hits, arm_used, retrieval_degraded = _retrieve_with_spans(
-            deps, tracer, query_for_retrieval, req.k, resolved_arm
-        )
+        with tracer.start_as_current_span("cache") as cache_span:
+            cached = _maybe_cache_lookup(req.query, resolved_arm, deps.llm_client.model)
+            cache_span.set_attribute("hit", cached is not None)
 
-        with tracer.start_as_current_span("llm") as llm_span:
-            result = answer_module.answer(
-                req.query, hits, client=deps.llm_client, arm_used=arm_used
+        if cached is not None:
+            result = cached
+        else:
+            query_for_retrieval, rewrite_used = _maybe_rewrite(deps, req, tracer)
+            hits, arm_used, retrieval_degraded = _retrieve_with_spans(
+                deps, tracer, query_for_retrieval, req.k, resolved_arm
             )
-            cost_usd = _compute_cost_usd(result.tokens.prompt, result.tokens.completion)
-            llm_span.set_attribute("model", deps.llm_client.model)
-            llm_span.set_attribute("tokens_prompt", result.tokens.prompt)
-            llm_span.set_attribute("tokens_completion", result.tokens.completion)
-            llm_span.set_attribute("cost_usd", cost_usd)
 
-        if retrieval_degraded and not result.degraded:
-            result = result.model_copy(update={"degraded": True})
+            with tracer.start_as_current_span("llm") as llm_span:
+                result = answer_module.answer(
+                    req.query, hits, client=deps.llm_client, arm_used=arm_used
+                )
+                cost_usd = _compute_cost_usd(result.tokens.prompt, result.tokens.completion)
+                llm_span.set_attribute("model", deps.llm_client.model)
+                llm_span.set_attribute("tokens_prompt", result.tokens.prompt)
+                llm_span.set_attribute("tokens_completion", result.tokens.completion)
+                llm_span.set_attribute("cost_usd", cost_usd)
 
-        with tracer.start_as_current_span("cite") as cite_span:
-            cite_span.set_attribute("citations", len(result.citations))
+            if retrieval_degraded and not result.degraded:
+                result = result.model_copy(update={"degraded": True})
 
+            with tracer.start_as_current_span("cite") as cite_span:
+                cite_span.set_attribute("citations", len(result.citations))
+
+            # Never cache a degraded answer — a fallback response would
+            # otherwise poison the demo cache under a key that a good
+            # retrieve+LLM run could still fill correctly next time.
+            if not result.degraded:
+                _maybe_cache_store(req.query, resolved_arm, deps.llm_client.model, result)
+
+    cache_hit = cached is not None
     total_latency_ms = int((time.monotonic() - start) * 1000)
-    result = result.model_copy(update={"latency_ms": total_latency_ms, "trace_id": trace_id})
+    update: dict[str, Any] = {
+        "latency_ms": total_latency_ms,
+        "trace_id": trace_id,
+        "cache_hit": cache_hit,
+    }
+    if cache_hit:
+        # A cache hit still gets its own request_id — never a byte-for-byte
+        # replay of whichever earlier request first populated this cache
+        # entry (that id is meaningless to this caller: feedback/tracing
+        # are keyed per-request, not per-cached-answer).
+        update["request_id"] = str(uuid.uuid4())
+    result = result.model_copy(update=update)
 
     deps.log_query(
         QueryLogRow(
@@ -711,6 +788,7 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
             degraded=result.degraded,
             cost_usd=cost_usd,
             trace_id=trace_id,
+            cache_hit=cache_hit,
         )
     )
     _maybe_log_answer(result.request_id, req.query, result.answer)

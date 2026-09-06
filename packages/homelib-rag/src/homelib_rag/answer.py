@@ -322,6 +322,11 @@ class AskResponse(BaseModel):
     # required in the OpenAPI schema) so evals/tests/test_openapi_snapshot.py's
     # pinned required-field set for AskResponse does not need to change.
     trace_id: str | None = None
+    # C4b (specs/monitoring.md "Demo answer cache"): True when this response
+    # was served from apps.store.answer_cache instead of a live retrieve+LLM
+    # call — set by post_ask via model_copy, same as trace_id. Always False
+    # from answer() itself, which has no cache seam of its own.
+    cache_hit: bool = False
 
 
 class CitationValidationError(Exception):

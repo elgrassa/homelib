@@ -196,6 +196,27 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
         )
     )
 
+    # 9. cache_hits_vs_live — C4b demo answer cache (specs/monitoring.md).
+    # Empty selfhosted (cache_hit is always 0 there — apps/api/main.py never
+    # reads/writes it outside APP_MODE=demo), populated once the demo cache
+    # has served at least one repeat question.
+    cache_rows = conn.execute(
+        "SELECT cache_hit, COUNT(*) FROM query_log GROUP BY cache_hit"
+    ).fetchall()
+    charts.append(
+        ObservatoryChart(
+            id="cache_hits_vs_live",
+            title="Cache hits vs live",
+            points=[
+                ObservatoryPoint(
+                    bucket="cache_hit" if int(r[0]) else "live",
+                    value=float(r[1]),
+                )
+                for r in cache_rows
+            ],
+        )
+    )
+
     return ObservatoryResponse(
         generated_at=datetime.now(UTC),
         charts=charts,

@@ -92,7 +92,11 @@ CREATE TABLE IF NOT EXISTS query_log (
     -- C5 (specs/monitoring.md "Tracing"): the OpenTelemetry trace covering
     -- this request's retrieve/rerank/rewrite/llm/cite spans (see `spans`
     -- below). NULL for rows logged before C5.
-    trace_id             text
+    trace_id             text,
+    -- C4b (specs/monitoring.md "Demo answer cache"): 1 when this response
+    -- was served from `answer_cache` (APP_MODE=demo only) instead of a
+    -- live retrieve+LLM call.
+    cache_hit            boolean NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS ix_query_log_ts ON query_log (ts DESC);
 
@@ -119,3 +123,12 @@ CREATE TABLE IF NOT EXISTS spans (
     PRIMARY KEY (trace_id, span_id)
 );
 CREATE INDEX IF NOT EXISTS ix_spans_trace_id ON spans (trace_id);
+
+-- C4b (specs/monitoring.md "Demo answer cache"): read-through cache, demo
+-- mode only. `key` = sha256(normalised question | arm | model | answer
+-- prompt hash) — see apps/store/answer_cache.py.
+CREATE TABLE IF NOT EXISTS answer_cache (
+    key        text PRIMARY KEY,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    answer     text NOT NULL
+);

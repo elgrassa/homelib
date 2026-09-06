@@ -472,7 +472,8 @@ def _in_memory_tracer_provider() -> Any:
 
 def test_ask_emits_stage_spans(monkeypatch: pytest.MonkeyPatch) -> None:
     """A rewritten /v1/ask call emits every stage span the handler owns: the
-    root `homelib.ask`, plus `rewrite`, `retrieve`, `llm`, `cite` as children.
+    root `homelib.ask`, plus `cache` (always opened; a no-op miss outside
+    APP_MODE=demo), `rewrite`, `retrieve`, `llm`, `cite` as children.
     `rerank` is emitted by the production retrieve seam around the real
     cross-encoder call (see `test_default_retrieve_emits_timed_rerank_span`),
     so a scripted `retrieve` fake — as here — never shows one: a trace must
@@ -498,7 +499,7 @@ def test_ask_emits_stage_spans(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert resp.status_code == 200
     span_names = {span.name for span in exporter.get_finished_spans()}
-    assert span_names == {"homelib.ask", "rewrite", "retrieve", "llm", "cite"}
+    assert span_names == {"homelib.ask", "cache", "rewrite", "retrieve", "llm", "cite"}
 
 
 def test_ask_omits_optional_stage_spans_when_not_used() -> None:
@@ -518,7 +519,7 @@ def test_ask_omits_optional_stage_spans_when_not_used() -> None:
 
     assert resp.status_code == 200
     span_names = {span.name for span in exporter.get_finished_spans()}
-    assert span_names == {"homelib.ask", "retrieve", "llm", "cite"}
+    assert span_names == {"homelib.ask", "cache", "retrieve", "llm", "cite"}
 
 
 def test_spans_never_carry_raw_question_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -611,6 +612,144 @@ def test_traces_unknown_trace_id_404(tmp_path: Any, monkeypatch: pytest.MonkeyPa
     resp = client.get("/v1/traces/does-not-exist")
 
     assert resp.status_code == 404
+
+
+# ── C4b: demo answer cache (specs/monitoring.md "Demo answer cache") ─────
+
+
+class _CountingClient(_ScriptedClient):
+    """Same scripted fake, but counts real `chat()` calls — a cache hit
+    must never reach this at all, so the count is the real assertion."""
+
+    def __init__(self, responses: list[LLMResponse | Exception]) -> None:
+        super().__init__(responses)
+        self.calls = 0
+
+    def chat(self, *args: Any, **kwargs: Any) -> LLMResponse:
+        self.calls += 1
+        return super().chat(*args, **kwargs)
+
+
+def test_demo_ask_serves_cached_answer_on_repeat(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """APP_MODE=demo: asking the SAME question twice calls the LLM once —
+    the second call is served from `answer_cache` (only one scripted
+    response is even configured below, so a second real call would itself
+    raise `IndexError` and fail this test)."""
+    db_path = tmp_path / "cache_demo.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    fake_llm = _CountingClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=fake_llm,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    first = client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+    second = client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert fake_llm.calls == 1
+    assert first.json()["cache_hit"] is False
+    assert second.json()["cache_hit"] is True
+    assert second.json()["answer"] == first.json()["answer"]
+    # A cache hit still gets its own request_id/trace_id — never a
+    # byte-for-byte replay of the first response's envelope.
+    assert second.json()["request_id"] != first.json()["request_id"]
+
+
+def test_selfhosted_ask_never_reads_answer_cache(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-seeded cache entry for the exact key this request would compute
+    is ignored in selfhosted mode — the LLM is called and its live answer
+    wins, never the stale cached one."""
+    from homelib_rag.answer import AskResponse as RagAskResponse
+    from homelib_rag.answer import TokenUsage
+
+    from apps.store import answer_cache
+
+    db_path = tmp_path / "cache_selfhosted.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    stale = RagAskResponse(
+        request_id="stale-req",
+        answer="STALE CACHED ANSWER",
+        citations=[],
+        arm_used="hybrid",
+        degraded=False,
+        latency_ms=1,
+        tokens=TokenUsage(prompt=1, completion=1),
+    )
+    key = answer_cache.cache_key("does it jump?", arm="hybrid", model="fake-model")
+    answer_cache.store(conn, key, stale)
+    conn.close()
+
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "selfhosted")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    fake_llm = _CountingClient(
+        [_llm_json("Fresh live answer.", [{"passage": 1, "quote": "fox jumps"}])]
+    )
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=fake_llm,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["answer"] == "Fresh live answer."
+    assert body["cache_hit"] is False
+    assert fake_llm.calls == 1
+
+
+def test_cache_hit_is_logged_and_flagged(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The `query_log` row for a cache hit has `cache_hit=True` — captured
+    via the same scripted `log_query` fake every other query_log test uses,
+    independent of the real sqlite write path."""
+    db_path = tmp_path / "cache_logged.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    logged: list[QueryLogRow] = []
+    fake_llm = _CountingClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=fake_llm,
+        log_query=logged.append,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+
+    assert len(logged) == 2
+    assert logged[0].cache_hit is False
+    assert logged[1].cache_hit is True
+    # No new LLM spend on a cache hit, regardless of LLM_PRICE_PER_1K_*.
+    assert logged[1].cost_usd == 0.0
 
 
 # ── /v1/roadmap ──────────────────────────────────────────────────────────

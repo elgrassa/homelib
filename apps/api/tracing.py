@@ -143,8 +143,17 @@ def reset_tracer_for_tests(provider: TracerProvider | None = None) -> None:
     """Test seam: force the next `get_tracer()` call to rebuild (`None`), or
     adopt a caller-supplied provider — e.g. one wired to an in-memory
     exporter so a test can inspect spans without touching disk.
+
+    Shuts down the OUTGOING provider first (flushing any `BatchSpanProcessor`
+    while its exporter's `connect` callable is still valid) rather than just
+    dropping the reference — otherwise a queued span exports later, on a
+    background thread, after a test's `monkeypatch` has already reverted the
+    env var `connect` depends on (e.g. `HOMELIB_SQLITE_PATH`), which
+    `SqliteSpanExporter` then logs as a spurious export failure.
     """
     global _provider
+    if _provider is not None:
+        _provider.shutdown()
     _provider = provider
 
 

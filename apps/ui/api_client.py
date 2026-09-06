@@ -77,6 +77,9 @@ class AskResponse(BaseModel):
     # C5 (specs/monitoring.md "Tracing"): optional so an API predating C5
     # (or one running without HOMELIB_SQLITE_PATH) still validates.
     trace_id: str | None = None
+    # C4b (specs/monitoring.md "Demo answer cache"): always False outside
+    # APP_MODE=demo.
+    cache_hit: bool = False
 
 
 class Provenance(BaseModel):
