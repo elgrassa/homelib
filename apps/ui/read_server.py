@@ -11,17 +11,27 @@ Runs alongside Streamlit in the UI container on port 8502.
 from __future__ import annotations
 
 import os
+import re
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import ParseResult, parse_qs, unquote, urlparse
 
 import httpx
 
 from apps.ui.book_spread import build_book_spread_html, official_book_by_id
 from apps.ui.read_html import ReadPage, build_read_article_html
-from apps.ui.view_model import POTTERMORE_HOST
+from apps.ui.view_model import is_allowlisted_official_url, official_viewer_enabled
 
 DEFAULT_API = "http://api:8000"
 DEFAULT_PORT = 8502
+
+# 64 MiB cap on a proxied PDF — bounds the buffer even though we stream the
+# upstream response instead of trusting Content-Length.
+MAX_PDF_BYTES = 64 * 1024 * 1024
+
+# Percent-decoded path segment must match this before it is trusted in a
+# routed URL (book id / block id). No "/", "?", "%" — safe to f-string.
+_BOOK_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
 def _api_base() -> str:
@@ -55,32 +65,67 @@ def _fetch_book_title(book_id: str) -> tuple[str, str]:
 
 
 def _stream_official_pdf(book_id: str) -> tuple[bytes, str]:
-    """Fetch allowlisted Pottermore PDF bytes for display only."""
+    """Fetch allowlisted Pottermore PDF bytes for display only.
+
+    Streamed (not buffered via ``client.get``) so ``MAX_PDF_BYTES`` bounds
+    memory regardless of what the upstream ``Content-Length`` claims.
+    """
     book = official_book_by_id(book_id)
     if book is None:
         raise LookupError(book_id)
-    if POTTERMORE_HOST not in book.pdf_url:
+    if not is_allowlisted_official_url(book.pdf_url):
         raise PermissionError("pdf host not allowlisted")
-    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
-        resp = client.get(book.pdf_url)
+    with (
+        httpx.Client(timeout=120.0, follow_redirects=False) as client,
+        client.stream("GET", book.pdf_url) as resp,
+    ):
+        if 300 <= resp.status_code < 400:
+            raise PermissionError("redirect refused")
         resp.raise_for_status()
         content_type = resp.headers.get("content-type", "application/pdf")
-        return resp.content, content_type.split(";")[0].strip() or "application/pdf"
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in resp.iter_bytes():
+            total += len(chunk)
+            if total > MAX_PDF_BYTES:
+                raise ValueError("upstream pdf exceeds MAX_PDF_BYTES")
+            chunks.append(chunk)
+        return b"".join(chunks), content_type.split(";")[0].strip() or "application/pdf"
 
 
 class ReadHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         return
 
+    def _write(
+        self,
+        status: int,
+        body: bytes,
+        content_type: str,
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        """Common response headers for every route: never cached, never
+        MIME-sniffed, and never CORS-open (this server is not an API)."""
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if extra_headers:
+            for name, value in extra_headers.items():
+                self.send_header(name, value)
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
+        raw = urlparse(self.path)
+        # Percent-decode BEFORE routing/validating so a path segment like
+        # "wal%2Fden" cannot smuggle a "/" past the book-id allowlist below.
+        parsed = raw._replace(path=unquote(raw.path))
+
         if parsed.path in {"/", "/health"}:
-            body = b"ok"
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._write(200, b"ok", "text/plain; charset=utf-8")
             return
 
         if parsed.path.startswith("/pdf/"):
@@ -95,7 +140,10 @@ class ReadHandler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def _serve_pdf(self, book_id: str) -> None:
-        if not book_id or "/" in book_id:
+        if not official_viewer_enabled():
+            self.send_error(404, "official viewer disabled")
+            return
+        if not _BOOK_ID_RE.match(book_id):
             self.send_error(404)
             return
         try:
@@ -103,25 +151,28 @@ class ReadHandler(BaseHTTPRequestHandler):
         except LookupError:
             self.send_error(404, "unknown official preview book")
             return
-        except PermissionError:
-            self.send_error(403, "pdf host not allowlisted")
+        except PermissionError as exc:
+            # Allowlist violation is a client-facing 403; a refused upstream
+            # redirect is treated as an upstream failure (502) — never trust
+            # or forward a redirect target.
+            status = 502 if str(exc) == "redirect refused" else 403
+            self.send_error(status, str(exc) or "pdf host not allowlisted")
+            return
+        except ValueError:
+            self.send_error(502, "upstream pdf too large")
             return
         except httpx.HTTPError:
             self.send_error(502, "upstream pdf unreachable")
             return
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "private, max-age=300")
-        self.send_header("Content-Disposition", "inline")
         # No X-Frame-Options: Streamlit :8501 embeds /book/ in an iframe; PDF
         # fetch is same-origin to that viewer document on :8502.
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(data)
+        self._write(200, data, content_type, extra_headers={"Content-Disposition": "inline"})
 
     def _serve_book(self, book_id: str) -> None:
-        if not book_id or "/" in book_id:
+        if not official_viewer_enabled():
+            self.send_error(404, "official viewer disabled")
+            return
+        if not _BOOK_ID_RE.match(book_id):
             self.send_error(404)
             return
         book = official_book_by_id(book_id)
@@ -129,20 +180,14 @@ class ReadHandler(BaseHTTPRequestHandler):
             self.send_error(404, "unknown official preview book")
             return
         html = build_book_spread_html(book).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(html)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(html)
+        self._write(200, html, "text/html; charset=utf-8")
 
-    def _serve_read(self, parsed: object) -> None:
-        path = str(getattr(parsed, "path", ""))
-        book_id = path[len("/read/") :].strip("/")
-        if not book_id or "/" in book_id:
+    def _serve_read(self, parsed: ParseResult) -> None:
+        book_id = parsed.path[len("/read/") :].strip("/")
+        if not _BOOK_ID_RE.match(book_id):
             self.send_error(404)
             return
-        qs = parse_qs(getattr(parsed, "query", "") or "")
+        qs = parse_qs(parsed.query)
         try:
             ordinal = int((qs.get("ordinal") or ["0"])[0])
         except ValueError:
@@ -155,7 +200,11 @@ class ReadHandler(BaseHTTPRequestHandler):
             block = _fetch_block(book_id, ordinal)
             title, authors = _fetch_book_title(book_id)
         except httpx.HTTPStatusError as exc:
-            self.send_error(exc.response.status_code, "block fetch failed")
+            if exc.response.status_code == 404:
+                self.send_error(404, "block not found")
+            else:
+                # Never reflect the upstream status verbatim.
+                self.send_error(502, "upstream error")
             return
         except Exception:
             self.send_error(502, "api unreachable")
@@ -177,19 +226,19 @@ class ReadHandler(BaseHTTPRequestHandler):
             next_ordinal=next_o,
         )
         html = build_read_article_html(page).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(html)))
-        self.end_headers()
-        self.wfile.write(html)
+        self._write(200, html, "text/html; charset=utf-8")
 
 
 def main() -> None:
     port = int(os.environ.get("READ_PORT", str(DEFAULT_PORT)))
-    # Container-internal bind; host LAN exposure is compose HOMELIB_UI_BIND.
-    server = ThreadingHTTPServer(("0.0.0.0", port), ReadHandler)  # noqa: S104
+    try:
+        # Container-internal bind; host LAN exposure is compose HOMELIB_UI_BIND.
+        server = ThreadingHTTPServer(("0.0.0.0", port), ReadHandler)  # noqa: S104
+    except OSError as exc:
+        print(f"read_server: cannot bind 0.0.0.0:{port}: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     server.serve_forever()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

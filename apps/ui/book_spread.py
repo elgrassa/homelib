@@ -14,15 +14,16 @@ from __future__ import annotations
 
 import html
 import json
-from pathlib import Path
 
-from apps.ui.view_model import OfficialPreviewBook, load_official_preview_books
-
-_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
+from apps.ui.view_model import (
+    POTTERMORE_FIXTURE_PATH,
+    OfficialPreviewBook,
+    load_official_preview_books,
+)
 
 
 def official_book_by_id(book_id: str) -> OfficialPreviewBook | None:
-    for book in load_official_preview_books("uk", fixture_path=_FIXTURE):
+    for book in load_official_preview_books("uk", fixture_path=POTTERMORE_FIXTURE_PATH):
         if book.id == book_id:
             return book
     return None
@@ -385,26 +386,29 @@ def build_book_spread_html(book: OfficialPreviewBook) -> str:
       busy = true;
       prevBtn.disabled = true;
       nextBtn.disabled = true;
-      if (animate && !reduce && !reading) {{
-        const frontBox = flip.querySelector(".flip-face.front");
-        const backBox = flip.querySelector(".flip-face.back");
-        if (goingForward) {{
-          await paintCanvasOnly(leaf + 2, flipFront, frontBox);
-          await paintCanvasOnly(target + 1, flipBack, backBox);
-          flip.className = "flip-leaf forward";
-          await runFlip("forward");
-        }} else {{
-          await paintCanvasOnly(leaf + 1, flipFront, frontBox);
-          await paintCanvasOnly(target + 2, flipBack, backBox);
-          flip.className = "flip-leaf backward";
-          await runFlip("backward");
+      try {{
+        if (animate && !reduce && !reading) {{
+          const frontBox = flip.querySelector(".flip-face.front");
+          const backBox = flip.querySelector(".flip-face.back");
+          if (goingForward) {{
+            await paintCanvasOnly(leaf + 2, flipFront, frontBox);
+            await paintCanvasOnly(target + 1, flipBack, backBox);
+            flip.className = "flip-leaf forward";
+            await runFlip("forward");
+          }} else {{
+            await paintCanvasOnly(leaf + 1, flipFront, frontBox);
+            await paintCanvasOnly(target + 2, flipBack, backBox);
+            flip.className = "flip-leaf backward";
+            await runFlip("backward");
+          }}
         }}
+        leaf = target;
+        await paintSpread(leaf);
+      }} finally {{
+        busy = false;
+        prevBtn.disabled = leaf <= 0;
+        nextBtn.disabled = leaf + 2 >= pdf.numPages;
       }}
-      leaf = target;
-      await paintSpread(leaf);
-      busy = false;
-      prevBtn.disabled = leaf <= 0;
-      nextBtn.disabled = leaf + 2 >= pdf.numPages;
     }}
 
     toggleRead.addEventListener("click", () => setReadingMode(!reading));

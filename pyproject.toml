@@ -112,10 +112,6 @@ branch = true
 omit = [
     "*/tests/*",
     "apps/ui/app.py",
-    # Companion :8502 BaseHTTPRequestHandler — behaviour pinned in
-    # apps/ui/tests/test_read_server.py (helpers + HTML); shell itself is
-    # runtime glue like Streamlit app.py.
-    "apps/ui/read_server.py",
     "scripts/*",
     "apps/api/v2_routes.py",
 ]

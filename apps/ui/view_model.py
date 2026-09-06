@@ -21,6 +21,7 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+from urllib.parse import urlparse
 
 from apps.runtime_settings import AppMode, read_app_mode
 from apps.ui.api_client import (
@@ -283,15 +284,56 @@ def observatory_chart_titles(payload: dict[str, Any]) -> list[str]:
 # Projection — This shelf vs Official preview (not a Crossroads door).
 ProjectionSource = Literal["shelf", "official"]
 ProjectionLanguage = Literal["en", "uk"]
-# Demo default: Official preview + Ukrainian Pottermore HP (publisher-hosted).
-DEFAULT_PROJECTION_SOURCE: ProjectionSource = "official"
+# Demo default: shelf. Official preview (Pottermore Ukrainian HP) is opt-in via
+# ?source=official — the public capstone/Cloud demo must not default to a
+# publisher-hosted preview.
+DEFAULT_PROJECTION_SOURCE: ProjectionSource = "shelf"
 DEFAULT_OFFICIAL_LANGUAGE: ProjectionLanguage = "uk"
 POTTERMORE_HOST = "www.pottermorepublishing.com"
-_POTTERMORE_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
+
+# Opt-in two-page viewer + /pdf proxy on :8502. Off by default: the public
+# demo (Streamlit Cloud) has no :8502 companion and the capstone repo ships
+# publisher links only; the owner enables it in .env on the LAN box.
+OFFICIAL_VIEWER_ENV = "HOMELIB_OFFICIAL_VIEWER"
+DEFAULT_READ_PORT = 8502
+
+
+def official_viewer_enabled(environ: Mapping[str, str] | None = None) -> bool:
+    """True only when ``HOMELIB_OFFICIAL_VIEWER`` is explicitly on."""
+    env = os.environ if environ is None else environ
+    return (env.get(OFFICIAL_VIEWER_ENV) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def read_port(environ: Mapping[str, str] | None = None) -> int:
+    """Companion :8502 port for links (``READ_PORT``; default 8502; bad → default)."""
+    env = os.environ if environ is None else environ
+    raw = (env.get("READ_PORT") or "").strip()
+    if not raw:
+        return DEFAULT_READ_PORT
+    try:
+        return int(raw)
+    except ValueError:
+        return DEFAULT_READ_PORT
+
+
+POTTERMORE_FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
+)
+
+
+def is_allowlisted_official_url(url: str) -> bool:
+    """``https://`` + exact (lower-cased) ``POTTERMORE_HOST`` — no substring match.
+
+    A substring check (``POTTERMORE_HOST not in url``) would let a lookalike
+    host through (``www.pottermorepublishing.com.evil.tld``) or a spoof in the
+    query string (``https://evil.example/?x=www.pottermorepublishing.com``).
+    """
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname or "") == POTTERMORE_HOST
 
 
 def normalize_projection_source(value: str | None) -> ProjectionSource:
-    """Unknown / missing → shelf (fail-closed), except empty uses the demo default."""
+    """Missing/empty → ``DEFAULT_PROJECTION_SOURCE``; unknown → shelf (fail-closed)."""
     if value is None or value == "":
         return DEFAULT_PROJECTION_SOURCE
     if value == "official":
@@ -325,13 +367,13 @@ def load_official_preview_books(
     """Metadata-only publisher previews. English has none yet; Ukrainian = Pottermore HP."""
     if language != "uk":
         return []
-    path = fixture_path if fixture_path is not None else _POTTERMORE_FIXTURE
+    path = fixture_path if fixture_path is not None else POTTERMORE_FIXTURE_PATH
     raw = json.loads(path.read_text(encoding="utf-8"))
     books: list[OfficialPreviewBook] = []
     for entry in raw.get("books") or []:
         reader = str(entry["reader_url"])
         pdf = str(entry["pdf_url"])
-        if POTTERMORE_HOST not in reader or POTTERMORE_HOST not in pdf:
+        if not is_allowlisted_official_url(reader) or not is_allowlisted_official_url(pdf):
             raise ValueError(f"official preview URL host must be {POTTERMORE_HOST}")
         authors = entry.get("authors") or []
         books.append(
@@ -362,24 +404,27 @@ def clean_read_url(book_id: str, *, ordinal: int = 0, read_port: int = 8502) -> 
     return f":{read_port}/read/{book_id}?ordinal={int(ordinal)}"
 
 
-def official_book_viewer_path(book_id: str, *, read_port: int = 8502) -> str:
-    """Two-page open-book viewer on the UI companion port (display-only PDF)."""
-    return f":{read_port}/book/{book_id}"
-
-
 def build_official_preview_stage_html(
     book: OfficialPreviewBook,
     *,
     projector: bool = False,
     read_port: int = 8502,
+    viewer_enabled: bool | None = None,
 ) -> str:
     """16:9 Official preview stage.
 
-    Projector embeds our ``:8502/book/{{id}}`` two-page spread (allowlisted PDF
-    proxy — Pottermore sets X-Frame-Options so their URL cannot be iframed).
-    CTAs use real ``<a href>`` / same-tab ``location.assign`` (iPad-safe; no
-    ``window.open``). Never ingests PDF bytes (ADR-008).
+    ``viewer_enabled`` gates the internal two-page viewer: ``None`` resolves it
+    via ``official_viewer_enabled()`` (the owner's LAN opt-in). When the viewer
+    is NOT enabled, both projector and non-projector modes return the
+    links-only stage — the public capstone/Cloud demo must never emit
+    ``:8502``/``/book/``/``location.assign``. Only when the viewer is enabled
+    AND ``projector`` is True does this embed our ``:{{read_port}}/book/{{id}}``
+    two-page spread (allowlisted PDF proxy — Pottermore sets X-Frame-Options so
+    their URL cannot be iframed). CTAs use real ``<a href>`` / same-tab
+    ``location.assign`` (iPad-safe; no ``window.open``). Never ingests PDF
+    bytes (ADR-008).
     """
+    enabled = official_viewer_enabled() if viewer_enabled is None else viewer_enabled
     title = html.escape(book.title)
     authors = html.escape(", ".join(book.authors))
     pdf_href = html.escape(book.pdf_url, quote=True)
@@ -388,7 +433,7 @@ def build_official_preview_stage_html(
     port_js = json.dumps(int(read_port))
     font = "1.35rem" if projector else "1.15rem"
 
-    if projector:
+    if projector and enabled:
         return f"""
 <div style="width:100%;border:1px solid #cab995;border-radius:12px;overflow:hidden;
  background:#1a140c;box-sizing:border-box;color:#fffaf0;
@@ -444,10 +489,23 @@ def build_official_preview_stage_html(
 </div>
 """
 
-    speech = (
-        "<p style='margin:0 0 1.25rem'>Publisher pages refuse iframes. Open the lawful "
-        "Ukrainian PDF or enter projector mode for the two-page book, then use Safari "
-        "Listen to Page / Speak Screen.</p>"
+    # Non-projector keeps the original explanatory copy; projector drops the
+    # (now-nonexistent, viewer-disabled) "enter projector mode for the
+    # internal two-page book" sentence in favour of naming what actually
+    # happens: publisher pages open in a new tab, Safari Listen to Page there.
+    if projector:
+        speech = (
+            "<p style='margin:0 0 1.25rem'>Publisher pages refuse iframes, so they open in a "
+            "new tab. Safari Listen to Page / Speak Screen works there.</p>"
+        )
+    else:
+        speech = (
+            "<p style='margin:0 0 1.25rem'>Publisher pages refuse iframes. Open the lawful "
+            "Ukrainian PDF or HTML reader, then use Safari Listen to Page / Speak Screen.</p>"
+        )
+    footer = (
+        '<p style="margin:1rem 0 0;font-size:0.9rem;color:#5c4a3a">'
+        "Publisher pages open in a new tab; Safari Listen to Page works there.</p>"
     )
     primary = (
         f"<a href='{pdf_href}' target='_blank' rel='noopener noreferrer' "
@@ -478,8 +536,6 @@ def build_official_preview_stage_html(
     {primary}
     {secondary}
   </p>
-  <p style="margin:1rem 0 0;font-size:0.9rem;color:#5c4a3a">
-    Enter projector mode for the internal two-page open book and Reading / Listen.
-  </p>
+  {footer}
 </div>
 """

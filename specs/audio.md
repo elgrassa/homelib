@@ -57,12 +57,18 @@ uv run pytest -k 'audio_capabilities or can_generate_is_false' -v
   Screen**, plus a clean article server on UI `:8502` (`/read/{book_id}`) for
   Safari **Listen to Page**. `GET /v1/audio/capabilities` stays
   `can_generate=False`.
-- **Official preview (demo default):** Pottermore Ukrainian HP PDFs are
-  **display-only** via UI `:8502/book/{id}` (two-page pdf.js spread + allowlisted
-  `/pdf/{id}` proxy). Not ingested into SQLite/FTS (ADR-008). Publishers set
-  `X-Frame-Options`, so their URL cannot be iframed directly. Speech: projector
-  **Reading / Listen** → `:8502/book/{id}?read=1` (Ukrainian article for Safari
-  Listen to Page / Speak Screen), or open the publisher PDF (ADR-009). Demo:
-  `?door=Projection&projection=1&source=official`.
+- **Official preview:** metadata + publisher links (`reader_url`/`pdf_url`) by
+  default — the public capstone repo / Streamlit Cloud demo shows Pottermore
+  Ukrainian HP as external links only, never an embedded viewer. The
+  display-only two-page pdf.js spread + allowlisted `/pdf/{id}` proxy on UI
+  `:8502/book/{id}` exist only when `HOMELIB_OFFICIAL_VIEWER` is on (owner's
+  LAN box opt-in) — see `.env.example`. Not ingested into SQLite/FTS
+  (ADR-008). Publishers set `X-Frame-Options`, so their URL cannot be iframed
+  directly even when the viewer is enabled. Speech: with the viewer on,
+  projector **Reading / Listen** → `:8502/book/{id}?read=1` (Ukrainian article
+  for Safari Listen to Page / Speak Screen); otherwise the publisher pages
+  open in a new tab and Safari Listen to Page works there. Demo default
+  projection source is now **shelf**; `?door=Projection&projection=1&source=official`
+  still selects the official links.
 - **Scope:** shelf text is the public-domain seed; Pottermore is never ingested
   (ADR-008).

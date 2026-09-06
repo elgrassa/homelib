@@ -18,7 +18,10 @@ class ProjectionLayout(StrEnum):
 
 # UI flags, not API this week unless a query param is needed:
 # ?projection=1 hides Streamlit chrome / ordinary nav
-# ?source=official|shelf — Projector submenu (default official for demo)
+# ?source=official|shelf — Projector submenu (default shelf; official =
+#   Pottermore publisher links, metadata only). The internal two-page viewer
+#   is opt-in via HOMELIB_OFFICIAL_VIEWER (owner's LAN box) — off by default,
+#   never on the public demo.
 # Official preview language default: uk (Pottermore Ukrainian HP)
 ```
 

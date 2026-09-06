@@ -34,7 +34,7 @@ def test_book_spread_html_is_two_page_pdfjs_stage() -> None:
 def test_projector_stage_embeds_book_viewer_not_pottermore_iframe() -> None:
     books = load_official_preview_books("uk")
     book = books[0]
-    doc = build_official_preview_stage_html(book, projector=True)
+    doc = build_official_preview_stage_html(book, projector=True, viewer_enabled=True)
     assert 'id="hl-official-book"' in doc
     assert "/book/" in doc
     assert "window.open(" not in doc
@@ -43,3 +43,20 @@ def test_projector_stage_embeds_book_viewer_not_pottermore_iframe() -> None:
     assert 'id="hl-official-read"' in doc
     assert "?read=1" in doc
     assert "location.assign" in doc
+
+
+def test_book_spread_busy_flag_has_finally() -> None:
+    """A render rejection inside showLeaf must not latch busy=true forever —
+    the finally block resets busy and both nav buttons regardless of outcome."""
+    book = official_book_by_id("hp-uk-1")
+    assert book is not None
+    doc = build_book_spread_html(book)
+    show_leaf_start = doc.index("async function showLeaf")
+    next_fn_start = doc.index("addEventListener", show_leaf_start)
+    show_leaf_body = doc[show_leaf_start:next_fn_start]
+    assert "try {" in show_leaf_body
+    assert "} finally {" in show_leaf_body
+    finally_block = show_leaf_body[show_leaf_body.index("} finally {") :]
+    assert "busy = false;" in finally_block
+    assert "prevBtn.disabled" in finally_block
+    assert "nextBtn.disabled" in finally_block
