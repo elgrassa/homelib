@@ -29,6 +29,8 @@ from homelib_rag.roadmap import RoadmapParseError, RoadmapResponse
 import apps.api.main as main
 from apps.api.main import Deps, QueryLogRow, app, get_deps
 from apps.api.schemas import BookSummary, IngestResponse
+from apps.store.sqlite import connect as sqlite_connect
+from apps.store.sqlite import migrate as sqlite_migrate
 
 client = TestClient(app)
 
@@ -381,6 +383,57 @@ def test_cost_usd_computed_from_prices(monkeypatch: pytest.MonkeyPatch) -> None:
     expected = (body["tokens"]["prompt"] / 1000) * 2.0 + (body["tokens"]["completion"] / 1000) * 4.0
     assert logged[0].cost_usd == pytest.approx(expected)
     assert logged[0].cost_usd > 0.0
+
+
+# ── C6: online judge — answer_log opt-in (specs/monitoring.md) ───────────
+
+
+def test_answer_log_off_by_default(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`HOMELIB_LOG_ANSWERS` unset (the default): a real /v1/ask call, with a
+    real SQLite store configured, writes no `answer_log` row at all — the
+    question's plaintext is never persisted unless an operator opts in."""
+    db_path = tmp_path / "answers_off.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.delenv("HOMELIB_LOG_ANSWERS", raising=False)
+    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [])]))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "does it jump?"})
+
+    assert resp.status_code == 200
+    check = sqlite_connect(db_path)
+    count = check.execute("SELECT COUNT(*) FROM answer_log").fetchone()[0]
+    check.close()
+    assert count == 0
+
+
+def test_answer_log_written_when_enabled(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`HOMELIB_LOG_ANSWERS=1` plus a real SQLite store: the question and
+    answer ARE persisted, keyed by the same request_id as `query_log`."""
+    db_path = tmp_path / "answers_on.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("HOMELIB_LOG_ANSWERS", "1")
+    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [])]))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "does it jump?"})
+
+    assert resp.status_code == 200
+    request_id = resp.json()["request_id"]
+    check = sqlite_connect(db_path)
+    row = check.execute(
+        "SELECT question, answer FROM answer_log WHERE request_id = ?", (request_id,)
+    ).fetchone()
+    check.close()
+    assert row is not None
+    assert row[0] == "does it jump?"
+    assert row[1] == "It jumps."
 
 
 # ── /v1/roadmap ──────────────────────────────────────────────────────────

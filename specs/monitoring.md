@@ -126,3 +126,46 @@ docker compose -f docker/docker-compose.yml exec postgres psql -U homelib -c "se
 curl -su admin:$GRAFANA_PASSWORD localhost:3001/api/search?query=homelib   # dashboard exists
 uv run python scripts/check_dashboard.py    # asserts >=5 panels return data via Grafana API
 ```
+
+## Cost estimate (C1)
+
+`LLM_PRICE_PER_1K_PROMPT` / `LLM_PRICE_PER_1K_COMPLETION` (`.env.example`,
+both default `0`) are read the same way every other `LLM_*` var is — at
+call time, no settings object. `post_ask` computes `query_log.cost_usd`
+(new SQLite migration 5 / Postgres column) from these prices and the same
+token counts already logged. 0/0 (the local/Ollama default) means every
+request's `cost_usd` is 0, which Observatory's `token_or_cost_estimate`
+chart treats as "unpriced" and falls back to summing tokens, exactly as
+before C1 shipped.
+
+## Online judge (C6)
+
+Rubric monitoring wants live traffic judged, not just eval fixtures. Two new
+nullable `query_log` columns (migration 6 / Postgres): `relevance` (the
+judge's own 1-5 sub-score, stored as text — Observatory's `judged_relevance`
+chart buckets on it directly) and `judge_model`. Both are written ONLY by
+`scripts/judge_recent.py` (`apps.store.judge_ops.judge_recent_rows`), never
+by the API itself — "background judging is never triggered by the API in
+demo mode" is not a demo-mode-only rule, `/v1/ask` never calls the judge in
+any mode.
+
+**Privacy trade-off, stated plainly:** the judge needs the actual question
+and answer text, not the sha256 prefix `query_log` normally carries. The new
+`answer_log` table (`request_id` PK, `question`, `answer`, `created_at`) is
+the one place in this codebase a question's PLAINTEXT is ever persisted, and
+it is written ONLY when the operator sets `HOMELIB_LOG_ANSWERS=1` — default
+off, so a deployment that never opts in has nothing for
+`scripts/judge_recent.py` to read and `answer_log` stays empty. This is a
+deliberate, narrow exception to the query-hashing rule above, not a
+relaxation of it: nothing else in this codebase reads `answer_log`, and
+turning the flag on is a one-line, reversible operator decision, not a
+default anyone inherits silently.
+
+`judge_recent_rows` selects `query_log` rows with `relevance IS NULL` that
+also have an `answer_log` entry, scores each with `evals.judge.judge`
+(imported, not copied) using an empty citations list — `answer_log` does not
+persist citations, so `citation_quality` is not meaningfully judged for live
+traffic; `relevance` is the score Observatory actually charts. A row the
+judge fails to parse is left unjudged (not marked) so a later run retries
+it; a row already judged is never re-selected, so re-running the script is
+always safe.

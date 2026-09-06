@@ -84,6 +84,20 @@ CREATE TABLE IF NOT EXISTS query_log (
     query_sha256_prefix text NOT NULL,
     query_plaintext     text,
     degraded            boolean NOT NULL DEFAULT false,
-    feedback            text CHECK (feedback IN ('up', 'down'))
+    feedback            text CHECK (feedback IN ('up', 'down')),
+    -- C6 (specs/monitoring.md "Online judge"): filled in by
+    -- scripts/judge_recent.py, never by the API itself. NULL until judged.
+    relevance            text,
+    judge_model          text
 );
 CREATE INDEX IF NOT EXISTS ix_query_log_ts ON query_log (ts DESC);
+
+-- C6: the one place a question's PLAINTEXT is ever persisted, and only when
+-- an operator sets HOMELIB_LOG_ANSWERS=1 (default off — see
+-- specs/monitoring.md's privacy note). judge_recent.py is the only reader.
+CREATE TABLE IF NOT EXISTS answer_log (
+    request_id text PRIMARY KEY,
+    question   text NOT NULL,
+    answer     text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);

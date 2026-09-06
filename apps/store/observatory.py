@@ -145,6 +145,21 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
             )
         )
 
+    # 7. judged_relevance — C6's online judge (specs/monitoring.md). Counts
+    # per `query_log.relevance` label (the judge's 1-5 sub-score, as a
+    # string); empty until `scripts/judge_recent.py` has run, never an error.
+    judged = conn.execute(
+        "SELECT relevance, COUNT(*) FROM query_log "
+        "WHERE relevance IS NOT NULL GROUP BY relevance ORDER BY relevance"
+    ).fetchall()
+    charts.append(
+        ObservatoryChart(
+            id="judged_relevance",
+            title="Judged relevance",
+            points=[ObservatoryPoint(bucket=str(r[0]), value=float(r[1])) for r in judged],
+        )
+    )
+
     return ObservatoryResponse(
         generated_at=datetime.now(UTC),
         charts=charts,

@@ -28,13 +28,14 @@ def _insert_query_log(
     cost_usd: float = 0.0,
     tokens_prompt: int = 100,
     tokens_completion: int = 50,
+    relevance: str | None = None,
 ) -> None:
     conn.execute(
         "INSERT INTO query_log ("
         "request_id, ts, latency_ms, arm, k, rerank, rewrite, model, "
-        "tokens_prompt, tokens_completion, query_sha256_prefix, degraded, cost_usd"
-        ") VALUES (?, datetime('now'), 100, 'hybrid', 5, 0, 0, 'm', ?, ?, ?, 0, ?)",
-        (str(uuid.uuid4()), tokens_prompt, tokens_completion, "a" * 16, cost_usd),
+        "tokens_prompt, tokens_completion, query_sha256_prefix, degraded, cost_usd, relevance"
+        ") VALUES (?, datetime('now'), 100, 'hybrid', 5, 0, 0, 'm', ?, ?, ?, 0, ?, ?)",
+        (str(uuid.uuid4()), tokens_prompt, tokens_completion, "a" * 16, cost_usd, relevance),
     )
     conn.commit()
 
@@ -68,3 +69,32 @@ def test_observatory_token_chart_when_nothing_priced(tmp_path: Path) -> None:
     assert chart.title == "Token estimate"
     assert chart.points[0].bucket == "total_tokens"
     assert chart.points[0].value == 150.0
+
+
+def test_observatory_relevance_chart(tmp_path: Path) -> None:
+    """C6: `judged_relevance` counts query_log rows per relevance label, and
+    ignores rows the online judge has not scored yet (relevance IS NULL)."""
+    conn = _db(tmp_path)
+    _insert_query_log(conn, relevance="4")
+    _insert_query_log(conn, relevance="4")
+    _insert_query_log(conn, relevance="2")
+    _insert_query_log(conn, relevance=None)  # not yet judged — excluded
+
+    response = build_observatory(conn)
+
+    chart = next(c for c in response.charts if c.id == "judged_relevance")
+    assert chart.title == "Judged relevance"
+    points = {p.bucket: p.value for p in chart.points}
+    assert points == {"2": 1.0, "4": 2.0}
+
+
+def test_observatory_relevance_chart_empty_when_nothing_judged(tmp_path: Path) -> None:
+    """Rubric requirement (specs/observatory.md): an unpopulated chart still
+    exists with empty points, never a 500."""
+    conn = _db(tmp_path)
+    _insert_query_log(conn, relevance=None)
+
+    response = build_observatory(conn)
+
+    chart = next(c for c in response.charts if c.id == "judged_relevance")
+    assert chart.points == []

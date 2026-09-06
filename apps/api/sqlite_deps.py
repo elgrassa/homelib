@@ -21,6 +21,7 @@ __all__ = [
     "sqlite_get_block",
     "sqlite_get_book_block",
     "sqlite_list_books",
+    "sqlite_log_answer",
     "sqlite_log_query",
     "sqlite_path",
     "sqlite_record_feedback",
@@ -166,6 +167,27 @@ def sqlite_log_query(row: Any) -> None:
                     1 if row.degraded else 0,
                     row.cost_usd,
                 ),
+            )
+            conn.commit()
+    except Exception:
+        return
+
+
+def sqlite_log_answer(request_id: str, question: str, answer: str) -> None:
+    """Best-effort `answer_log` write — the one place a question's PLAINTEXT
+    is ever persisted (specs/monitoring.md's "Online judge" section).
+
+    Callers gate this on `HOMELIB_LOG_ANSWERS=1` (default off); this function
+    itself has no opinion on the flag, matching `sqlite_log_query`'s
+    never-raise contract so an answer-log failure can never turn into a
+    500 on `/v1/ask`.
+    """
+    try:
+        with open_store() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO answer_log (request_id, question, answer, created_at) "
+                "VALUES (?, ?, ?, datetime('now'))",
+                (request_id, question, answer),
             )
             conn.commit()
     except Exception:

@@ -282,12 +282,30 @@ _SQL_V5 = """
 ALTER TABLE query_log ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0;
 """
 
+# C6 (specs/monitoring.md "Online judge"): nullable judge output on
+# query_log, plus a small answer_log table judge_recent.py reads from.
+# answer_log is written ONLY when HOMELIB_LOG_ANSWERS=1 (default off) — the
+# one place a question's plaintext is ever persisted, so nothing here is
+# populated unless an operator explicitly opts in.
+_SQL_V6 = """
+ALTER TABLE query_log ADD COLUMN relevance TEXT;
+ALTER TABLE query_log ADD COLUMN judge_model TEXT;
+
+CREATE TABLE answer_log (
+    request_id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
     (3, _SQL_V3),
     (4, _SQL_V4),
     (5, _SQL_V5),
+    (6, _SQL_V6),
 )
 
 

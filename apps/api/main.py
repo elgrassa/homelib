@@ -134,6 +134,29 @@ def _compute_cost_usd(tokens_prompt: int, tokens_completion: int) -> float:
     return (tokens_prompt / 1000) * prompt_price + (tokens_completion / 1000) * completion_price
 
 
+def _log_answers_enabled() -> bool:
+    return os.environ.get("HOMELIB_LOG_ANSWERS", "").strip() == "1"
+
+
+def _maybe_log_answer(request_id: str, question: str, answer: str) -> None:
+    """Best-effort, opt-in `answer_log` write for C6's online judge.
+
+    Off by default (specs/monitoring.md's privacy trade-off: `answer_log` is
+    the only place a question's PLAINTEXT is ever persisted, needed so
+    `scripts/judge_recent.py` has a question+answer pair to score). Requires
+    both `HOMELIB_LOG_ANSWERS=1` and a configured SQLite store — there is no
+    Postgres-backed writer yet, matching the sqlite-only dispatch already
+    used for `list_books`/`log_query` elsewhere in this module.
+    """
+    if not _log_answers_enabled():
+        return
+    from apps.api import sqlite_deps
+
+    if sqlite_deps.sqlite_path() is None:
+        return
+    sqlite_deps.sqlite_log_answer(request_id, question, answer)
+
+
 def _infer_provider(base_url: str) -> str:
     """Best-effort human-readable provider name for `/health`, from the
     configured `LLM_BASE_URL` — never the key, never anything secret."""
@@ -625,6 +648,7 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
             cost_usd=_compute_cost_usd(result.tokens.prompt, result.tokens.completion),
         )
     )
+    _maybe_log_answer(result.request_id, req.query, result.answer)
     return result
 
 
