@@ -303,18 +303,6 @@ regenerating the snapshot in the same PR — deliberately, with the diff
 visible in review. WP01 does not add routes; leaving the snapshot on v1 is
 intentional, not drift.
 
-**Known gap (C5):** `GET /v1/traces/{trace_id}` was added and the snapshot
-regenerated in the same commit, per this rule — but
-`test_snapshot_covers_every_endpoint_in_api_md`'s `expected_paths` set is a
-literal list hardcoded in that same evals/ test file, and that file was out
-of scope for the C5 change (edits to anything under `evals/` other than
-importing `evals/judge.py` were explicitly disallowed for that work). That
-one assertion is red until a session in scope for `evals/` adds
-`/v1/traces/{trace_id}` to its `expected_paths` literal —
-`test_openapi_snapshot_matches` (the actual drift guard against the
-committed snapshot) and the two required-field tests are unaffected and
-green.
-
 ## Named red tests
 
 - `test_openapi_snapshot_matches` — the drift guard above.

@@ -298,9 +298,12 @@ rather than being silently skipped.
 ### Run the evaluations
 
 ```bash
-just eval-retrieval   # 4 arms x 235 questions -> evals/results/retrieval.md
+just eval-retrieval   # 4 arms x 235 questions, chunk- and book-level hit-rate + MRR -> evals/results/retrieval.md
 just eval-llm         # 4 prompt arms x 30 questions, judge-scored -> evals/results/llm_eval.md
 just eval             # both, in sequence
+just eval-rrf-k       # RRF fusion constant sweep k in {1,10,60,100,200} -> retrieval.md "RRF k sweep"
+just eval-chunking    # 600/100 vs 1200/200 vs 2000/400 chunking, book-level recall + prompt tokens -> evals/results/chunking.md
+uv run python evals/answer_similarity.py --answers <jsonl>   # second LLM-eval method: answer-vs-reference cosine -> llm_eval.md
 ```
 
 Set `HOMELIB_SQLITE_PATH` first to run these against the SQLite tip store
@@ -312,16 +315,37 @@ unset to run against Postgres instead. Full numbers and methodology:
 ### See the monitoring dashboard
 
 ```bash
-HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python scripts/demo_traffic.py --n 40
+HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python -m scripts.demo_traffic --n 40
 ```
 
 Then open the UI and turn the rotunda to the **Observatory** door (or call
-`GET /v1/observatory` directly) for six charts over the SQLite `query_log`
-plus thumbs-up/down feedback on every answer. On a freshly seeded store the
+`GET /v1/observatory` directly) for nine charts over the SQLite `query_log`
+and `spans` tables plus thumbs-up/down feedback on every answer: queries
+over time, latency p50/p95, retrieval-mode usage, feedback ratio, degraded
+rate, token or USD cost, judged relevance, time per stage, cache hits vs
+live. On a freshly seeded store the
 charts are empty — that is expected, not a bug; `demo_traffic.py` above (or
 a real round of `/v1/ask`) is what fills them. Feedback recorded through the
 thumbs buttons (`POST /v1/feedback`) feeds the same charts as the synthetic
 traffic.
+
+**Tracing, cost, online judge, demo cache.** Every `/v1/ask` is one
+OpenTelemetry trace (`homelib.ask` with `cache`, `rewrite`, `retrieve` →
+`rerank`, `llm`, `cite` child spans) exported to the `spans` table; the Ask
+door prints the `trace_id` and `GET /v1/traces/{trace_id}` returns the span
+tree, which is where the *time per stage* chart comes from. Spans carry only
+a hash of the question unless `HOMELIB_TRACE_QUESTIONS=1`. Set
+`LLM_PRICE_PER_1K_PROMPT` / `LLM_PRICE_PER_1K_COMPLETION` (commented Groq
+values in `.env.example`) and the cost chart switches from tokens to USD.
+`uv run python -m scripts.judge_recent --n 50` scores recent live answers
+with the same LLM judge the offline bake-off uses and fills the *judged
+relevance* chart; it needs `HOMELIB_LOG_ANSWERS=1` on the API (off by
+default, because `query_log` deliberately stores only a hash of the
+question). In `APP_MODE=demo` an identical repeat question is served from
+the answer cache in milliseconds (`cache_hit: true` in the response and the
+Ask door); self-hosted mode never reads it. Details and the measured
+numbers: [`specs/monitoring.md`](specs/monitoring.md),
+[`docs/zoomcamp-2026-gap-report.md`](docs/zoomcamp-2026-gap-report.md).
 
 ## Data
 
@@ -387,9 +411,9 @@ strict there: `done` means verified by a command whose output is recorded in
 | Retrieval flow (KB + LLM) | 2 | done | Postgres FTS + pgvector + grounded, citation-validated answers — [`packages/homelib-rag`](packages/homelib-rag), [`apps/api/main.py`](apps/api/main.py) |
 | Retrieval evaluation | 2 | done | 4 arms × 235 questions, 0 degraded, on both stores (SQLite 2026-09-03 is the gated one) — [`evals/results/retrieval.md`](evals/results/retrieval.md), [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 | LLM evaluation | 2 | done | 4 prompt arms × 30 questions, judge with bias control; null result recorded — [`evals/results/llm_eval.md`](evals/results/llm_eval.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md) |
-| Interface (UI or API) | 2 | done | Both — FastAPI (18 paths, OpenAPI-pinned) and the Streamlit Crossroads: **seven doors** behind the rotunda, static grid always rendered — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui), [`specs/ui.md`](specs/ui.md) |
+| Interface (UI or API) | 2 | done | Both — FastAPI (19 paths, OpenAPI-pinned) and the Streamlit Crossroads: **seven doors** behind the rotunda, static grid always rendered — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui), [`specs/ui.md`](specs/ui.md) |
 | Ingestion pipeline (e.g. dlt) | 2 | done | Real dlt source/resources, ELT into the canonical schema, 37 tests against a live Postgres — [`apps/ingest/pipeline.py`](apps/ingest/pipeline.py) |
-| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Observatory door: 6 charts over SQLite `query_log` + thumbs feedback, asserted by `just drill`; Grafana (Postgres) is the v1 surface and is empty on the tip path — [ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md), [`docs/evidence.md`](docs/evidence.md) |
+| Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Observatory door: 9 charts over SQLite `query_log` + `spans` (incl. OpenTelemetry time-per-stage, USD cost, online-judge relevance, cache hits) + thumbs feedback, asserted by `just drill`; Grafana (Postgres) is the v1 surface and is empty on the tip path — [ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md), [`docs/evidence.md`](docs/evidence.md) |
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
 | Reproducibility | 2 | done | Pins, snapshot, digests; **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory 6 charts / 5 populated, `queries_over_time` 1 point). Earlier: PASSED on `v2` @ `d6f9946` (2026-09-04); the 2026-09-05 re-run on `ae83d51` passed clone/seeds/health and failed the ask step under host load (3/5 timeouts) — recorded, not hidden — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |

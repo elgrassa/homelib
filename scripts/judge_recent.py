@@ -2,7 +2,7 @@
 """Score recent unjudged /v1/ask traffic with the LLM-as-judge (C6).
 
 Usage:
-  HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python scripts/judge_recent.py --n 50
+  HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python -m scripts.judge_recent --n 50
 
 Judges only rows with a matching `answer_log` entry, which exists only when
 the API ran with `HOMELIB_LOG_ANSWERS=1` (off by default — see
