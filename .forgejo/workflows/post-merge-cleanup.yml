@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 10
     env:
       # TEMPLATE: branches that are never candidates, space-separated.
-      PROTECTED_BRANCHES: main v2
+      PROTECTED_BRANCHES: main
     steps:
       # hostexecutor runners do not clone on their own; every job checks out.
       # Full history: the ancestor check needs every branch's commits.

@@ -26,8 +26,8 @@ local / Groq for the public demo behind the existing `OpenAIClient`.
    `GRAPH_REPORT.md` into context** (~14k / ~900k tokens measured 2026-09-05 —
    query only). Never install upstream `graphify-mcp` / the `[mcp]` extra —
    CLI indexer only. Branches never touch `graphify-out/` (graph-guard
-   hard-fails); `graph-refresh` regenerates it on `v2` after merge; `main` is a pure
-   fast-forward of `v2` (a rebuild is not byte-stable, so `main` never refreshes).
+   hard-fails); `graph-refresh` regenerates it on `main` after merge (`main`
+   is the single long-lived branch — `v2` was collapsed into it 2026-09-06).
    `just graph` is local inspection only — never commit its output. Until the
    first refresh lands, fall back to step 2.
 2. Latest handoff in `docs/handoffs/` (`YYYY-MM-DD-*-handoff.md`).
@@ -48,11 +48,11 @@ local / Groq for the public demo behind the existing `OpenAIClient`.
 
 ## Standing rules
 
-- Stacked PRs into `v2` (oldest-first, rebase-merge); agents do not merge.
+- Stacked PRs into `main` (oldest-first, rebase-merge); agents do not merge.
 - One `just ci` per push; targeted pytest per fix; no OpenAPI regen unless asked.
 - Demo LLM stays behind existing `OpenAIClient`/`LLM_*` — no ProviderChain,
   no `LLM_PROVIDERS`, no new SDK.
-- Owner-only: `just publish`, Cloud deploy, peers, LICENSE, `v2`→`main`.
+- Owner-only: `just publish`, Cloud deploy, peers, LICENSE.
 
 ## Skill routing
 

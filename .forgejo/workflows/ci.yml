@@ -2,18 +2,17 @@ name: ci
 
 # Forgejo Actions CI. This instance's runners are hostexecutor: no job gets an
 # automatic clone, so EVERY job must start with actions/checkout.
-# `push` is scoped to `main` and the `v2` integration branch. With `push` on
+# `push` is scoped to `main` (the single long-lived branch since the `v2`
+# integration branch was collapsed into it on 2026-09-06). With `push` on
 # every branch AND `pull_request`, an open PR makes each push fire TWO runs
 # of the same commit on the same host — not merely wasteful (2 x ~5m40s on a
 # shared runner) but actively breaking: the two runs raced over a shared
 # throwaway test database and one deleted the other's mid-test (run 12259 red,
 # identical push run green). Feature-branch work is covered by its PR run;
-# `main` and `v2` (the integration branch that feature PRs target) are covered
-# here. A long-lived `v2`→`main` PR would re-introduce the double run on
-# pushes to `v2`; keep that PR short-lived (drill-green only).
+# `main` (the branch every feature PR targets) is covered here.
 on:
   push:
-    branches: [main, v2]
+    branches: [main]
   pull_request:
 
 # Scoped off main so a merge run is never cancelled by a later push.
@@ -164,11 +163,12 @@ jobs:
 
   # Canonical PR-side graph guard — see studio-kit ci/graphify/graph-guard.yml.
   # PRs must NOT touch graphify-out/: the committed graph is refreshed on
-  # main/v2 by graph-refresh after each merge. Homelib adaptations vs the
+  # main by graph-refresh after each merge. Homelib adaptations vs the
   # studio-kit template (documented here; do not silent-edit the template):
   # runs-on uses this repo's [macos-arm64, quick] labels (not `native`);
-  # graph-refresh pushes HEAD:$GITHUB_REF_NAME for main|v2 only (canonical
-  # template always pushes HEAD:main, which would no-op on v2). Bootstrap:
+  # graph-refresh pushes HEAD:$GITHUB_REF_NAME for main only (kept keyed on
+  # the ref rather than a literal HEAD:main so a future integration branch is
+  # a one-line change, not a template re-copy). Bootstrap:
   # this PR wires the jobs but does NOT commit graphify-out/; the first
   # post-merge refresh creates it so the guard never gates its own bootstrap.
   graph-guard:
@@ -190,7 +190,7 @@ jobs:
           touched="$(git diff --name-only "origin/${GITHUB_BASE_REF:-main}...HEAD" -- graphify-out/)"
           if [ -n "$touched" ]; then
             echo "$touched"
-            echo "::error::PR modifies committed graph artifacts — drop the graphify-out/ delta; the graph-refresh job regenerates it on main/v2 after merge"
+            echo "::error::PR modifies committed graph artifacts — drop the graphify-out/ delta; the graph-refresh job regenerates it on main after merge"
             exit 1
           fi
           echo "graphify-out/ untouched"
@@ -204,10 +204,13 @@ jobs:
           echo "graph generation OK"
 
   # Canonical post-merge graph refresh — see studio-kit ci/graphify/graph-refresh.yml.
-  # Homelib: the graph is refreshed on v2 only; main is always a pure
-  # fast-forward of v2 and inherits v2's graph commit. Feature-branch pushes
-  # never reach this job (workflow `on.push.branches` is [main, v2] only); the
-  # ref check is belt-and-braces.
+  # Homelib: the graph is refreshed on main only. Until 2026-09-06 it was
+  # refreshed on the `v2` integration branch and main was a pure fast-forward
+  # of it (rebuilds are not byte-stable, so refreshing on both forked them —
+  # runs 13318/13319); `v2` is now retired and main is the single line.
+  # Feature-branch pushes never reach this job (workflow `on.push.branches`
+  # is [main] only); the ref check is belt-and-braces and also refuses the
+  # retired `v2` name should anyone recreate it.
   graph-refresh:
     if: ${{ github.event_name == 'push' }}
     runs-on: [macos-arm64, quick]
@@ -225,14 +228,7 @@ jobs:
         run: |
           ref="${GITHUB_REF_NAME:-}"
           case "$ref" in
-            v2) ;;
-            main)
-              # Rebuilds are not byte-stable (community ids, manifest mtimes,
-              # cache paths differ per run), so refreshing here forked main
-              # from v2 on every fast-forward (runs 13318/13319, 2026-09-06).
-              echo "main is a pure fast-forward of v2 — graph refreshed on v2 only"
-              exit 0
-              ;;
+            main) ;;
             *)
               echo "::warning::graph-refresh refusing to push to non-protected ref $ref"
               exit 0

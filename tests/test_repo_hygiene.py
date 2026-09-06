@@ -95,8 +95,8 @@ def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
     tests with `database "homelib_test_index" does not exist` while run 12258
     (push, same commit) passed, because the two raced over a shared throwaway
     database. The per-process database name fixes the race; scoping `push` to
-    main and the v2 integration branch leaves feature-branch work on the PR
-    trigger only.
+    main (the single long-lived branch since `v2` was collapsed into it on
+    2026-09-06) leaves feature-branch work on the PR trigger only.
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     # PyYAML parses a bare `on:` key as the boolean True.
@@ -104,10 +104,10 @@ def test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request() -> None:
 
     if "push" in triggers and "pull_request" in triggers:
         branches = (triggers.get("push") or {}).get("branches")
-        assert branches == ["main", "v2"], (
-            "`push` must be scoped to main and the v2 integration branch when "
-            "`pull_request` is also a trigger, otherwise every feature-branch "
-            f"push runs CI twice; got branches={branches!r}"
+        assert branches == ["main"], (
+            "`push` must be scoped to main alone when `pull_request` is also a "
+            "trigger, otherwise every feature-branch push runs CI twice; the "
+            f"`v2` integration branch is retired; got branches={branches!r}"
         )
 
 
@@ -464,11 +464,12 @@ def test_ci_graph_guard_job_exists() -> None:
 
 
 def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
-    """Homelib refreshes on main AND v2 — never a literal HEAD:main only.
+    """Homelib refreshes on the pushed protected ref — main, and only main.
 
-    The studio-kit template always pushes HEAD:main; copied verbatim that
-    would warn-and-exit on every v2 merge and never create the graph on the
-    integration branch sessions actually target.
+    The refresh stays keyed on GITHUB_REF_NAME (a future integration branch
+    is a one-line case addition), but since `v2` was collapsed into main on
+    2026-09-06 the only accepted ref is main: a stray `v2)` case would resurrect
+    the two-branch ping-pong the moment someone recreates that branch.
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     jobs = workflow["jobs"]
@@ -481,7 +482,8 @@ def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
     # Must not be the unadapted template that only ever targets main.
     assert "git push origin HEAD:main" not in body or "HEAD:${ref}" in body
     script = _graph_refresh_script()
-    assert "v2)" in script and "main)" in script, "refresh must branch on main vs v2"
+    assert "main)" in script, "refresh must accept the main ref"
+    assert "v2)" not in script, "the retired v2 integration branch must not be a refresh target"
 
 
 def _graph_refresh_script() -> str:
@@ -550,28 +552,30 @@ def _run_graph_refresh(tmp_path: Path, ref: str) -> tuple[int, str, bool, str]:
     return proc.returncode, proc.stdout + proc.stderr, marker.exists(), tip
 
 
-def test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2(
-    tmp_path: Path,
-) -> None:
-    """Behavioural: a push to main must not rebuild or commit the graph.
+def test_ci_graph_refresh_commits_on_main(tmp_path: Path) -> None:
+    """Behavioural: a push to main rebuilds, commits and pushes the graph.
 
-    Rebuilds are not byte-stable (community ids, manifest mtimes and cache
-    paths differ per run), so a main-side refresh forked main from v2 on every
-    fast-forward (runs 13318/13319, 2026-09-06: main = v2 + one bot commit,
-    then v2 = main + one, ad infinitum). main is a pure fast-forward of v2.
+    Until 2026-09-06 main was a pure fast-forward of the `v2` integration
+    branch and deliberately never refreshed (rebuilds are not byte-stable, so
+    refreshing on both forked them — runs 13318/13319). With `v2` collapsed
+    into main, main is the one branch that owns the committed graph.
     """
     code, out, called, tip = _run_graph_refresh(tmp_path, "main")
     assert code == 0, out
-    assert not called, "graph-refresh must not invoke graphify on main"
-    assert tip == "seed", f"graph-refresh pushed to main: {tip!r}"
+    assert called, "graph-refresh must invoke graphify on main"
+    assert tip == "chore(graph): refresh main post-merge", out
 
 
-def test_ci_graph_refresh_still_commits_on_v2(tmp_path: Path) -> None:
-    """Behavioural: the v2 push still rebuilds, commits and pushes the graph."""
+def test_ci_graph_refresh_refuses_the_retired_v2_ref(tmp_path: Path) -> None:
+    """Behavioural: a push to a recreated `v2` neither rebuilds nor pushes.
+
+    A second refreshed branch is exactly the ping-pong that was fixed; the
+    step must treat `v2` like any other non-protected ref (warn, exit 0).
+    """
     code, out, called, tip = _run_graph_refresh(tmp_path, "v2")
     assert code == 0, out
-    assert called, "graph-refresh must invoke graphify on v2"
-    assert tip == "chore(graph): refresh v2 post-merge", out
+    assert not called, "graph-refresh must not invoke graphify on the retired v2"
+    assert tip == "seed", f"graph-refresh pushed to v2: {tip!r}"
 
 
 def test_ci_graph_refresh_commits_the_bootstrap_graph() -> None:

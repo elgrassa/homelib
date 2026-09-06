@@ -46,7 +46,7 @@ test-fast:
 
 # Local code-graph refresh for inspection. Never commit the output — branches
 # that touch graphify-out/ hard-fail graph-guard; graph-refresh owns the
-# committed graph on main/v2 after merge (studio-kit ci/graphify/).
+# committed graph on main after merge (studio-kit ci/graphify/).
 graph:
     PYTHONHASHSEED=0 graphify update .
 
