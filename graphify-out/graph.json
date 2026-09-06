@@ -932,7 +932,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_api_tests_test_api_scriptedclient_init",
-      "community": 5,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -4692,7 +4692,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_py",
-      "community": 63,
+      "community": 58,
       "norm_label": "inprocess_bridge.py"
     },
     {
@@ -4702,7 +4702,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_inside_data_dir",
-      "community": 63,
+      "community": 58,
       "norm_label": "_inside_data_dir()"
     },
     {
@@ -4722,7 +4722,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_inflate_seed_if_missing",
-      "community": 63,
+      "community": 58,
       "norm_label": "inflate_seed_if_missing()"
     },
     {
@@ -4732,7 +4732,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_require_sqlite_path",
-      "community": 63,
+      "community": 58,
       "norm_label": "require_sqlite_path()"
     },
     {
@@ -4742,7 +4742,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_syncasgitransport",
-      "community": 149,
+      "community": 58,
       "norm_label": "syncasgitransport"
     },
     {
@@ -4752,7 +4752,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_syncasgitransport_init",
-      "community": 149,
+      "community": 58,
       "norm_label": ".__init__()"
     },
     {
@@ -4772,7 +4772,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_syncasgitransport_call",
-      "community": 149,
+      "community": 58,
       "norm_label": "._call()"
     },
     {
@@ -4782,7 +4782,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "request",
-      "community": 149,
+      "community": 58,
       "norm_label": "request"
     },
     {
@@ -4802,7 +4802,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_syncasgitransport_handle_request",
-      "community": 149,
+      "community": 58,
       "norm_label": ".handle_request()"
     },
     {
@@ -4812,7 +4812,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_syncasgitransport_close",
-      "community": 149,
+      "community": 58,
       "norm_label": ".close()"
     },
     {
@@ -4822,7 +4822,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_shared_transport",
-      "community": 63,
+      "community": 58,
       "norm_label": "_shared_transport()"
     },
     {
@@ -4832,7 +4832,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_build_inprocess_client",
-      "community": 63,
+      "community": 58,
       "norm_label": "build_inprocess_client()"
     },
     {
@@ -4842,7 +4842,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_1",
-      "community": 63,
+      "community": 58,
       "norm_label": "wire inprocessclient for app_mode=demo (outside apps/ui ast boundary).  streamli"
     },
     {
@@ -4852,7 +4852,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_40",
-      "community": 63,
+      "community": 58,
       "norm_label": "true only for paths under the repo's `data/` directory, with no `..`.      the s"
     },
     {
@@ -4862,7 +4862,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_53",
-      "community": 63,
+      "community": 58,
       "norm_label": "inflate the committed seed to `target` when `target` is absent.      returns tru"
     },
     {
@@ -4872,7 +4872,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_104",
-      "community": 149,
+      "community": 58,
       "norm_label": "sync facade over ``httpx.asgitransport`` for a blocking ``httpx.client``.      `"
     },
     {
@@ -4882,7 +4882,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_155",
-      "community": 63,
+      "community": 58,
       "norm_label": "one loop thread per app object per process: streamlit builds a client     on eve"
     },
     {
@@ -4892,7 +4892,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_inprocess_bridge_rationale_161",
-      "community": 63,
+      "community": 58,
       "norm_label": "build an inprocessclient backed by the fastapi app over asgi."
     },
     {
@@ -5382,7 +5382,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "exception",
-      "community": 5,
+      "community": 27,
       "norm_label": "exception"
     },
     {
@@ -5472,7 +5472,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_rights_status_from_manifest",
-      "community": 27,
+      "community": 382,
       "norm_label": "rights_status_from_manifest()"
     },
     {
@@ -5582,7 +5582,7 @@
       "source_location": "L372",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_ensure_local_user",
-      "community": 6,
+      "community": 27,
       "norm_label": "_ensure_local_user()"
     },
     {
@@ -5592,7 +5592,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_seed",
-      "community": 6,
+      "community": 149,
       "norm_label": "seed()"
     },
     {
@@ -5602,7 +5602,7 @@
       "source_location": "L443",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_table_exists",
-      "community": 42,
+      "community": 149,
       "norm_label": "_table_exists()"
     },
     {
@@ -5612,7 +5612,7 @@
       "source_location": "L450",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_row_counts",
-      "community": 42,
+      "community": 149,
       "norm_label": "row_counts()"
     },
     {
@@ -5622,7 +5622,7 @@
       "source_location": "L477",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_logical_checksum",
-      "community": 6,
+      "community": 149,
       "norm_label": "logical_checksum()"
     },
     {
@@ -5652,7 +5652,7 @@
       "source_location": "L534",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_insert_playlist",
-      "community": 6,
+      "community": 149,
       "norm_label": "insert_playlist()"
     },
     {
@@ -5662,7 +5662,7 @@
       "source_location": "L563",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_insert_read_progress",
-      "community": 6,
+      "community": 149,
       "norm_label": "insert_read_progress()"
     },
     {
@@ -5712,7 +5712,7 @@
       "source_location": "L668",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_list_bookmarks",
-      "community": 27,
+      "community": 149,
       "norm_label": "list_bookmarks()"
     },
     {
@@ -5722,7 +5722,7 @@
       "source_location": "L677",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_list_playlist_items",
-      "community": 6,
+      "community": 149,
       "norm_label": "list_playlist_items()"
     },
     {
@@ -5732,7 +5732,7 @@
       "source_location": "L688",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_list_read_progress",
-      "community": 6,
+      "community": 149,
       "norm_label": "list_read_progress()"
     },
     {
@@ -5742,7 +5742,7 @@
       "source_location": "L697",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_list_conversations",
-      "community": 27,
+      "community": 149,
       "norm_label": "list_conversations()"
     },
     {
@@ -5752,7 +5752,7 @@
       "source_location": "L705",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_list_areas",
-      "community": 27,
+      "community": 149,
       "norm_label": "list_areas()"
     },
     {
@@ -5762,7 +5762,7 @@
       "source_location": "L714",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_reset_demo",
-      "community": 6,
+      "community": 149,
       "norm_label": "reset_demo()"
     },
     {
@@ -5772,7 +5772,7 @@
       "source_location": "L722",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_books_default_rights_status",
-      "community": 6,
+      "community": 27,
       "norm_label": "books_default_rights_status()"
     },
     {
@@ -5792,7 +5792,7 @@
       "source_location": "L740",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_compute_index_revision",
-      "community": 27,
+      "community": 42,
       "norm_label": "compute_index_revision()"
     },
     {
@@ -5812,7 +5812,7 @@
       "source_location": "L762",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_current_index_revision",
-      "community": 42,
+      "community": 6,
       "norm_label": "current_index_revision()"
     },
     {
@@ -5872,7 +5872,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_rationale_74",
-      "community": 27,
+      "community": 382,
       "norm_label": "resolve manifest rights \u2014 explicit `rights_status` only; else fail closed."
     },
     {
@@ -5892,7 +5892,7 @@
       "source_location": "L741",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_sqlite_rationale_741",
-      "community": 27,
+      "community": 42,
       "norm_label": "stable revision id for the cached embedding matrix (product \u00a77.5)."
     },
     {
@@ -6012,7 +6012,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_coffee_table_test_restart_persists_playlist_and_progress",
-      "community": 6,
+      "community": 100,
       "norm_label": "test_restart_persists_playlist_and_progress()"
     },
     {
@@ -6062,7 +6062,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_first_book",
-      "community": 6,
+      "community": 149,
       "norm_label": "_first_book()"
     },
     {
@@ -6102,7 +6102,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_seed_rerun_zero_new_rows",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_seed_rerun_zero_new_rows()"
     },
     {
@@ -6112,7 +6112,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_restart_persists",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_restart_persists()"
     },
     {
@@ -6122,7 +6122,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_demo_reset_restores_seed",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_demo_reset_restores_seed()"
     },
     {
@@ -6142,7 +6142,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_demo_sessions_cannot_read_each_other",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_demo_sessions_cannot_read_each_other()"
     },
     {
@@ -6152,7 +6152,7 @@
       "source_location": "L235",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_logical_checksum_stable_across_two_builds",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_logical_checksum_stable_across_two_builds()"
     },
     {
@@ -6212,7 +6212,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_playlist_does_not_silently_copy_resource_id_to_book_id",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_playlist_does_not_silently_copy_resource_id_to_book_id()"
     },
     {
@@ -6222,7 +6222,7 @@
       "source_location": "L341",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_rights_status_requires_explicit_manifest_field",
-      "community": 27,
+      "community": 382,
       "norm_label": "test_rights_status_requires_explicit_manifest_field()"
     },
     {
@@ -6242,7 +6242,7 @@
       "source_location": "L357",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_failed_write_leaves_no_partial_rows",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_failed_write_leaves_no_partial_rows()"
     },
     {
@@ -6312,7 +6312,7 @@
       "source_location": "L474",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_row_counts_zero_before_v2_tables_exist",
-      "community": 42,
+      "community": 6,
       "norm_label": "test_row_counts_zero_before_v2_tables_exist()"
     },
     {
@@ -6322,7 +6322,7 @@
       "source_location": "L484",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_rights_status_rejects_unknown_explicit_value",
-      "community": 27,
+      "community": 382,
       "norm_label": "test_rights_status_rejects_unknown_explicit_value()"
     },
     {
@@ -6332,7 +6332,7 @@
       "source_location": "L489",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_second_playlist_item_reuses_playlist_row",
-      "community": 6,
+      "community": 149,
       "norm_label": "test_second_playlist_item_reuses_playlist_row()"
     },
     {
@@ -6382,7 +6382,7 @@
       "source_location": "L562",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_index_revision_bumps_after_fts_rebuild",
-      "community": 42,
+      "community": 6,
       "norm_label": "test_index_revision_bumps_after_fts_rebuild()"
     },
     {
@@ -6392,7 +6392,7 @@
       "source_location": "L590",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_rebuild_chunks_fts_noop_before_v4",
-      "community": 42,
+      "community": 6,
       "norm_label": "test_rebuild_chunks_fts_noop_before_v4()"
     },
     {
@@ -6402,7 +6402,7 @@
       "source_location": "L599",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_bump_index_revision_noop_before_v4",
-      "community": 42,
+      "community": 6,
       "norm_label": "test_bump_index_revision_noop_before_v4()"
     },
     {
@@ -6412,7 +6412,7 @@
       "source_location": "L609",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_test_compute_index_revision_stable",
-      "community": 27,
+      "community": 6,
       "norm_label": "test_compute_index_revision_stable()"
     },
     {
@@ -6432,7 +6432,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_store_tests_test_sqlite_rationale_236",
-      "community": 6,
+      "community": 149,
       "norm_label": "sqlite files are not byte-reproducible; counts + checksum must be."
     },
     {
@@ -6932,7 +6932,7 @@
       "source_location": "L394",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_api_client_httpclient",
-      "community": 3,
+      "community": 66,
       "norm_label": "httpclient"
     },
     {
@@ -7222,7 +7222,7 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_api_client_rationale_395",
-      "community": 3,
+      "community": 66,
       "norm_label": "selfhosted edition \u2014 fastapi over http with per-call timeouts."
     },
     {
@@ -8122,7 +8122,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_py",
-      "community": 63,
+      "community": 58,
       "norm_label": "test_inprocess_bridge.py"
     },
     {
@@ -8132,7 +8132,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_test_require_sqlite_path_fails_when_unset",
-      "community": 63,
+      "community": 58,
       "norm_label": "test_require_sqlite_path_fails_when_unset()"
     },
     {
@@ -8152,7 +8152,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_test_require_sqlite_path_fails_when_missing_file",
-      "community": 63,
+      "community": 58,
       "norm_label": "test_require_sqlite_path_fails_when_missing_file()"
     },
     {
@@ -8172,7 +8172,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_test_build_inprocess_client_wraps_asgi_delegate",
-      "community": 63,
+      "community": 58,
       "norm_label": "test_build_inprocess_client_wraps_asgi_delegate()"
     },
     {
@@ -8192,7 +8192,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_test_sync_asgi_transport_maps_a_stalled_app_to_a_read_timeout",
-      "community": 149,
+      "community": 58,
       "norm_label": "test_sync_asgi_transport_maps_a_stalled_app_to_a_read_timeout()"
     },
     {
@@ -8202,7 +8202,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_rationale_1",
-      "community": 63,
+      "community": 58,
       "norm_label": "unit tests for apps.inprocess_bridge (demo asgi wiring)."
     },
     {
@@ -8222,7 +8222,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_apps_ui_tests_test_inprocess_bridge_rationale_75",
-      "community": 149,
+      "community": 58,
       "norm_label": "the in-process edition must degrade like the http one: a stalled route     becom"
     },
     {
@@ -10262,7 +10262,7 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_llm_eval_default_retrieve",
-      "community": 382,
+      "community": 58,
       "norm_label": "_default_retrieve()"
     },
     {
@@ -10452,7 +10452,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_llm_eval_rationale_282",
-      "community": 382,
+      "community": 58,
       "norm_label": "production retrieval for the fixed `_arm`: hybrid search plus rerank.      impor"
     },
     {
@@ -10692,7 +10692,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_queryoutcome",
-      "community": 34,
+      "community": 154,
       "norm_label": "queryoutcome"
     },
     {
@@ -10702,7 +10702,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_queryoutcome_degraded",
-      "community": 34,
+      "community": 154,
       "norm_label": ".degraded()"
     },
     {
@@ -10712,7 +10712,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_bookmetrics",
-      "community": 34,
+      "community": 154,
       "norm_label": "bookmetrics"
     },
     {
@@ -10822,7 +10822,7 @@
       "source_location": "L349",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_retrieve_one",
-      "community": 34,
+      "community": 154,
       "norm_label": "_retrieve_one()"
     },
     {
@@ -10832,7 +10832,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "retriever",
-      "community": 34,
+      "community": 154,
       "norm_label": "retriever"
     },
     {
@@ -10852,7 +10852,7 @@
       "source_location": "L401",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_per_book",
-      "community": 34,
+      "community": 154,
       "norm_label": "_per_book()"
     },
     {
@@ -10862,7 +10862,7 @@
       "source_location": "L414",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_run_arm",
-      "community": 34,
+      "community": 63,
       "norm_label": "run_arm()"
     },
     {
@@ -11022,7 +11022,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_163",
-      "community": 34,
+      "community": 154,
       "norm_label": "what one arm actually returned for one ground-truth question."
     },
     {
@@ -11032,7 +11032,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_178",
-      "community": 34,
+      "community": 154,
       "norm_label": "true when the arm that ran is not the arm that was asked for."
     },
     {
@@ -11042,7 +11042,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_183",
-      "community": 34,
+      "community": 154,
       "norm_label": "one book's slice of an arm's score."
     },
     {
@@ -11112,7 +11112,7 @@
       "source_location": "L358",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_358",
-      "community": 34,
+      "community": 154,
       "norm_label": "run one query through one arm, recording what actually happened.      a retrieva"
     },
     {
@@ -11132,7 +11132,7 @@
       "source_location": "L402",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_402",
-      "community": 34,
+      "community": 154,
       "norm_label": "break the same outcomes down by book, using the same two metrics."
     },
     {
@@ -11142,7 +11142,7 @@
       "source_location": "L426",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_retrieval_eval_rationale_426",
-      "community": 34,
+      "community": 63,
       "norm_label": "score one arm over `rows`.      `rewrite=true` routes every question through `ho"
     },
     {
@@ -11942,7 +11942,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_judge_scriptedclient_init",
-      "community": 5,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -13022,7 +13022,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_py",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_retrieval_eval.py"
     },
     {
@@ -13042,7 +13042,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_row",
-      "community": 34,
+      "community": 63,
       "norm_label": "_row()"
     },
     {
@@ -13052,7 +13052,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_fixed_retriever",
-      "community": 34,
+      "community": 63,
       "norm_label": "_fixed_retriever()"
     },
     {
@@ -13062,7 +13062,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_metrics_are_reexported_from_evals_metrics_not_reimplemented",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_metrics_are_reexported_from_evals_metrics_not_reimplemented()"
     },
     {
@@ -13072,7 +13072,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_default_database_url_matches_the_index_module",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_default_database_url_matches_the_index_module()"
     },
     {
@@ -13082,7 +13082,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_arm_hit_rate_and_mrr_hand_computed",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_arm_hit_rate_and_mrr_hand_computed()"
     },
     {
@@ -13092,7 +13092,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_arm_scores_one_when_relevant_is_always_rank_one",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_arm_scores_one_when_relevant_is_always_rank_one()"
     },
     {
@@ -13102,7 +13102,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_arm_respects_k_and_ignores_hits_beyond_it",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_arm_respects_k_and_ignores_hits_beyond_it()"
     },
     {
@@ -13112,7 +13112,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_arm_rejects_an_unknown_arm",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_arm_rejects_an_unknown_arm()"
     },
     {
@@ -13122,7 +13122,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_arm_raises_on_zero_rows_rather_than_scoring_zero",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_arm_raises_on_zero_rows_rather_than_scoring_zero()"
     },
     {
@@ -13132,7 +13132,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_per_book_breakdown_sums_to_overall_n",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_per_book_breakdown_sums_to_overall_n()"
     },
     {
@@ -13142,7 +13142,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_two_rows_sharing_a_question_are_scored_separately",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_two_rows_sharing_a_question_are_scored_separately()"
     },
     {
@@ -13152,7 +13152,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_degraded_hybrid_is_reported_as_the_arm_that_actually_ran",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_degraded_hybrid_is_reported_as_the_arm_that_actually_ran()"
     },
     {
@@ -13162,7 +13162,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_partial_degradation_is_counted_not_rounded_away",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_partial_degradation_is_counted_not_rounded_away()"
     },
     {
@@ -13172,7 +13172,7 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_retrieval_exception_is_recorded_as_an_error_row_not_a_crash",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_retrieval_exception_is_recorded_as_an_error_row_not_a_crash()"
     },
     {
@@ -13182,7 +13182,7 @@
       "source_location": "L219",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_query_outcome_degraded_is_derived_from_the_arm_actually_used",
-      "community": 34,
+      "community": 154,
       "norm_label": "test_query_outcome_degraded_is_derived_from_the_arm_actually_used()"
     },
     {
@@ -13192,7 +13192,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_drifted_rows_are_split_out_not_scored_as_misses",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_drifted_rows_are_split_out_not_scored_as_misses()"
     },
     {
@@ -13212,7 +13212,7 @@
       "source_location": "L280",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_default_run_never_calls_the_rewriter",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_default_run_never_calls_the_rewriter()"
     },
     {
@@ -13222,7 +13222,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_rewrite_flag_routes_the_question_through_the_rewriter",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_rewrite_flag_routes_the_question_through_the_rewriter()"
     },
     {
@@ -13232,7 +13232,7 @@
       "source_location": "L320",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_run_all_arms_covers_the_four_named_arms",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_run_all_arms_covers_the_four_named_arms()"
     },
     {
@@ -13242,7 +13242,7 @@
       "source_location": "L333",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_arm_metrics",
-      "community": 34,
+      "community": 380,
       "norm_label": "_arm_metrics()"
     },
     {
@@ -13252,7 +13252,7 @@
       "source_location": "L359",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_four_arms",
-      "community": 34,
+      "community": 380,
       "norm_label": "_four_arms()"
     },
     {
@@ -13262,7 +13262,7 @@
       "source_location": "L368",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_marks_the_best_arm_as_winner",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_marks_the_best_arm_as_winner()"
     },
     {
@@ -13282,7 +13282,7 @@
       "source_location": "L381",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_states_every_coverage_bound",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_states_every_coverage_bound()"
     },
     {
@@ -13292,7 +13292,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_states_a_numeric_question_budget_when_capped",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_states_a_numeric_question_budget_when_capped()"
     },
     {
@@ -13302,7 +13302,7 @@
       "source_location": "L403",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_refuses_a_winner_when_an_arm_fully_degraded",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_refuses_a_winner_when_an_arm_fully_degraded()"
     },
     {
@@ -13312,7 +13312,7 @@
       "source_location": "L415",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_refuses_a_winner_when_an_arm_scored_nothing",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_refuses_a_winner_when_an_arm_scored_nothing()"
     },
     {
@@ -13322,7 +13322,7 @@
       "source_location": "L426",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_refuses_a_winner_with_fewer_than_four_arms",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_refuses_a_winner_with_fewer_than_four_arms()"
     },
     {
@@ -13332,7 +13332,7 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_caveats_a_winner_that_partially_degraded",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_caveats_a_winner_that_partially_degraded()"
     },
     {
@@ -13342,7 +13342,7 @@
       "source_location": "L448",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_lists_the_arm_actually_used_per_arm",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_lists_the_arm_actually_used_per_arm()"
     },
     {
@@ -13352,7 +13352,7 @@
       "source_location": "L461",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_report_includes_a_per_book_breakdown",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_report_includes_a_per_book_breakdown()"
     },
     {
@@ -13362,7 +13362,7 @@
       "source_location": "L470",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_write_report_refuses_an_empty_result_set",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_write_report_refuses_an_empty_result_set()"
     },
     {
@@ -13372,7 +13372,7 @@
       "source_location": "L480",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_load_questions_default_budget_takes_every_row",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_load_questions_default_budget_takes_every_row()"
     },
     {
@@ -13382,7 +13382,7 @@
       "source_location": "L492",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_load_questions_budget_spreads_across_books_instead_of_truncating",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_load_questions_budget_spreads_across_books_instead_of_truncating()"
     },
     {
@@ -13392,7 +13392,7 @@
       "source_location": "L512",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_load_questions_skips_blank_lines",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_load_questions_skips_blank_lines()"
     },
     {
@@ -13402,7 +13402,7 @@
       "source_location": "L520",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_committed_ground_truth_loads_and_covers_many_books",
-      "community": 34,
+      "community": 63,
       "norm_label": "test_committed_ground_truth_loads_and_covers_many_books()"
     },
     {
@@ -13412,7 +13412,7 @@
       "source_location": "L530",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_test_models_allow_extra_fields",
-      "community": 34,
+      "community": 380,
       "norm_label": "test_models_allow_extra_fields()"
     },
     {
@@ -13442,7 +13442,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_rationale_1",
-      "community": 34,
+      "community": 63,
       "norm_label": "tests for evals/retrieval_eval.py \u2014 the retrieval-arm bake-off.  every test here"
     },
     {
@@ -13452,7 +13452,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_evals_tests_test_retrieval_eval_rationale_56",
-      "community": 34,
+      "community": 63,
       "norm_label": "a fake `retriever` returning a canned ranking per question."
     },
     {
@@ -14515,7 +14515,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_core_src_homelib_core_normalize_rationale_33",
-      "community": 46,
+      "community": 92,
       "norm_label": "dispatch `path` to the right format handler by its suffix.      dispatches on `p"
     },
     {
@@ -17648,7 +17648,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_py",
-      "community": 154,
+      "community": 58,
       "norm_label": "rerank.py"
     },
     {
@@ -17658,7 +17658,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_load_model",
-      "community": 154,
+      "community": 58,
       "norm_label": "_load_model()"
     },
     {
@@ -17668,7 +17668,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crossencoder",
-      "community": 154,
+      "community": 58,
       "norm_label": "crossencoder"
     },
     {
@@ -17678,7 +17678,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_reset_singleton_for_tests",
-      "community": 154,
+      "community": 58,
       "norm_label": "_reset_singleton_for_tests()"
     },
     {
@@ -17698,7 +17698,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_rationale_1",
-      "community": 154,
+      "community": 58,
       "norm_label": "cross-encoder reranker \u2014 see specs/rerank.md.  improves ranking quality on top o"
     },
     {
@@ -17708,7 +17708,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_rationale_38",
-      "community": 154,
+      "community": 58,
       "norm_label": "return the process-wide `crossencoder` singleton, loading it if needed.      ret"
     },
     {
@@ -17718,7 +17718,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_src_homelib_rag_rerank_rationale_60",
-      "community": 154,
+      "community": 58,
       "norm_label": "reset the lazy singleton. test-only \u2014 not part of the public api."
     },
     {
@@ -18088,7 +18088,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "runtimeerror",
-      "community": 66,
+      "community": 62,
       "norm_label": "runtimeerror"
     },
     {
@@ -18998,7 +18998,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_answer_scriptedclient_init",
-      "community": 5,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -20598,7 +20598,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_index_sqlite_dispatch_sqlite_dispatch_db",
-      "community": 6,
+      "community": 42,
       "norm_label": "sqlite_dispatch_db()"
     },
     {
@@ -20968,7 +20968,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_rerank_raisingcrossencoder_init",
-      "community": 66,
+      "community": 62,
       "norm_label": ".__init__()"
     },
     {
@@ -21008,7 +21008,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_rerank_scoringfailsoncecrossencoder",
-      "community": 380,
+      "community": 58,
       "norm_label": "_scoringfailsoncecrossencoder"
     },
     {
@@ -21018,7 +21018,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_rerank_scoringfailsoncecrossencoder_init",
-      "community": 380,
+      "community": 58,
       "norm_label": ".__init__()"
     },
     {
@@ -21028,7 +21028,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_rerank_scoringfailsoncecrossencoder_predict",
-      "community": 380,
+      "community": 62,
       "norm_label": ".predict()"
     },
     {
@@ -21198,7 +21198,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_rerank_rationale_54",
-      "community": 380,
+      "community": 58,
       "norm_label": "loads fine; the first `predict` call raises, later calls succeed."
     },
     {
@@ -21538,7 +21538,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "volumes_externalssdmini_ci_runner_quick_workdir_c26b5c5c9bbd3be8_hostexecutor_packages_homelib_rag_tests_test_roadmap_scriptedclient_init",
-      "community": 5,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -23732,7 +23732,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "checklist",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_md",
       "community": 10,
       "norm_label": "checklist.md"
     },
@@ -23742,7 +23742,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "checklist_homelib_submission_checklist",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
       "community": 10,
       "norm_label": "homelib \u2014 submission checklist"
     },
@@ -23752,7 +23752,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L15",
       "_origin": "ast",
-      "id": "checklist_a_rubric_the_graded_criteria_26_points",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_a_rubric_the_graded_criteria_26_points",
       "community": 10,
       "norm_label": "a. rubric \u2014 the graded criteria (26 points)"
     },
@@ -23762,7 +23762,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L35",
       "_origin": "ast",
-      "id": "checklist_b_self_hosted_docker_readiness",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_b_self_hosted_docker_readiness",
       "community": 10,
       "norm_label": "b. self-hosted docker readiness"
     },
@@ -23772,7 +23772,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L51",
       "_origin": "ast",
-      "id": "checklist_c_engineering_quality_the_maintainable_extendable_half",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_c_engineering_quality_the_maintainable_extendable_half",
       "community": 10,
       "norm_label": "c. engineering quality (the \"maintainable, extendable\" half)"
     },
@@ -23782,7 +23782,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L71",
       "_origin": "ast",
-      "id": "checklist_d_nice_to_have_extendability",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_d_nice_to_have_extendability",
       "community": 10,
       "norm_label": "d. nice to have \u2014 extendability"
     },
@@ -23792,7 +23792,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L80",
       "_origin": "ast",
-      "id": "checklist_e_known_gaps_stated_plainly",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_e_known_gaps_stated_plainly",
       "community": 10,
       "norm_label": "e. known gaps, stated plainly"
     },
@@ -23802,7 +23802,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L118",
       "_origin": "ast",
-      "id": "checklist_f_v2_work_packages_wp00_wp11",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_f_v2_work_packages_wp00_wp11",
       "community": 10,
       "norm_label": "f. v2 work packages (wp00\u2013wp11)"
     },
@@ -23812,7 +23812,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L143",
       "_origin": "ast",
-      "id": "checklist_cut_order_html_prototype_first",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_cut_order_html_prototype_first",
       "community": 10,
       "norm_label": "cut order (html prototype first)"
     },
@@ -23822,7 +23822,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L153",
       "_origin": "ast",
-      "id": "checklist_scored_bar_do_not_drop_for_v2_ux",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_scored_bar_do_not_drop_for_v2_ux",
       "community": 10,
       "norm_label": "scored bar \u2014 do not drop for v2 ux"
     },
@@ -23832,7 +23832,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L159",
       "_origin": "ast",
-      "id": "checklist_g_never_commit_before_public_github_just_publish",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_g_never_commit_before_public_github_just_publish",
       "community": 10,
       "norm_label": "g. never commit before public github (`just publish`)"
     },
@@ -23842,7 +23842,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L182",
       "_origin": "ast",
-      "id": "checklist_h_wp00_landing_checklist_this_pr",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_h_wp00_landing_checklist_this_pr",
       "community": 10,
       "norm_label": "h. wp00 landing checklist (this pr)"
     },
@@ -23852,7 +23852,7 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L196",
       "_origin": "ast",
-      "id": "checklist_i_stacked_review_protocol_v2_binding_2026_09_01",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_i_stacked_review_protocol_v2_binding_2026_09_01",
       "community": 10,
       "norm_label": "i. stacked review protocol (v2, binding 2026-09-01)"
     },
@@ -24862,7 +24862,7 @@
       "source_file": "docs/evidence.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_evidence",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_md",
       "community": 10,
       "norm_label": "evidence.md"
     },
@@ -24872,7 +24872,7 @@
       "source_file": "docs/evidence.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_evidence_build_evidence_log",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_build_evidence_log",
       "community": 10,
       "norm_label": "build evidence log"
     },
@@ -24882,7 +24882,7 @@
       "source_file": "docs/evidence.md",
       "source_location": "L108",
       "_origin": "ast",
-      "id": "docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
       "community": 10,
       "norm_label": "plan addendum \u2014 post-merge corrections (2026-09-01)"
     },
@@ -25102,7 +25102,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_md",
       "community": 10,
       "norm_label": "2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md"
     },
@@ -25112,7 +25112,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
       "community": 10,
       "norm_label": "stakeholder picky review + wiki/mermaid handoff \u2014 2026-09-05"
     },
@@ -25122,7 +25122,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L5",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_0_live_snapshot_read_only_start_of_session",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_0_live_snapshot_read_only_start_of_session",
       "community": 10,
       "norm_label": "0. live snapshot (read-only, start of session)"
     },
@@ -25132,7 +25132,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L15",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_1_scoreboard_rubric_cold_re_score_on_the_stack",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_1_scoreboard_rubric_cold_re_score_on_the_stack",
       "community": 10,
       "norm_label": "1. scoreboard (rubric, cold re-score on the stack)"
     },
@@ -25142,7 +25142,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L32",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
       "community": 10,
       "norm_label": "2. findings"
     },
@@ -25152,7 +25152,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L34",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_fixed_in_this_stack_each_with_named_tests_see_pr_bodies_for_the_regression_matrix",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_fixed_in_this_stack_each_with_named_tests_see_pr_bodies_for_the_regression_matrix",
       "community": 10,
       "norm_label": "fixed in this stack (each with named tests \u2014 see pr bodies for the regression matrix)"
     },
@@ -25162,7 +25162,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L46",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_found_while_verifying_not_in_the_review_brief",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_found_while_verifying_not_in_the_review_brief",
       "community": 10,
       "norm_label": "found while verifying (not in the review brief)"
     },
@@ -25172,7 +25172,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L56",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_recorded_not_fixed_owner_decisions",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_recorded_not_fixed_owner_decisions",
       "community": 10,
       "norm_label": "recorded, not fixed (owner decisions)"
     },
@@ -25182,7 +25182,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L64",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_phase_2_picky_review_of_the_train_2026_09_06_owner_verify_picky_all_prs",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_phase_2_picky_review_of_the_train_2026_09_06_owner_verify_picky_all_prs",
       "community": 10,
       "norm_label": "phase 2 picky review of the train (2026-09-06, owner: \"verify picky all prs\")"
     },
@@ -25192,7 +25192,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L75",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stack_status_at_hand_off",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stack_status_at_hand_off",
       "community": 10,
       "norm_label": "stack status at hand-off"
     },
@@ -25202,7 +25202,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L86",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_3_talk_track_5_8_min",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_3_talk_track_5_8_min",
       "community": 10,
       "norm_label": "3. talk track (5\u20138 min)"
     },
@@ -25212,7 +25212,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L95",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_4_re_verify_next_agent_or_owner",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_4_re_verify_next_agent_or_owner",
       "community": 10,
       "norm_label": "4. re-verify (next agent or owner)"
     },
@@ -25222,7 +25222,7 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L105",
       "_origin": "ast",
-      "id": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_5_pasteable_prompt_for_the_next_model",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_5_pasteable_prompt_for_the_next_model",
       "community": 10,
       "norm_label": "5. pasteable prompt for the next model"
     },
@@ -25382,7 +25382,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_md",
       "community": 10,
       "norm_label": "reviewer-handoff-v2.md"
     },
@@ -25392,7 +25392,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
       "community": 10,
       "norm_label": "homelib v2 \u2014 reviewer handoff"
     },
@@ -25402,7 +25402,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L20",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_1_project_intent",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_1_project_intent",
       "community": 10,
       "norm_label": "1. project intent"
     },
@@ -25412,7 +25412,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L37",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
       "community": 10,
       "norm_label": "2. architecture & schema (v2 on `v2` branch)"
     },
@@ -25422,7 +25422,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L39",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_store",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_store",
       "community": 10,
       "norm_label": "store"
     },
@@ -25432,7 +25432,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L50",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_key_modules",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_key_modules",
       "community": 10,
       "norm_label": "key modules"
     },
@@ -25442,7 +25442,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L66",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_3_how_to_run_locally",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_3_how_to_run_locally",
       "community": 10,
       "norm_label": "3. how to run locally"
     },
@@ -25452,7 +25452,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L102",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
       "community": 10,
       "norm_label": "4. plan 2.1 / zoomcamp checklist matrix"
     },
@@ -25462,7 +25462,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L107",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_rubric_checklist_a_mostly_v1_evidence_on_main",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_rubric_checklist_a_mostly_v1_evidence_on_main",
       "community": 10,
       "norm_label": "rubric (checklist \u00a7a) \u2014 mostly **v1 evidence on `main`**"
     },
@@ -25472,7 +25472,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L123",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_v2_wps_checklist_f",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_v2_wps_checklist_f",
       "community": 10,
       "norm_label": "v2 wps (checklist \u00a7f)"
     },
@@ -25482,7 +25482,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L139",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_named_wp04_eval_numbers_sqlite_2026_09_03",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_named_wp04_eval_numbers_sqlite_2026_09_03",
       "community": 10,
       "norm_label": "named wp04 eval numbers (sqlite, 2026-09-03)"
     },
@@ -25492,7 +25492,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L153",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_5_wiki_map",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_5_wiki_map",
       "community": 10,
       "norm_label": "5. wiki map"
     },
@@ -25502,7 +25502,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L173",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_6_what_to_verify_in_review",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_6_what_to_verify_in_review",
       "community": 10,
       "norm_label": "6. what to verify in review"
     },
@@ -25512,7 +25512,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L193",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_7_known_gaps_improvements_priority",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_7_known_gaps_improvements_priority",
       "community": 10,
       "norm_label": "7. known gaps / improvements (priority)"
     },
@@ -25522,7 +25522,7 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L206",
       "_origin": "ast",
-      "id": "docs_reviewer_handoff_v2_8_current_git_state",
+      "id": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_8_current_git_state",
       "community": 10,
       "norm_label": "8. current git state"
     },
@@ -82175,8 +82175,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L1",
       "weight": 1.0,
-      "source": "checklist",
-      "target": "checklist_homelib_submission_checklist",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
       "confidence_score": 1.0
     },
     {
@@ -82185,8 +82185,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L8",
       "weight": 1.0,
-      "source": "checklist",
-      "target": "docs_evidence",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_md",
       "confidence_score": 1.0
     },
     {
@@ -82195,8 +82195,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L15",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_a_rubric_the_graded_criteria_26_points",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_a_rubric_the_graded_criteria_26_points",
       "confidence_score": 1.0
     },
     {
@@ -82205,8 +82205,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L35",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_b_self_hosted_docker_readiness",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_b_self_hosted_docker_readiness",
       "confidence_score": 1.0
     },
     {
@@ -82215,8 +82215,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L51",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_c_engineering_quality_the_maintainable_extendable_half",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_c_engineering_quality_the_maintainable_extendable_half",
       "confidence_score": 1.0
     },
     {
@@ -82225,8 +82225,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L71",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_d_nice_to_have_extendability",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_d_nice_to_have_extendability",
       "confidence_score": 1.0
     },
     {
@@ -82235,8 +82235,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L80",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_e_known_gaps_stated_plainly",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_e_known_gaps_stated_plainly",
       "confidence_score": 1.0
     },
     {
@@ -82245,8 +82245,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L118",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_f_v2_work_packages_wp00_wp11",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_f_v2_work_packages_wp00_wp11",
       "confidence_score": 1.0
     },
     {
@@ -82255,8 +82255,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L159",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_g_never_commit_before_public_github_just_publish",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_g_never_commit_before_public_github_just_publish",
       "confidence_score": 1.0
     },
     {
@@ -82265,8 +82265,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L182",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_h_wp00_landing_checklist_this_pr",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_h_wp00_landing_checklist_this_pr",
       "confidence_score": 1.0
     },
     {
@@ -82275,8 +82275,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L196",
       "weight": 1.0,
-      "source": "checklist_homelib_submission_checklist",
-      "target": "checklist_i_stacked_review_protocol_v2_binding_2026_09_01",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_homelib_submission_checklist",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_i_stacked_review_protocol_v2_binding_2026_09_01",
       "confidence_score": 1.0
     },
     {
@@ -82285,8 +82285,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L143",
       "weight": 1.0,
-      "source": "checklist_f_v2_work_packages_wp00_wp11",
-      "target": "checklist_cut_order_html_prototype_first",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_f_v2_work_packages_wp00_wp11",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_cut_order_html_prototype_first",
       "confidence_score": 1.0
     },
     {
@@ -82295,8 +82295,8 @@
       "source_file": "CHECKLIST.md",
       "source_location": "L153",
       "weight": 1.0,
-      "source": "checklist_f_v2_work_packages_wp00_wp11",
-      "target": "checklist_scored_bar_do_not_drop_for_v2_ux",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_f_v2_work_packages_wp00_wp11",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_checklist_scored_bar_do_not_drop_for_v2_ux",
       "confidence_score": 1.0
     },
     {
@@ -83475,8 +83475,8 @@
       "source_file": "docs/evidence.md",
       "source_location": "L1",
       "weight": 1.0,
-      "source": "docs_evidence",
-      "target": "docs_evidence_build_evidence_log",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_build_evidence_log",
       "confidence_score": 1.0
     },
     {
@@ -83485,8 +83485,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L28",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2",
-      "target": "docs_evidence",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_md",
       "confidence_score": 1.0
     },
     {
@@ -83495,8 +83495,8 @@
       "source_file": "docs/evidence.md",
       "source_location": "L108",
       "weight": 1.0,
-      "source": "docs_evidence_build_evidence_log",
-      "target": "docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_build_evidence_log",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
       "confidence_score": 1.0
     },
     {
@@ -83705,8 +83705,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L1",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
       "confidence_score": 1.0
     },
     {
@@ -83715,8 +83715,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L12",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_md",
       "confidence_score": 1.0
     },
     {
@@ -83725,8 +83725,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L5",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_0_live_snapshot_read_only_start_of_session",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_0_live_snapshot_read_only_start_of_session",
       "confidence_score": 1.0
     },
     {
@@ -83735,8 +83735,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L15",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_1_scoreboard_rubric_cold_re_score_on_the_stack",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_1_scoreboard_rubric_cold_re_score_on_the_stack",
       "confidence_score": 1.0
     },
     {
@@ -83745,8 +83745,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L32",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
       "confidence_score": 1.0
     },
     {
@@ -83755,8 +83755,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L86",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_3_talk_track_5_8_min",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_3_talk_track_5_8_min",
       "confidence_score": 1.0
     },
     {
@@ -83765,8 +83765,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L95",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_4_re_verify_next_agent_or_owner",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_4_re_verify_next_agent_or_owner",
       "confidence_score": 1.0
     },
     {
@@ -83775,8 +83775,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L105",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_5_pasteable_prompt_for_the_next_model",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stakeholder_picky_review_wiki_mermaid_handoff_2026_09_05",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_5_pasteable_prompt_for_the_next_model",
       "confidence_score": 1.0
     },
     {
@@ -83785,8 +83785,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L34",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_fixed_in_this_stack_each_with_named_tests_see_pr_bodies_for_the_regression_matrix",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_fixed_in_this_stack_each_with_named_tests_see_pr_bodies_for_the_regression_matrix",
       "confidence_score": 1.0
     },
     {
@@ -83795,8 +83795,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L46",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_found_while_verifying_not_in_the_review_brief",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_found_while_verifying_not_in_the_review_brief",
       "confidence_score": 1.0
     },
     {
@@ -83805,8 +83805,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L64",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_phase_2_picky_review_of_the_train_2026_09_06_owner_verify_picky_all_prs",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_phase_2_picky_review_of_the_train_2026_09_06_owner_verify_picky_all_prs",
       "confidence_score": 1.0
     },
     {
@@ -83815,8 +83815,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L56",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_recorded_not_fixed_owner_decisions",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_recorded_not_fixed_owner_decisions",
       "confidence_score": 1.0
     },
     {
@@ -83825,8 +83825,8 @@
       "source_file": "docs/handoffs/2026-09-05-stakeholder-picky-review-and-wiki-mermaid-handoff.md",
       "source_location": "L75",
       "weight": 1.0,
-      "source": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
-      "target": "docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stack_status_at_hand_off",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_2_findings",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_handoffs_2026_09_05_stakeholder_picky_review_and_wiki_mermaid_handoff_stack_status_at_hand_off",
       "confidence_score": 1.0
     },
     {
@@ -83965,8 +83965,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L1",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2",
-      "target": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_md",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
       "confidence_score": 1.0
     },
     {
@@ -83975,8 +83975,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L20",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_1_project_intent",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_1_project_intent",
       "confidence_score": 1.0
     },
     {
@@ -83985,8 +83985,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L37",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
       "confidence_score": 1.0
     },
     {
@@ -83995,8 +83995,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L66",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_3_how_to_run_locally",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_3_how_to_run_locally",
       "confidence_score": 1.0
     },
     {
@@ -84005,8 +84005,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L102",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
       "confidence_score": 1.0
     },
     {
@@ -84015,8 +84015,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L153",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_5_wiki_map",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_5_wiki_map",
       "confidence_score": 1.0
     },
     {
@@ -84025,8 +84025,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L173",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_6_what_to_verify_in_review",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_6_what_to_verify_in_review",
       "confidence_score": 1.0
     },
     {
@@ -84035,8 +84035,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L193",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_7_known_gaps_improvements_priority",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_7_known_gaps_improvements_priority",
       "confidence_score": 1.0
     },
     {
@@ -84045,8 +84045,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L206",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
-      "target": "docs_reviewer_handoff_v2_8_current_git_state",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_homelib_v2_reviewer_handoff",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_8_current_git_state",
       "confidence_score": 1.0
     },
     {
@@ -84055,8 +84055,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L50",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
-      "target": "docs_reviewer_handoff_v2_key_modules",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_key_modules",
       "confidence_score": 1.0
     },
     {
@@ -84065,8 +84065,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L39",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
-      "target": "docs_reviewer_handoff_v2_store",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_2_architecture_schema_v2_on_v2_branch",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_store",
       "confidence_score": 1.0
     },
     {
@@ -84075,8 +84075,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L139",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
-      "target": "docs_reviewer_handoff_v2_named_wp04_eval_numbers_sqlite_2026_09_03",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_named_wp04_eval_numbers_sqlite_2026_09_03",
       "confidence_score": 1.0
     },
     {
@@ -84085,8 +84085,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L107",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
-      "target": "docs_reviewer_handoff_v2_rubric_checklist_a_mostly_v1_evidence_on_main",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_rubric_checklist_a_mostly_v1_evidence_on_main",
       "confidence_score": 1.0
     },
     {
@@ -84095,8 +84095,8 @@
       "source_file": "docs/reviewer-handoff-v2.md",
       "source_location": "L123",
       "weight": 1.0,
-      "source": "docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
-      "target": "docs_reviewer_handoff_v2_v2_wps_checklist_f",
+      "source": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_4_plan_2_1_zoomcamp_checklist_matrix",
+      "target": "volumes_externalssdmini_ci_runner_quick_workdir_335df5bb0f94cb6b_hostexecutor_docs_reviewer_handoff_v2_v2_wps_checklist_f",
       "confidence_score": 1.0
     },
     {
@@ -89641,5 +89641,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "6ecf25afa7d82dedd222d1c94d890645ea8eb2f1"
+  "built_at_commit": "03242aad0a071e126f9eb50b2468a0d27cc705b6"
 }
