@@ -84,6 +84,7 @@ __all__ = [
     "AnsweredCase",
     "VariantScore",
     "run_variant",
+    "save_answers",
     "score_variants",
     "write_report",
 ]
@@ -374,6 +375,25 @@ def run_variant(
     return [_answer_one(variant, row, variant_client, retrieve_fn, k) for row in questions]
 
 
+def save_answers(cases_by_variant: Mapping[str, list[AnsweredCase]], path: Path) -> None:
+    """Persist every answered case as JSON Lines, one `AnsweredCase` per line.
+
+    Opt-in via `--save-answers`: this module otherwise persists nothing but
+    the markdown report, and the JSONL can grow large over a full
+    questions x variants run. Written flat (every variant's cases, in
+    `cases_by_variant`'s iteration order) rather than nested by variant, so
+    a downstream reader — `evals/answer_similarity.py`, the second LLM-eval
+    method that scores these same answers by embedding cosine similarity
+    instead of an LLM judge — can stream it without knowing the variant set
+    up front.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as out:
+        for cases in cases_by_variant.values():
+            for case in cases:
+                out.write(case.model_dump_json() + "\n")
+
+
 # ── score the arms ──────────────────────────────────────────────────────────
 
 
@@ -620,6 +640,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "production's 30s: this box is shared, and a short ceiling turns "
         "contention into recorded model failures (default: %(default)s)",
     )
+    parser.add_argument(
+        "--save-answers",
+        dest="save_answers",
+        type=Path,
+        default=None,
+        help="persist every answered case as JSON Lines (one AnsweredCase per "
+        "line, all variants) to this path — input for "
+        "evals/answer_similarity.py's cosine-similarity scoring. Off by "
+        "default (no answers are otherwise kept on disk).",
+    )
     return parser.parse_args(argv)
 
 
@@ -672,6 +702,12 @@ def main(argv: list[str] | None = None) -> int:
     after = _machine_snapshot()
     if before != after:
         print(f"⚠ machine state changed during the run:\n    before {before}\n    after  {after}")
+
+    if args.save_answers:
+        save_answers(cases_by_variant, args.save_answers)
+        n_saved = sum(len(cases) for cases in cases_by_variant.values())
+        print(f"saved {n_saved} answered case(s) -> {args.save_answers}")
+
     write_report(scores, args.report)
     print(f"wrote {args.report} in {time.monotonic() - started:.1f}s")
     print(json.dumps([score.model_dump() for score in scores], indent=2))

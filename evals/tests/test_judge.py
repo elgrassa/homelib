@@ -32,6 +32,7 @@ from evals.llm_eval import (
     AnsweredCase,
     VariantScore,
     run_variant,
+    save_answers,
     score_variants,
     write_report,
 )
@@ -445,6 +446,40 @@ def test_score_variants_returns_one_row_per_variant_including_empty_ones() -> No
     assert by_variant["stepwise"].n == 0
     assert by_variant["stepwise"].mean_faithfulness == 0.0
     assert by_variant["concise"].n == 1
+
+
+def test_save_answers_writes_one_json_line_per_case_across_variants(tmp_path: Path) -> None:
+    # Two variants, two cases each -> 4 lines, flat (not nested by variant),
+    # so a downstream reader (evals/answer_similarity.py) can stream it
+    # without knowing the variant set up front.
+    cases_by_variant = {
+        "concise": [
+            _answered_case("concise", question="q1"),
+            _answered_case("concise", question="q2"),
+        ],
+        "stepwise": [_answered_case("stepwise", question="q1")],
+    }
+    path = tmp_path / "answers.jsonl"
+
+    save_answers(cases_by_variant, path)
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 3
+    parsed = [json.loads(line) for line in lines]
+    assert [row["variant"] for row in parsed] == ["concise", "concise", "stepwise"]
+    assert [row["question"] for row in parsed] == ["q1", "q2", "q1"]
+    assert all(row["answer"] == "a." for row in parsed)
+
+
+def test_save_answers_round_trips_through_answered_case(tmp_path: Path) -> None:
+    case = _answered_case("concise", question="q?", answer="the answer.")
+    path = tmp_path / "answers.jsonl"
+
+    save_answers({"concise": [case]}, path)
+    (line,) = path.read_text(encoding="utf-8").splitlines()
+    restored = AnsweredCase.model_validate_json(line)
+
+    assert restored == case
 
 
 def test_judge_score_model_allows_extra_fields() -> None:

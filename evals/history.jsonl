@@ -6,3 +6,4 @@
 {"git_sha": "39b91460365a03167835c5ed656592de810061f3", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-03T13:10:49.877947+00:00"}
 {"git_sha": "7f4a8c4fae7b5a0b74b4a1d43cc1714159df6286", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-06T21:47:05.422912+00:00"}
 {"git_sha": "7f4a8c4fae7b5a0b74b4a1d43cc1714159df6286", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-06T21:54:33.339888+00:00"}
+{"git_sha": "9ff4c9a12f96f0b6dcd7cf1a8ea3b83c0e24cdbf", "metrics": {"judge.mean_faithfulness": 3.4}, "regressions": [], "ts": "2026-09-06T22:35:29.458462+00:00"}
