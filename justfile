@@ -136,6 +136,15 @@ eval-llm:
 eval-rrf-k:
     uv run python evals/retrieval_eval.py --rrf-k 1 --rrf-k 10 --rrf-k 60 --rrf-k 100 --rrf-k 200
 
+# Chunking experiment: target_chars/overlap in {600/100, 1200/200, 2000/400},
+# book-level hit-rate/MRR@5 (fresh in-memory lexical+vector indices per config)
+# -> evals/results/chunking.md. --books 6 matches the documented, measured run
+# (evals/results/chunking.md, ~8 min): embedding all 18 books across three
+# configs is the actual bottleneck, not question count -- see
+# evals/chunk_sweep.py's docstring before widening this to the full corpus.
+eval-chunking:
+    uv run python evals/chunk_sweep.py --books 6 --questions 235
+
 # ── demos (used as WP verify commands) ──────────────────────────────────────
 
 demo-ask Q:

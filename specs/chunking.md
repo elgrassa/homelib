@@ -106,3 +106,19 @@ assert all(doc.canonical_text[c.char_start:c.char_end] == c.text for c in chunks
 print(len(chunks), 'chunks, invariant holds')
 "
 ```
+
+## Chunking experiment (2026-09-06)
+
+`evals/chunk_sweep.py` (`just eval-chunking`) sweeps `target_chars`/`overlap`
+at `600/100`, `1200/200` (production default, this spec) and `2000/400`,
+re-chunking a corpus subset from `data/corpus_snapshot.jsonl.gz` and scoring
+book-level hit-rate/MRR@5 (ground-truth chunk ids do not survive
+re-chunking) with fresh in-memory lexical (SQLite FTS5) and vector
+(`all-MiniLM-L6-v2`) indices per config — `evals/results/chunking.md`.
+Measured on a 6/18-book subset (73 ground-truth rows; full 18-book corpus
+embeds too slowly across three configs for the 20-minute budget — see that
+module's docstring): `1200/200` edges out `600/100`/`2000/400` by a 0.014
+book-level hit@5 spread on the vector arm (0.986 vs 0.973), so the production
+default is not a meaningfully worse choice than either alternative on this
+sample; retrieving the top-5 chunks under it costs ~893 mean tokens against a
+~3073-token whole-section baseline.
