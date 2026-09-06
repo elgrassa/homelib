@@ -183,7 +183,7 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 5. **Coverage floor:** `just ci` ≥ 90%.
 6. **Honest residual (WP11):** `just drill` is green on the train tip `ee0f318`
    (2026-09-05; the same-day run on `ae83d51` failed under load — both recorded).
-   Still owner Mon: merge the train, `just publish`, Streamlit Cloud, peer×3. Do
+   Train merged 2026-09-06 (`v2` = `02a26ba`). Still owner Mon: `just publish`, Streamlit Cloud, peer×3. Do
    not claim a live public URL, and do not claim `v2` @ `86ba349` is drilled.
 7. **Compose:** if Docker healthy, `just up` + `/health` + one `/v1/ask`.
    For SQLite demo path also set `HOMELIB_SQLITE_PATH` + seed.
@@ -209,6 +209,6 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 |---|---|
 | `forgejo/v2` | `86ba349` — product tip; the stack below merges into it oldest-first |
 | `main` / `v1-fallback` | `535f58b` |
-| Open PRs | `v2 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E (draft)`, each gated by `just ci` before push; merge A → B → D → C → E oldest-first; agents never merge |
+| Merged 2026-09-06 | `v2 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E ← #30 PR-B2`, each green on Forgejo at its head and merged fast-forward-only; `v2` = `02a26ba`, linear. Nothing is open on `v2`. |
 
 Merge style: `tea pulls merge <n> --style rebase`. No force-push to `v2`/`main`.
