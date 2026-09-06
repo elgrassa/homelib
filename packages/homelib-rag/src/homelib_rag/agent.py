@@ -10,7 +10,13 @@ ingested shelf), `search_catalog` (Open Library catalog), `build_roadmap`
 (wraps `homelib_rag.roadmap.build_roadmap` with default client/catalog
 wiring), and `get_block` (fetch one block by id — also reused directly by
 `apps/api`'s `GET /v1/blocks/{block_id}`, so the two never disagree about
-what a block looks like).
+what a block looks like). This module's own default tool table
+(`_TOOL_FUNCTIONS`) binds `get_block`/`search_catalog` to Postgres directly,
+so `run_agent(...)`'s `tools=` parameter exists precisely so a store-agnostic
+caller can inject its own (e.g. SQLite-dispatching) callables instead —
+`homelib_rag.mentor.mentor_intake` is the one caller that does, on the Mentor
+request path (specs/agent-tools.md: "on the Mentor request path since
+2026-09-06; Ask stays single-shot").
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import psycopg
@@ -321,20 +328,33 @@ def run_agent(
     *,
     max_rounds: int = 6,
     client: OpenAICompatibleClient,
+    tools: Mapping[str, Callable[..., Any]] | None = None,
+    tool_schemas: list[dict[str, Any]] | None = None,
+    max_tokens: int = 400,
 ) -> AgentResult:
     """Drive the request -> tool -> result loop until the model produces a
     final message with no further tool calls, or `max_rounds` is hit.
 
+    `tools` and `tool_schemas` default to this module's own `_TOOL_FUNCTIONS`
+    / `TOOL_SCHEMAS` (Postgres-bound `get_block`/`search_catalog`) — pass both
+    to run the loop against a different, store-safe tool table without
+    touching the defaults (`homelib_rag.mentor.mentor_intake` does exactly
+    this on the Mentor path, wiring `Deps.get_block` etc. in instead).
+
     `LLMUnreachableError` from `client.chat(...)` propagates out uncaught —
-    turning that into a `200 degraded: true` response is `apps/api`'s job
+    turning that into a `200 degraded: true` response is the caller's job
     (specs/agent-tools.md), not this loop's.
     """
+    active_tools: Mapping[str, Callable[..., Any]] = tools if tools is not None else _TOOL_FUNCTIONS
+    active_schemas: list[dict[str, Any]] = (
+        tool_schemas if tool_schemas is not None else TOOL_SCHEMAS
+    )
     history = list(messages)
     tool_call_log: list[ToolCallRecord] = []
     last_unknown_tool: str | None = None
 
     for round_index in range(max_rounds):
-        response = client.chat(history, tools=TOOL_SCHEMAS)
+        response = client.chat(history, tools=active_schemas, max_tokens=max_tokens)
 
         if not response.tool_calls:
             return AgentResult(
@@ -356,7 +376,7 @@ def run_agent(
             call_id = tool_call.get("id", "")
             arguments = _parse_arguments(function.get("arguments"))
 
-            if tool_name not in _TOOL_FUNCTIONS:
+            if tool_name not in active_tools:
                 if tool_name == last_unknown_tool:
                     return AgentResult(
                         final_message=(
@@ -386,7 +406,7 @@ def run_agent(
 
             last_unknown_tool = None
             try:
-                result = _TOOL_FUNCTIONS[tool_name](**arguments)
+                result = active_tools[tool_name](**arguments)
             except Exception as exc:  # a single tool failure never crashes the request
                 error_message = str(exc)
                 logger.warning("run_agent: tool %r raised: %s", tool_name, error_message)

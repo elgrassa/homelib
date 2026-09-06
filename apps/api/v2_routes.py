@@ -142,6 +142,11 @@ def post_mentor_intake(req: MentorIntakeRequest) -> MentorIntakeResponse:
         client=deps.llm_client,
         catalog=deps.catalog_search,
         shelf_search=lambda q, k: deps.retrieve(q, k, "hybrid")[0],
+        # `Deps.get_block` already dispatches on HOMELIB_SQLITE_PATH
+        # (apps/api/main.py's `_get_block`), so the Mentor agent loop's
+        # `get_block` tool is store-safe without touching agent.py's own
+        # Postgres-bound default (specs/agent-tools.md).
+        get_block=deps.get_block,
     )
 
 

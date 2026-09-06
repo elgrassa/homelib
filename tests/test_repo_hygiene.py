@@ -374,19 +374,27 @@ def test_ci_pytest_forces_workspace_basetemp() -> None:
     )
 
 
-def test_run_agent_is_not_on_the_demo_request_path() -> None:
-    """`homelib_rag.agent.run_agent`'s tool table binds `get_block` to the
-    Postgres implementation. That is only safe because no request path in
-    `apps/` calls `run_agent` — the API wires `get_block`/`search_catalog`
-    through `Deps`, which dispatch on HOMELIB_SQLITE_PATH. Pin the fact, so a
-    future "just call run_agent" lands with the dispatch work, not without.
+def test_run_agent_is_only_on_the_mentor_path() -> None:
+    """`homelib_rag.agent.run_agent`'s own default tool table binds
+    `get_block` to Postgres directly, so calling it with no store-safe
+    `tools=` override is only safe for the Mentor path — the one caller
+    (`homelib_rag.mentor.mentor_intake`) that injects `Deps.get_block`
+    et al. (specs/agent-tools.md: "on the Mentor request path since
+    2026-09-06; Ask stays single-shot"). `/v1/ask`'s handler
+    (`apps/api/main.py`) and the Ask door (`apps/ui`) must never reference
+    `run_agent`; only the Mentor route (`apps/api/v2_routes.py`) may.
     """
-    offenders = [
+    main_py_text = (REPO_ROOT / "apps" / "api" / "main.py").read_text()
+    assert "run_agent" not in main_py_text, (
+        "run_agent referenced in apps/api/main.py (/v1/ask's module) — Ask must stay single-shot"
+    )
+
+    ui_offenders = [
         path.relative_to(REPO_ROOT)
-        for path in (REPO_ROOT / "apps").rglob("*.py")
+        for path in (REPO_ROOT / "apps" / "ui").rglob("*.py")
         if "tests" not in path.parts and "run_agent" in path.read_text()
     ]
-    assert offenders == [], f"run_agent referenced on a request path: {offenders}"
+    assert ui_offenders == [], f"run_agent referenced under apps/ui: {ui_offenders}"
 
 
 def _compose() -> dict[str, object]:

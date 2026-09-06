@@ -1,6 +1,6 @@
 # spec: agent-tools — `homelib_rag.agent`
 
-**Implemented by:** WP-14 · **Consumed by:** `apps/api` (`/v1/ask`, `/v1/roadmap`), `roadmap.py`, `answer.py`.
+**Implemented by:** WP-14 · **Consumed by:** `apps/api` (`/v1/ask`, `/v1/roadmap`), `roadmap.py`, `answer.py`, `mentor.py` (`run_agent`, Mentor path only, since 2026-09-06).
 **v2 tool allowlist** (product §7.7, `specs/provider.md`): `search_library`,
 `get_block`, `get_resource`, `propose_playlist`, `build_path`. v1 names below
 remain live until WP06. Mutating tools create **proposals**.
@@ -22,8 +22,12 @@ def search_shelf(query: str, k: int = 5) -> list[Hit]                       # Hi
 def search_catalog(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]   # specs/core-models.md
 # Dispatches to homelib_rag.sqlite_index.search_catalog when HOMELIB_SQLITE_PATH is set
 # (ADR-004) — inside the function, so Deps.catalog_search, build_roadmap and
-# _TOOL_FUNCTIONS all follow. run_agent itself is not on any apps/ request path
-# (tests/test_repo_hygiene.py::test_run_agent_is_not_on_the_demo_request_path).
+# _TOOL_FUNCTIONS all follow. run_agent's OWN default tool table still binds
+# get_block to Postgres directly; it is on the Mentor request path since
+# 2026-09-06 (homelib_rag.mentor.mentor_intake, POST /v1/mentor/intake) via
+# its `tools=`/`tool_schemas=` injection seam, wired to Deps.get_block et al.
+# so the loop stays store-safe — Ask (/v1/ask) stays single-shot and never
+# calls run_agent (tests/test_repo_hygiene.py::test_run_agent_is_only_on_the_mentor_path).
 def build_roadmap(interests: list[str], level: Level, goal: str) -> RoadmapResponse       # specs/api.md, specs/roadmap.md
 def get_block(block_id: str) -> Block                                        # specs/core-models.md
 
@@ -47,6 +51,9 @@ def run_agent(
     *,
     max_rounds: int = 6,
     client: OpenAICompatibleClient,
+    tools: Mapping[str, Callable[..., Any]] | None = None,      # default: this module's _TOOL_FUNCTIONS
+    tool_schemas: list[dict] | None = None,                     # default: this module's TOOL_SCHEMAS
+    max_tokens: int = 400,
 ) -> AgentResult
 ```
 

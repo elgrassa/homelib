@@ -139,6 +139,10 @@ def render_mentor_tab(client: Client) -> None:
         st.warning("Mentor returned a degraded proposal.")
     if last.get("high_stakes_notice"):
         st.info(last["high_stakes_notice"])
+    tool_calls = last.get("tool_calls") or []
+    if tool_calls:
+        rounds_used = last.get("rounds_used", 0)
+        st.caption(f"Tools used: {' → '.join(tool_calls)} ({rounds_used} rounds)")
     st.write(last.get("rationale") or "")
     path = last.get("proposed_path")
     if path:

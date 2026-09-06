@@ -392,6 +392,54 @@ def test_tool_schemas_shape() -> None:
         assert "parameters" in schema["function"]
 
 
+def test_run_agent_uses_injected_get_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_agent(..., tools=...)` dispatches to the caller's own tool table
+    instead of this module's Postgres-bound `_TOOL_FUNCTIONS` default — the
+    store-safety seam `homelib_rag.mentor.mentor_intake` uses to wire
+    `Deps.get_block` in on the Mentor path (specs/agent-tools.md)."""
+
+    def _real_get_block_must_not_run(**_kwargs: Any) -> Block:
+        raise AssertionError("the module-default get_block must not be called")
+
+    monkeypatch.setitem(agent_module._TOOL_FUNCTIONS, "get_block", _real_get_block_must_not_run)
+
+    injected_calls: list[str] = []
+
+    def _injected_get_block(block_id: str) -> Block:
+        injected_calls.append(block_id)
+        return Block(
+            block_id=block_id,
+            book_id="bk",
+            ordinal=0,
+            section_path=[],
+            text="t",
+            char_start=0,
+            char_end=1,
+            provenance=Provenance(format="txt", source_sha256=""),
+        )
+
+    client = _ScriptedClient(
+        [
+            _tool_call_response(_tool_call("get_block", '{"block_id": "blk-1"}')),
+            _final_message("fetched"),
+        ]
+    )
+
+    result = run_agent(
+        [ChatMessage(role="user", content="fetch a block")],
+        client=client,
+        tools={"get_block": _injected_get_block},
+    )
+
+    assert injected_calls == ["blk-1"]
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0].tool_name == "get_block"
+    assert result.tool_calls[0].arguments == {"block_id": "blk-1"}
+    assert result.tool_calls[0].error is None
+    assert result.final_message == "fetched"
+    assert result.degraded is False
+
+
 def test_tool_call_record_and_agent_result_roundtrip() -> None:
     record = ToolCallRecord(round=0, tool_name="x", arguments={}, result_summary="ok", error=None)
     result = AgentResult(final_message="done", tool_calls=[record], rounds_used=1, degraded=False)

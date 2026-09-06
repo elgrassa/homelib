@@ -8,9 +8,9 @@ from typing import Any
 
 import homelib_rag.agent as agent_module
 import pytest
-from homelib_core.models import CatalogEntry
+from homelib_core.models import Block, CatalogEntry, Provenance
 from homelib_rag.agent import run_agent
-from homelib_rag.answer import ChatMessage, LLMResponse, LLMUsage
+from homelib_rag.answer import ChatMessage, LLMResponse, LLMUnreachableError, LLMUsage
 from homelib_rag.mentor import (
     MentorIntakeResponse,
     build_path,
@@ -49,6 +49,36 @@ def _hit(text: str = "Virtue is the only good.", chunk_id: str = "c1") -> Hit:
         section_path=["Book I"],
         page=3,
         block_ids=["blk1"],
+    )
+
+
+class _UnreachableClient:
+    """A scripted client whose endpoint is down before any tool call."""
+
+    model = "fake-model"
+
+    def chat(
+        self,
+        messages: Any,
+        *,
+        tools: Any = None,
+        response_format: Any = None,
+        max_tokens: int = 400,
+    ) -> LLMResponse:
+        _ = (messages, tools, response_format, max_tokens)
+        raise LLMUnreachableError("connection refused")
+
+
+def _get_block_fixture(block_id: str) -> Block:
+    return Block(
+        block_id=block_id,
+        book_id="b1",
+        ordinal=0,
+        section_path=[],
+        text="fetched text",
+        char_start=0,
+        char_end=12,
+        provenance=Provenance(format="txt", source_sha256=""),
     )
 
 
@@ -205,6 +235,61 @@ def test_high_stakes_note() -> None:
     )
     assert response.high_stakes_notice is not None
     assert "informational" in response.high_stakes_notice.lower()
+
+
+def test_mentor_response_reports_tool_calls() -> None:
+    """A scripted fake LLM calls `get_block` once before its final proposal
+    (`run_agent`'s loop, wired in on the Mentor path since 2026-09-06); the
+    response surfaces the tool name and the number of rounds it took."""
+    tool_call = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "get_block", "arguments": '{"block_id": "blk1"}'},
+    }
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                content="",
+                tool_calls=[tool_call],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+            _intake_json(),
+        ]
+    )
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+
+    assert response.tool_calls == ["get_block"]
+    assert response.rounds_used == 2
+    assert response.degraded is False
+
+
+def test_mentor_intake_degrades_when_llm_down() -> None:
+    """The LLM endpoint is unreachable before `run_agent` gets to invoke a
+    tool: the response is still returned degraded, exactly as it was before
+    the intake ran through the agent loop, with no tool activity to report."""
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=_UnreachableClient(),
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+
+    assert response.degraded is True
+    assert response.tool_calls == []
+    assert response.rounds_used == 0
+    assert response.rationale == "The mentor service is temporarily unavailable."
 
 
 def test_abstention_on_no_evidence() -> None:

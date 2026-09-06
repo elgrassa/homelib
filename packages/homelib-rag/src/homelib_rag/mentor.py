@@ -12,11 +12,13 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
-from homelib_core.models import CatalogEntry
+from homelib_core.models import Block, CatalogEntry
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from homelib_rag.agent import TOOL_SCHEMAS as _AGENT_TOOL_SCHEMAS
+from homelib_rag.agent import run_agent
 from homelib_rag.answer import (
     ChatMessage,
     Citation,
@@ -27,6 +29,15 @@ from homelib_rag.answer import (
 )
 from homelib_rag.models import Hit
 from homelib_rag.roadmap import CatalogSearch, Level, RoadmapParseError, RoadmapStep
+
+# Mentor's own tool-calling surface (specs/agent-tools.md: "on the Mentor
+# request path since 2026-09-06"): the same three retrieval tools `run_agent`
+# already knows how to schema/dispatch, minus `build_roadmap` — the mentor
+# proposes its own path rather than delegating to the roadmap tool.
+_MENTOR_TOOL_NAMES = {"search_shelf", "search_catalog", "get_block"}
+_MENTOR_TOOL_SCHEMAS = [
+    schema for schema in _AGENT_TOOL_SCHEMAS if schema["function"]["name"] in _MENTOR_TOOL_NAMES
+]
 
 __all__ = [
     "CreatePathRequest",
@@ -107,6 +118,12 @@ class MentorIntakeResponse(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     degraded: bool = False
     high_stakes_notice: str | None = None
+    #: Tool names in call order, from the `run_agent` loop this intake now
+    #: drives (specs/agent-tools.md). Empty when the LLM never got to call a
+    #: tool (abstention on no evidence, or the endpoint was unreachable) —
+    #: defaulted so older clients parsing this response still validate.
+    tool_calls: list[str] = Field(default_factory=list)
+    rounds_used: int = 0
 
 
 class CreatePathRequest(BaseModel):
@@ -217,6 +234,40 @@ def _build_intake_prompt(
     return "\n".join(lines)
 
 
+def _mentor_tools(
+    catalog: CatalogSearch,
+    shelf_search: Callable[[str, int], list[Hit]] | None,
+    get_block: Callable[[str], Block] | None,
+) -> dict[str, Callable[..., Any]]:
+    """Adapt the mentor's own retrieval callables to the keyword-argument
+    shape `run_agent` calls tools with (`_MENTOR_TOOL_SCHEMAS`'s parameter
+    names) — independent of whatever positional signature the caller's
+    `catalog`/`shelf_search`/`get_block` happen to have (e.g. `Deps.get_block`,
+    already store-safe: it dispatches on `HOMELIB_SQLITE_PATH` in
+    `apps/api/main.py`, or a test fixture's `lambda _goal, _subjects: ...`)."""
+
+    def _search_catalog_tool(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]:
+        return catalog(query, subjects)
+
+    tools: dict[str, Callable[..., Any]] = {"search_catalog": _search_catalog_tool}
+
+    if shelf_search is not None:
+
+        def _search_shelf_tool(query: str, k: int = 5) -> list[Hit]:
+            return shelf_search(query, k)
+
+        tools["search_shelf"] = _search_shelf_tool
+
+    if get_block is not None:
+
+        def _get_block_tool(block_id: str) -> Block:
+            return get_block(block_id)
+
+        tools["get_block"] = _get_block_tool
+
+    return tools
+
+
 def mentor_intake(
     goal: str,
     interests: list[str],
@@ -225,8 +276,18 @@ def mentor_intake(
     client: OpenAICompatibleClient,
     catalog: CatalogSearch,
     shelf_search: Callable[[str, int], list[Hit]] | None = None,
+    get_block: Callable[[str], Block] | None = None,
 ) -> MentorIntakeResponse:
-    """Analyze a goal and return a proposal — never persists Areas/Wings/items."""
+    """Analyze a goal and return a proposal — never persists Areas/Wings/items.
+
+    Drives the final LLM call through `homelib_rag.agent.run_agent`
+    (specs/agent-tools.md: "on the Mentor request path since 2026-09-06"),
+    with `search_shelf`/`search_catalog`/`get_block` wired to this call's own
+    `shelf_search`/`catalog`/`get_block` — so the loop is store-safe by
+    construction, never through `run_agent`'s own Postgres-bound default
+    tool table. `MentorIntakeResponse.tool_calls`/`rounds_used` report what
+    the loop actually did.
+    """
     notice = detect_high_stakes_notice(goal, interests)
     hits = shelf_search(goal, 5) if shelf_search is not None else []
     candidates = catalog(goal, interests or None)
@@ -257,8 +318,20 @@ def mentor_intake(
         ),
     ]
 
+    mentor_tools = _mentor_tools(catalog, shelf_search, get_block)
+    # Only advertise a tool schema the LLM can actually invoke — `get_block`
+    # (and, in principle, `search_shelf`) is optional, so an un-wired one
+    # must not appear in `tools=` only to dead-end as "unknown tool".
+    mentor_schemas = [s for s in _MENTOR_TOOL_SCHEMAS if s["function"]["name"] in mentor_tools]
+
     try:
-        llm_response = client.chat(messages, max_tokens=1200)
+        agent_result = run_agent(
+            messages,
+            client=client,
+            max_tokens=1200,
+            tools=mentor_tools,
+            tool_schemas=mentor_schemas,
+        )
     except LLMUnreachableError:
         return MentorIntakeResponse(
             request_id=str(uuid.uuid4()),
@@ -268,8 +341,11 @@ def mentor_intake(
             high_stakes_notice=notice,
         )
 
+    tool_calls = [record.tool_name for record in agent_result.tool_calls]
+    rounds_used = agent_result.rounds_used
+
     try:
-        payload = json.loads(llm_response.content or "{}")
+        payload = json.loads(agent_result.final_message or "{}")
         parsed = _LLMIntakeOutput.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("mentor intake parse failed: %s", exc)
@@ -279,6 +355,8 @@ def mentor_intake(
             citations=[],
             degraded=True,
             high_stakes_notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
         )
 
     try:
@@ -293,6 +371,8 @@ def mentor_intake(
             citations=[],
             degraded=True,
             high_stakes_notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
         )
 
     return MentorIntakeResponse(
@@ -302,8 +382,10 @@ def mentor_intake(
         proposed_path=parsed.proposed_path,
         rationale=parsed.rationale,
         citations=citations,
-        degraded=False,
+        degraded=agent_result.degraded,
         high_stakes_notice=notice,
+        tool_calls=tool_calls,
+        rounds_used=rounds_used,
     )
 
 
