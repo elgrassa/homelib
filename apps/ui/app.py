@@ -284,6 +284,16 @@ def render_projection_tab(client: Client) -> None:
     source = st.session_state["projection_source"]
 
     projector = st.toggle("Enter projector mode", key="projector_mode")
+    # Shareable iPad AirPlay deep link — set once when missing, avoid param thrash.
+    if projector:
+        if st.query_params.get("projection") not in {"1", "true", "yes"}:
+            st.query_params["projection"] = "1"
+        want = "official" if source == "official" else "shelf"
+        if st.query_params.get("source") != want:
+            st.query_params["source"] = want
+    elif st.query_params.get("projection") in {"1", "true", "yes"}:
+        del st.query_params["projection"]
+
     if projection_wants_chrome_hidden(
         projector_mode=projector,
         query_projection=st.query_params.get("projection"),
@@ -305,7 +315,8 @@ def render_projection_tab(client: Client) -> None:
 
 
 def _render_official_preview(projector: bool) -> None:
-    st.caption("Preview on Pottermore Publishing — not on this shelf. Metadata only.")
+    if not projector:
+        st.caption("Preview on Pottermore Publishing — not on this shelf. Metadata only.")
     lang = st.selectbox(
         "Language",
         options=("uk", "en"),
@@ -324,17 +335,22 @@ def _render_official_preview(projector: bool) -> None:
         format_func=lambda b: b.title,
         key="official_book",
     )
-    st.link_button("Open lawful source (new tab)", book.reader_url)
-    # Publisher sets X-Frame-Options / CSP frame-ancestors — never iframe.
-    # Click opens a named browser window (same target on re-click).
+    st.link_button("Open Ukrainian PDF", book.pdf_url)
+    st.link_button("Open HTML reader", book.reader_url)
     st.html(
         build_official_preview_stage_html(book, projector=projector),
         unsafe_allow_javascript=True,
     )
-    st.caption(
-        "AirPlay mirrors this stage. Speech: open the reader window, then Safari "
-        "Listen to Page (aA) or Speak Screen."
-    )
+    if projector:
+        st.caption(
+            "Tap Reading / Listen for Ukrainian text (Safari Speak Screen / Listen to Page). "
+            "Prev/Next turns the open book on this stage."
+        )
+    else:
+        st.caption(
+            "Enter projector mode for the internal two-page book and Reading / Listen. "
+            "Or open the Pottermore PDF / HTML reader above."
+        )
 
 
 def _render_shelf_projection(client: Client, projector: bool) -> None:
@@ -503,6 +519,17 @@ def main() -> None:
     )
 
     if not hide_nav:
+        st.markdown(
+            "<style>"
+            ".stApp{background:"
+            "radial-gradient(ellipse 80% 50% at 50% -10%,rgba(226,184,95,.18),transparent 55%),"
+            "radial-gradient(ellipse 60% 40% at 100% 0%,rgba(79,209,197,.08),transparent 45%),"
+            "var(--background-color,#f7f0e3)!important}"
+            "h1{letter-spacing:.02em;text-shadow:0 0 28px rgba(138,91,19,.25)}"
+            "[data-testid='stCaption'] p{color:#5c4a3a!important}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
         st.title("MagicLib")
         st.caption(
             "HomeLib — a private academic shelf you can ask, with citations that open the page. "

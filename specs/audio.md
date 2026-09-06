@@ -57,8 +57,12 @@ uv run pytest -k 'audio_capabilities or can_generate_is_false' -v
   Screen**, plus a clean article server on UI `:8502` (`/read/{book_id}`) for
   Safari **Listen to Page**. `GET /v1/audio/capabilities` stays
   `can_generate=False`.
-- **Official preview (demo default):** Pottermore Ukrainian HP opens in a
-  named browser **window** (`window.open`) — publishers refuse iframes.
-  Speech is Safari Listen to Page on their `bookN/` reader, not HomeLib.
+- **Official preview (demo default):** Pottermore Ukrainian HP PDFs are
+  **display-only** via UI `:8502/book/{id}` (two-page pdf.js spread + allowlisted
+  `/pdf/{id}` proxy). Not ingested into SQLite/FTS (ADR-008). Publishers set
+  `X-Frame-Options`, so their URL cannot be iframed directly. Speech: projector
+  **Reading / Listen** → `:8502/book/{id}?read=1` (Ukrainian article for Safari
+  Listen to Page / Speak Screen), or open the publisher PDF (ADR-009). Demo:
+  `?door=Projection&projection=1&source=official`.
 - **Scope:** shelf text is the public-domain seed; Pottermore is never ingested
   (ADR-008).

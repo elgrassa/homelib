@@ -1,7 +1,11 @@
-"""Minimal HTTP server for clean /read pages (Safari Listen to Page).
+"""Minimal HTTP server for clean /read pages + Official Pottermore PDF preview.
 
-Runs alongside Streamlit in the UI container on port 8502. Fetches blocks from
-the API over the Docker network — never opens SQLite itself.
+Runs alongside Streamlit in the UI container on port 8502.
+
+- ``/read/{book_id}`` — shelf article HTML for Safari Listen to Page (via API).
+- ``/pdf/{book_id}`` — display-only stream of allowlisted Pottermore PDFs
+  (publishers set X-Frame-Options; we never write bytes to SQLite / FTS).
+- ``/book/{book_id}`` — two-page pdf.js open-book stage for the projector.
 """
 
 from __future__ import annotations
@@ -12,7 +16,9 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
+from apps.ui.book_spread import build_book_spread_html, official_book_by_id
 from apps.ui.read_html import ReadPage, build_read_article_html
+from apps.ui.view_model import POTTERMORE_HOST
 
 DEFAULT_API = "http://api:8000"
 DEFAULT_PORT = 8502
@@ -48,6 +54,20 @@ def _fetch_book_title(book_id: str) -> tuple[str, str]:
     return book_id, ""
 
 
+def _stream_official_pdf(book_id: str) -> tuple[bytes, str]:
+    """Fetch allowlisted Pottermore PDF bytes for display only."""
+    book = official_book_by_id(book_id)
+    if book is None:
+        raise LookupError(book_id)
+    if POTTERMORE_HOST not in book.pdf_url:
+        raise PermissionError("pdf host not allowlisted")
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        resp = client.get(book.pdf_url)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "application/pdf")
+        return resp.content, content_type.split(";")[0].strip() or "application/pdf"
+
+
 class ReadHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -62,14 +82,67 @@ class ReadHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if not parsed.path.startswith("/read/"):
-            self.send_error(404)
+
+        if parsed.path.startswith("/pdf/"):
+            self._serve_pdf(parsed.path[len("/pdf/") :].strip("/"))
             return
-        book_id = parsed.path[len("/read/") :].strip("/")
+        if parsed.path.startswith("/book/"):
+            self._serve_book(parsed.path[len("/book/") :].strip("/"))
+            return
+        if parsed.path.startswith("/read/"):
+            self._serve_read(parsed)
+            return
+        self.send_error(404)
+
+    def _serve_pdf(self, book_id: str) -> None:
         if not book_id or "/" in book_id:
             self.send_error(404)
             return
-        qs = parse_qs(parsed.query)
+        try:
+            data, content_type = _stream_official_pdf(book_id)
+        except LookupError:
+            self.send_error(404, "unknown official preview book")
+            return
+        except PermissionError:
+            self.send_error(403, "pdf host not allowlisted")
+            return
+        except httpx.HTTPError:
+            self.send_error(502, "upstream pdf unreachable")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "private, max-age=300")
+        self.send_header("Content-Disposition", "inline")
+        # No X-Frame-Options: Streamlit :8501 embeds /book/ in an iframe; PDF
+        # fetch is same-origin to that viewer document on :8502.
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _serve_book(self, book_id: str) -> None:
+        if not book_id or "/" in book_id:
+            self.send_error(404)
+            return
+        book = official_book_by_id(book_id)
+        if book is None:
+            self.send_error(404, "unknown official preview book")
+            return
+        html = build_book_spread_html(book).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(html)
+
+    def _serve_read(self, parsed: object) -> None:
+        path = str(getattr(parsed, "path", ""))
+        book_id = path[len("/read/") :].strip("/")
+        if not book_id or "/" in book_id:
+            self.send_error(404)
+            return
+        qs = parse_qs(getattr(parsed, "query", "") or "")
         try:
             ordinal = int((qs.get("ordinal") or ["0"])[0])
         except ValueError:

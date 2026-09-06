@@ -288,9 +288,6 @@ DEFAULT_PROJECTION_SOURCE: ProjectionSource = "official"
 DEFAULT_OFFICIAL_LANGUAGE: ProjectionLanguage = "uk"
 POTTERMORE_HOST = "www.pottermorepublishing.com"
 _POTTERMORE_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
-# Named window so re-clicks focus the same Pottermore tab instead of spawning many.
-OFFICIAL_PREVIEW_WINDOW_NAME = "magiclib-official-preview"
-OFFICIAL_PREVIEW_WINDOW_FEATURES = "noopener,noreferrer,width=1280,height=800"
 
 
 def normalize_projection_source(value: str | None) -> ProjectionSource:
@@ -360,48 +357,129 @@ def projection_wants_chrome_hidden(
     return query_projection in {"1", "true", "yes"}
 
 
+def clean_read_url(book_id: str, *, ordinal: int = 0, read_port: int = 8502) -> str:
+    """Relative hint for the clean article page (LAN host is the Streamlit host)."""
+    return f":{read_port}/read/{book_id}?ordinal={int(ordinal)}"
+
+
+def official_book_viewer_path(book_id: str, *, read_port: int = 8502) -> str:
+    """Two-page open-book viewer on the UI companion port (display-only PDF)."""
+    return f":{read_port}/book/{book_id}"
+
+
 def build_official_preview_stage_html(
     book: OfficialPreviewBook,
     *,
     projector: bool = False,
+    read_port: int = 8502,
 ) -> str:
-    """16:9 stage that opens Pottermore in a real window — publishers block iframes."""
+    """16:9 Official preview stage.
+
+    Projector embeds our ``:8502/book/{{id}}`` two-page spread (allowlisted PDF
+    proxy — Pottermore sets X-Frame-Options so their URL cannot be iframed).
+    CTAs use real ``<a href>`` / same-tab ``location.assign`` (iPad-safe; no
+    ``window.open``). Never ingests PDF bytes (ADR-008).
+    """
     title = html.escape(book.title)
     authors = html.escape(", ".join(book.authors))
-    reader_js = json.dumps(book.reader_url)
-    pdf_js = json.dumps(book.pdf_url)
-    win = json.dumps(OFFICIAL_PREVIEW_WINDOW_NAME)
-    features = json.dumps(OFFICIAL_PREVIEW_WINDOW_FEATURES)
-    font = "1.6rem" if projector else "1.15rem"
+    pdf_href = html.escape(book.pdf_url, quote=True)
+    reader_href = html.escape(book.reader_url, quote=True)
+    book_id_js = json.dumps(book.id)
+    port_js = json.dumps(int(read_port))
+    font = "1.35rem" if projector else "1.15rem"
+
+    if projector:
+        return f"""
+<div style="width:100%;border:1px solid #cab995;border-radius:12px;overflow:hidden;
+ background:#1a140c;box-sizing:border-box;color:#fffaf0;
+ font-family:Georgia,'Times New Roman',serif;font-size:{font}">
+  <div style="padding:0.75rem 1rem 0.35rem">
+    <p style="margin:0;font-size:0.85rem;color:#d4c4a8">
+      Official preview · open book · metadata only
+    </p>
+    <h2 style="margin:0.2rem 0 0;font-weight:500;font-size:1.25em">{title}</h2>
+    <p style="margin:0.2rem 0 0.75rem;color:#d4c4a8">{authors}</p>
+  </div>
+  <iframe id="hl-official-book" title="{title}"
+    style="width:100%;aspect-ratio:16/9;min-height:420px;border:0;background:#1a140c"
+    allow="fullscreen"></iframe>
+  <p style="margin:0;padding:0.75rem 1rem;display:flex;flex-wrap:wrap;gap:0.75rem;
+   font-family:system-ui,sans-serif;font-size:0.95rem">
+    <button type="button" id="hl-official-read"
+      style="font:inherit;padding:0.65rem 1.1rem;min-height:44px;cursor:pointer;
+       background:#e2b85f;color:#1a140c;border:0;border-radius:8px;font-weight:600">
+      Reading / Listen
+    </button>
+    <a id="hl-official-book-link" href="#"
+      style="padding:0.65rem 1.1rem;min-height:44px;display:inline-flex;align-items:center;
+       text-decoration:none;background:#8a5b13;color:#fffaf0;border-radius:8px">
+      Open book (Prev/Next)
+    </a>
+    <a href="{pdf_href}" target="_blank" rel="noopener noreferrer"
+      style="padding:0.65rem 1.1rem;min-height:44px;display:inline-flex;align-items:center;
+       text-decoration:none;background:transparent;color:#e2b85f;border:1px solid #8a5b13;
+       border-radius:8px">Publisher PDF</a>
+  </p>
+  <p style="margin:0;padding:0 1rem 1rem;font:0.9rem system-ui,sans-serif;color:#d4c4a8">
+    Tap <strong>Reading / Listen</strong> for Ukrainian text (Safari Speak Screen / Listen to Page).
+    Use Prev/Next in the book for a two-page spread.
+  </p>
+  <script>
+  (function () {{
+    var id = {book_id_js};
+    var port = {port_js};
+    var url = location.protocol + "//" + location.hostname + ":" + port
+      + "/book/" + encodeURIComponent(id);
+    var readUrl = url + "?read=1";
+    var frame = document.getElementById("hl-official-book");
+    var link = document.getElementById("hl-official-book-link");
+    var readBtn = document.getElementById("hl-official-read");
+    if (frame) frame.src = url;
+    if (link) link.href = url;
+    if (readBtn) {{
+      readBtn.onclick = function () {{ location.assign(readUrl); }};
+    }}
+  }})();
+  </script>
+</div>
+"""
+
+    speech = (
+        "<p style='margin:0 0 1.25rem'>Publisher pages refuse iframes. Open the lawful "
+        "Ukrainian PDF or enter projector mode for the two-page book, then use Safari "
+        "Listen to Page / Speak Screen.</p>"
+    )
+    primary = (
+        f"<a href='{pdf_href}' target='_blank' rel='noopener noreferrer' "
+        f"style='font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;"
+        f"display:inline-flex;align-items:center;text-decoration:none;"
+        f"background:#8a5b13;color:#fffaf0;border-radius:8px'>"
+        f"Open Ukrainian PDF</a>"
+    )
+    secondary = (
+        f"<a href='{reader_href}' target='_blank' rel='noopener noreferrer' "
+        f"style='font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;"
+        f"display:inline-flex;align-items:center;text-decoration:none;"
+        f"background:transparent;color:#8a5b13;border:1px solid #8a5b13;"
+        f"border-radius:8px'>"
+        f"Open HTML reader</a>"
+    )
     return f"""
 <div style="aspect-ratio:16/9;width:100%;border:1px solid #cab995;border-radius:12px;
  overflow:auto;background:#fffaf0;padding:1.5rem;box-sizing:border-box;font-size:{font};
  line-height:1.55;color:#241c16;font-family:Georgia,'Times New Roman',serif">
-  <p style="margin:0 0 0.35rem;font-size:0.85rem;color:#756758">
-    Official preview · Pottermore Publishing
+  <p style="margin:0 0 0.35rem;font-size:0.85rem;color:#5c4a3a">
+    Official preview · Pottermore Publishing · metadata only
   </p>
   <h2 style="margin:0 0 0.35rem;font-weight:500;font-size:1.35em">{title}</h2>
-  <p style="margin:0 0 1rem;color:#756758">{authors}</p>
-  <p style="margin:0 0 1.25rem">Publisher pages refuse iframes. Open the lawful source in a
-   browser window, then use Safari Listen to Page / Speak Screen.</p>
+  <p style="margin:0 0 1rem;color:#5c4a3a">{authors}</p>
+  {speech}
   <p style="margin:0;display:flex;flex-wrap:wrap;gap:0.75rem">
-    <button type="button"
-      style="font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;cursor:pointer;
-       background:#8a5b13;color:#fffaf0;border:0;border-radius:8px"
-      onclick="window.open({reader_js}, {win}, {features})">
-      Open reader in window
-    </button>
-    <button type="button"
-      style="font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;cursor:pointer;
-       background:transparent;color:#8a5b13;border:1px solid #8a5b13;border-radius:8px"
-      onclick="window.open({pdf_js}, {win}, {features})">
-      Open PDF in window
-    </button>
+    {primary}
+    {secondary}
+  </p>
+  <p style="margin:1rem 0 0;font-size:0.9rem;color:#5c4a3a">
+    Enter projector mode for the internal two-page open book and Reading / Listen.
   </p>
 </div>
 """
-
-
-def clean_read_url(book_id: str, *, ordinal: int = 0, read_port: int = 8502) -> str:
-    """Relative hint for the clean article page (LAN host is the Streamlit host)."""
-    return f":{read_port}/read/{book_id}?ordinal={int(ordinal)}"

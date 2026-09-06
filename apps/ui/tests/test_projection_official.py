@@ -91,9 +91,8 @@ def test_read_html_is_article_and_not_streamlit_shell() -> None:
     assert 'href="/read/walden?ordinal=1"' in doc
 
 
-def test_official_preview_stage_opens_window_not_iframe() -> None:
+def test_official_preview_stage_uses_real_anchors_not_window_open() -> None:
     from apps.ui.view_model import (
-        OFFICIAL_PREVIEW_WINDOW_NAME,
         build_official_preview_stage_html,
         load_official_preview_books,
     )
@@ -101,10 +100,36 @@ def test_official_preview_stage_opens_window_not_iframe() -> None:
     books = load_official_preview_books("uk", fixture_path=FIXTURE)
     assert books, "expected Ukrainian Pottermore fixture books"
     book = books[0]
-    doc = build_official_preview_stage_html(book, projector=True)
+    doc = build_official_preview_stage_html(book, projector=False)
     assert "<iframe" not in doc.lower()
-    assert "window.open(" in doc
-    assert OFFICIAL_PREVIEW_WINDOW_NAME in doc
+    assert "window.open(" not in doc
+    assert f'href="{book.pdf_url}"' in doc or f"href='{book.pdf_url}'" in doc
     assert book.reader_url in doc
-    assert book.pdf_url in doc
+    assert "Open Ukrainian PDF" in doc
+    assert "Open HTML reader" in doc
     assert "aspect-ratio:16/9" in doc.replace(" ", "")
+
+
+def test_official_preview_projector_embeds_internal_two_page_book() -> None:
+    from apps.ui.view_model import build_official_preview_stage_html, load_official_preview_books
+
+    book = load_official_preview_books("uk", fixture_path=FIXTURE)[0]
+    doc = build_official_preview_stage_html(book, projector=True)
+    assert 'id="hl-official-book"' in doc
+    assert "/book/" in doc
+    assert book.id in doc
+    assert 'id="hl-official-read"' in doc
+    assert "Reading / Listen" in doc
+    assert "location.assign" in doc
+    assert "?read=1" in doc
+    assert "window.open(" not in doc
+    assert 'src="https://www.pottermorepublishing.com' not in doc
+
+
+def test_ukrainian_hp_fixture_exposes_direct_pdf_urls() -> None:
+    books = load_official_preview_books("uk", fixture_path=FIXTURE)
+    assert len(books) == 7
+    for book in books:
+        assert book.pdf_url.startswith("https://www.pottermorepublishing.com/")
+        assert book.pdf_url.endswith(".pdf")
+        assert "wp-content/uploads/" in book.pdf_url
