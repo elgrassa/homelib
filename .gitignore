@@ -34,3 +34,6 @@ data/homelib.sqlite
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
+
+# design-sync build output (hand-authored MagicLib bundle, regenerated)
+ds-bundle/
