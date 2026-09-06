@@ -235,7 +235,11 @@ jobs:
           # built_at_commit records the rebuilding HEAD; filter it. Textual
           # diff because --quiet short-circuits on blob identity BEFORE -I
           # applies (git 2.50) and would always report drift.
-          if [ -z "$(git diff -I '"built_at_commit"' -- graphify-out/graph.json)" ]; then
+          # `git diff` is empty for an UNTRACKED graphify-out/ — the bootstrap case
+          # (first refresh after the graphify PR merges) must fall through to
+          # the commit below, or the graph never lands (v2 run 13219, 2026-09-06).
+          if git ls-files --error-unmatch graphify-out/graph.json >/dev/null 2>&1 \
+             && [ -z "$(git diff -I '"built_at_commit"' -- graphify-out/graph.json)" ]; then
             echo "graph is fresh"
             exit 0
           fi

@@ -483,6 +483,19 @@ def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
     assert "main|v2" in body
 
 
+def test_ci_graph_refresh_commits_the_bootstrap_graph() -> None:
+    """Hygiene (string-match): the freshness short-circuit must not fire on an
+    untracked graph. `git diff -- graphify-out/graph.json` is empty while the
+    directory is untracked, so a bare diff test printed "graph is fresh" on the
+    first v2 refresh (run 13219) and the bootstrap graph never landed.
+    """
+    body = CI_WORKFLOW.read_text()
+    fresh = body.index('echo "graph is fresh"')
+    guard = body.rfind("git ls-files --error-unmatch graphify-out/graph.json", 0, fresh)
+    assert guard != -1, "graph-refresh must check the graph is tracked before calling it fresh"
+    assert "git add graphify-out/" in body
+
+
 def test_graphifyignore_excludes_generated_and_data_paths() -> None:
     """Indexer excludes: do not confuse with .gitignore — graphify-out/ is committed."""
     ignore = (REPO_ROOT / ".graphifyignore").read_text()
