@@ -37,3 +37,8 @@ data/*.sqlite-wal
 
 # design-sync build output (hand-authored MagicLib bundle, regenerated)
 ds-bundle/
+
+# never publish local secrets / design-sync state / session handoffs
+.streamlit/secrets.toml
+.design-sync/
+docs/handoffs/

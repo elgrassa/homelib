@@ -1,8 +1,8 @@
-# CLAUDE.md — HomeLib
+# AGENTS.md — HomeLib
 
 Repo-level instructions, auto-loaded every session. Read the maintained docs
 below instead of crawling source. Global git/security rules:
-`~/.claude/CLAUDE.md` (binding here).
+`~/.Codex/AGENTS.md` (binding here).
 
 ## What this is
 

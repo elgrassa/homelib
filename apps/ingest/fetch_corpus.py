@@ -32,10 +32,7 @@ BOOKS_DIR = REPO_ROOT / "data" / "books"
 GUTENBERG_START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK"
 GUTENBERG_END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK"
 
-USER_AGENT = (
-    "homelib-ingest/0.1 (+https://github.com/elgrassa/homelib; "
-    "contact: pavlo.skorodziievskyi@gmail.com)"
-)
+USER_AGENT = "homelib-ingest/0.1 (+https://github.com/elgrassa/homelib)"
 
 
 @dataclass(frozen=True)

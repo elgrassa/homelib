@@ -38,10 +38,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = REPO_ROOT / "data" / "catalog.jsonl"
 
 OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json"
-USER_AGENT = (
-    "homelib-ingest/0.1 (+https://github.com/elgrassa/homelib; "
-    "contact: pavlo.skorodziievskyi@gmail.com)"
-)
+USER_AGENT = "homelib-ingest/0.1 (+https://github.com/elgrassa/homelib)"
 
 # Roadmap-relevant subjects, each queried as search.json?q=subject:"<subject>".
 # Never the 4 GB Open Library works dump.
