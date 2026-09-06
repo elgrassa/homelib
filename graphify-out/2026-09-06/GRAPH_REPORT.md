@@ -1,7 +1,7 @@
 # Graph Report - hostexecutor  (2026-09-06)
 
 ## Corpus Check
-- 192 files · ~227,745 words
+- 192 files · ~227,942 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ecca18a6`
+- Built from commit: `94eae698`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -673,7 +673,7 @@ Nodes (25): Retriever, Rewriter, Run one query through one arm, recording what a
 
 ### Community 64 - "12.3 Work packages"
 Cohesion: 0.14
-Nodes (13): Guards on the gates themselves.  A config file that looks like a guarantee but i, The pre-push gate must not grow into the full suite.      Quality gates live on, Streamlit runs `apps/ui/app.py` as a script, not as `python -m`.      Without PY, Hygiene pin (string-match, not behavioural): on the tip path the API     logs as, Only `.env.example` may be tracked; a real `.env*` carries keys., Indexer excludes: do not confuse with .gitignore — graphify-out/ is committed., `just ci` is documented as "what CI runs"; it must actually match., test_drill_verifies_monitoring_via_observatory_not_grafana_panel_count() (+5 more)
+Nodes (13): Guards on the gates themselves.  A config file that looks like a guarantee but i, Forgejo ignores `permissions:` and warns about it.      It is GitHub Actions syn, Hygiene pin (string-match, not behavioural): on the tip path the API     logs as, Only `.env.example` may be tracked; a real `.env*` carries keys., Hygiene (string-match): the freshness short-circuit must not fire on an     untr, `just ci` is documented as "what CI runs"; it must actually match., A branch push plus an open PR must not fire two runs of the same commit.      Wi, test_ci_declares_no_permissions_block() (+5 more)
 
 ### Community 65 - "homelib — submission checklist"
 Cohesion: 0.26
@@ -685,7 +685,7 @@ Nodes (13): RuntimeError, Demo-mode HomelibClient factory — APP_MODE=demo sele
 
 ### Community 67 - "HomeLib v2.1 — final merged execution plan (capstone rebuild + product)"
 Cohesion: 0.24
-Nodes (10): _graph_refresh_script(), Path, Homelib refreshes on main AND v2 — never a literal HEAD:main only.      The stud, Execute the graph-refresh step script in a scratch repo with a stub graphify., Behavioural: a push to main must not rebuild or commit the graph.      Rebuilds, Behavioural: the v2 push still rebuilds, commits and pushes the graph., _run_graph_refresh(), test_ci_graph_refresh_pushes_to_current_protected_branch() (+2 more)
+Nodes (10): _graph_refresh_script(), Path, Homelib refreshes on the pushed protected ref — main, and only main.      The re, Execute the graph-refresh step script in a scratch repo with a stub graphify., Behavioural: a push to main rebuilds, commits and pushes the graph.      Until 2, Behavioural: a push to a recreated `v2` neither rebuilds nor pushes.      A seco, _run_graph_refresh(), test_ci_graph_refresh_commits_on_main() (+2 more)
 
 ### Community 68 - "Architecture overview"
 Cohesion: 0.13

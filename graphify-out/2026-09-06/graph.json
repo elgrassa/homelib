@@ -22983,7 +22983,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request",
-      "community": 190,
+      "community": 64,
       "norm_label": "test_ci_does_not_double_trigger_on_branch_push_and_a_pull_request()"
     },
     {
@@ -22993,7 +22993,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_ci_declares_no_permissions_block",
-      "community": 158,
+      "community": 64,
       "norm_label": "test_ci_declares_no_permissions_block()"
     },
     {
@@ -23003,7 +23003,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_pre_push_hook_stays_fast_by_excluding_the_slow_markers",
-      "community": 64,
+      "community": 158,
       "norm_label": "test_pre_push_hook_stays_fast_by_excluding_the_slow_markers()"
     },
     {
@@ -23053,7 +23053,7 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve",
-      "community": 64,
+      "community": 188,
       "norm_label": "test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve()"
     },
     {
@@ -23220,7 +23220,7 @@
       "label": "_graph_refresh_script()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L487",
+      "source_location": "L489",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_graph_refresh_script",
       "community": 67,
@@ -23230,7 +23230,7 @@
       "label": "_run_graph_refresh()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L493",
+      "source_location": "L495",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_run_graph_refresh",
       "community": 67,
@@ -23247,50 +23247,50 @@
       "norm_label": "path"
     },
     {
-      "label": "test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2()",
+      "label": "test_ci_graph_refresh_commits_on_main()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L553",
+      "source_location": "L555",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2",
+      "id": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_on_main",
       "community": 67,
-      "norm_label": "test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2()"
+      "norm_label": "test_ci_graph_refresh_commits_on_main()"
     },
     {
-      "label": "test_ci_graph_refresh_still_commits_on_v2()",
+      "label": "test_ci_graph_refresh_refuses_the_retired_v2_ref()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L569",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_test_ci_graph_refresh_still_commits_on_v2",
+      "id": "tests_test_repo_hygiene_test_ci_graph_refresh_refuses_the_retired_v2_ref",
       "community": 67,
-      "norm_label": "test_ci_graph_refresh_still_commits_on_v2()"
+      "norm_label": "test_ci_graph_refresh_refuses_the_retired_v2_ref()"
     },
     {
       "label": "test_ci_graph_refresh_commits_the_bootstrap_graph()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L577",
+      "source_location": "L581",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_the_bootstrap_graph",
-      "community": 188,
+      "community": 64,
       "norm_label": "test_ci_graph_refresh_commits_the_bootstrap_graph()"
     },
     {
       "label": "test_graphifyignore_excludes_generated_and_data_paths()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L590",
+      "source_location": "L594",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_graphifyignore_excludes_generated_and_data_paths",
-      "community": 64,
+      "community": 190,
       "norm_label": "test_graphifyignore_excludes_generated_and_data_paths()"
     },
     {
       "label": "test_claude_md_routes_named_symbols_through_graphify_explain()",
       "file_type": "code",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L597",
+      "source_location": "L601",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_test_claude_md_routes_named_symbols_through_graphify_explain",
       "community": 189,
@@ -23353,7 +23353,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_90",
-      "community": 190,
+      "community": 64,
       "norm_label": "a branch push plus an open pr must not fire two runs of the same commit.      wi"
     },
     {
@@ -23363,7 +23363,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_115",
-      "community": 158,
+      "community": 64,
       "norm_label": "forgejo ignores `permissions:` and warns about it.      it is github actions syn"
     },
     {
@@ -23373,7 +23373,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_133",
-      "community": 64,
+      "community": 158,
       "norm_label": "the pre-push gate must not grow into the full suite.      quality gates live on"
     },
     {
@@ -23423,7 +23423,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_221",
-      "community": 64,
+      "community": 188,
       "norm_label": "streamlit runs `apps/ui/app.py` as a script, not as `python -m`.      without py"
     },
     {
@@ -23567,72 +23567,72 @@
       "norm_label": "prs must not carry a private graphify-out/ snapshot (studio-kit #47)."
     },
     {
-      "label": "Homelib refreshes on main AND v2 \u2014 never a literal HEAD:main only.      The stud",
+      "label": "Homelib refreshes on the pushed protected ref \u2014 main, and only main.      The re",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L467",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_467",
       "community": 67,
-      "norm_label": "homelib refreshes on main and v2 \u2014 never a literal head:main only.      the stud"
+      "norm_label": "homelib refreshes on the pushed protected ref \u2014 main, and only main.      the re"
     },
     {
       "label": "Execute the graph-refresh step script in a scratch repo with a stub graphify.",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L494",
+      "source_location": "L496",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_rationale_494",
+      "id": "tests_test_repo_hygiene_rationale_496",
       "community": 67,
       "norm_label": "execute the graph-refresh step script in a scratch repo with a stub graphify."
     },
     {
-      "label": "Behavioural: a push to main must not rebuild or commit the graph.      Rebuilds",
+      "label": "Behavioural: a push to main rebuilds, commits and pushes the graph.      Until 2",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L556",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_556",
       "community": 67,
-      "norm_label": "behavioural: a push to main must not rebuild or commit the graph.      rebuilds"
+      "norm_label": "behavioural: a push to main rebuilds, commits and pushes the graph.      until 2"
     },
     {
-      "label": "Behavioural: the v2 push still rebuilds, commits and pushes the graph.",
+      "label": "Behavioural: a push to a recreated `v2` neither rebuilds nor pushes.      A seco",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L570",
       "_origin": "ast",
       "id": "tests_test_repo_hygiene_rationale_570",
       "community": 67,
-      "norm_label": "behavioural: the v2 push still rebuilds, commits and pushes the graph."
+      "norm_label": "behavioural: a push to a recreated `v2` neither rebuilds nor pushes.      a seco"
     },
     {
       "label": "Hygiene (string-match): the freshness short-circuit must not fire on an     untr",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L578",
+      "source_location": "L582",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_rationale_578",
-      "community": 188,
+      "id": "tests_test_repo_hygiene_rationale_582",
+      "community": 64,
       "norm_label": "hygiene (string-match): the freshness short-circuit must not fire on an     untr"
     },
     {
       "label": "Indexer excludes: do not confuse with .gitignore \u2014 graphify-out/ is committed.",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L591",
+      "source_location": "L595",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_rationale_591",
-      "community": 64,
+      "id": "tests_test_repo_hygiene_rationale_595",
+      "community": 190,
       "norm_label": "indexer excludes: do not confuse with .gitignore \u2014 graphify-out/ is committed."
     },
     {
       "label": "Without 1bis, a committed graph is dead weight \u2014 sessions still crawl.",
       "file_type": "rationale",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L598",
+      "source_location": "L602",
       "_origin": "ast",
-      "id": "tests_test_repo_hygiene_rationale_598",
+      "id": "tests_test_repo_hygiene_rationale_602",
       "community": 189,
       "norm_label": "without 1bis, a committed graph is dead weight \u2014 sessions still crawl."
     },
@@ -24960,7 +24960,7 @@
       "label": "Plan addendum \u2014 post-merge corrections (2026-09-01)",
       "file_type": "document",
       "source_file": "docs/evidence.md",
-      "source_location": "L109",
+      "source_location": "L110",
       "_origin": "ast",
       "id": "docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
       "community": 32,
@@ -81458,7 +81458,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L487",
+      "source_location": "L489",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
       "target": "tests_test_repo_hygiene_graph_refresh_script",
@@ -81468,7 +81468,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L493",
+      "source_location": "L495",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
       "target": "tests_test_repo_hygiene_run_graph_refresh",
@@ -81518,7 +81518,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L577",
+      "source_location": "L555",
+      "weight": 1.0,
+      "source": "tests_test_repo_hygiene",
+      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_on_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_repo_hygiene.py",
+      "source_location": "L581",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
       "target": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_the_bootstrap_graph",
@@ -81538,20 +81548,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L553",
-      "weight": 1.0,
-      "source": "tests_test_repo_hygiene",
-      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L569",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
-      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_still_commits_on_v2",
+      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_refuses_the_retired_v2_ref",
       "confidence_score": 1.0
     },
     {
@@ -81568,7 +81568,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L597",
+      "source_location": "L601",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
       "target": "tests_test_repo_hygiene_test_claude_md_routes_named_symbols_through_graphify_explain",
@@ -81658,7 +81658,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L590",
+      "source_location": "L594",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene",
       "target": "tests_test_repo_hygiene_test_graphifyignore_excludes_generated_and_data_paths",
@@ -82124,7 +82124,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L483",
+      "source_location": "L484",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene_test_ci_graph_refresh_pushes_to_current_protected_branch",
       "target": "tests_test_repo_hygiene_graph_refresh_script",
@@ -82135,7 +82135,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L535",
+      "source_location": "L537",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene_run_graph_refresh",
       "target": "tests_test_repo_hygiene_graph_refresh_script",
@@ -82145,9 +82145,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L494",
+      "source_location": "L496",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_rationale_494",
+      "source": "tests_test_repo_hygiene_rationale_496",
       "target": "tests_test_repo_hygiene_run_graph_refresh",
       "confidence_score": 1.0
     },
@@ -82156,7 +82156,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L493",
+      "source_location": "L495",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene_run_graph_refresh",
       "target": "tests_test_repo_hygiene_py_path",
@@ -82169,7 +82169,7 @@
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L563",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2",
+      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_on_main",
       "target": "tests_test_repo_hygiene_run_graph_refresh",
       "confidence_score": 1.0
     },
@@ -82178,9 +82178,9 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L571",
+      "source_location": "L575",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_still_commits_on_v2",
+      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_refuses_the_retired_v2_ref",
       "target": "tests_test_repo_hygiene_run_graph_refresh",
       "confidence_score": 1.0
     },
@@ -82189,9 +82189,9 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L553",
+      "source_location": "L555",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2",
+      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_on_main",
       "target": "tests_test_repo_hygiene_py_path",
       "confidence_score": 1.0
     },
@@ -82202,7 +82202,7 @@
       "source_file": "tests/test_repo_hygiene.py",
       "source_location": "L569",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_still_commits_on_v2",
+      "source": "tests_test_repo_hygiene_test_ci_graph_refresh_refuses_the_retired_v2_ref",
       "target": "tests_test_repo_hygiene_py_path",
       "confidence_score": 1.0
     },
@@ -82213,7 +82213,7 @@
       "source_location": "L556",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene_rationale_556",
-      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2",
+      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_on_main",
       "confidence_score": 1.0
     },
     {
@@ -82223,16 +82223,16 @@
       "source_location": "L570",
       "weight": 1.0,
       "source": "tests_test_repo_hygiene_rationale_570",
-      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_still_commits_on_v2",
+      "target": "tests_test_repo_hygiene_test_ci_graph_refresh_refuses_the_retired_v2_ref",
       "confidence_score": 1.0
     },
     {
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L578",
+      "source_location": "L582",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_rationale_578",
+      "source": "tests_test_repo_hygiene_rationale_582",
       "target": "tests_test_repo_hygiene_test_ci_graph_refresh_commits_the_bootstrap_graph",
       "confidence_score": 1.0
     },
@@ -82240,9 +82240,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L591",
+      "source_location": "L595",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_rationale_591",
+      "source": "tests_test_repo_hygiene_rationale_595",
       "target": "tests_test_repo_hygiene_test_graphifyignore_excludes_generated_and_data_paths",
       "confidence_score": 1.0
     },
@@ -82250,9 +82250,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_repo_hygiene.py",
-      "source_location": "L598",
+      "source_location": "L602",
       "weight": 1.0,
-      "source": "tests_test_repo_hygiene_rationale_598",
+      "source": "tests_test_repo_hygiene_rationale_602",
       "target": "tests_test_repo_hygiene_test_claude_md_routes_named_symbols_through_graphify_explain",
       "confidence_score": 1.0
     },
@@ -83710,7 +83710,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/evidence.md",
-      "source_location": "L109",
+      "source_location": "L110",
       "weight": 1.0,
       "source": "docs_evidence_build_evidence_log",
       "target": "docs_evidence_plan_addendum_post_merge_corrections_2026_09_01",
@@ -89858,5 +89858,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "ecca18a624a656609f571aa20708c43a960ce56b"
+  "built_at_commit": "94eae698bbb91f75f48193ae04be6e2f40ecd4f9"
 }
