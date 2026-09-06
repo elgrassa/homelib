@@ -30,7 +30,7 @@ live in [`docs/evidence.md`](evidence.md) addendum + CHECKLIST §I). Editions:
 (Ollama / LM Studio); no paid cloud LLM lanes by default.
 
 **Safety:** tag `v1-fallback` = `535f58b` on `main` (verified Postgres stack).
-`v2` → `main` done 2026-09-06: `main` = `v2` = `eb4a4ff` (fast-forward; drill green on `ee0f318`, every train head green on Forgejo).
+`v2` → `main` done 2026-09-06: `main` = `v2` = `eb4a4ff` (fast-forward; drill green on `ee0f318`, every train head green on Forgejo); re-synced after #32 (MagicLib design-sync inputs) — `main` follows every `v2` bot commit.
 
 ---
 
