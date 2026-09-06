@@ -72,7 +72,7 @@ from evals.ground_truth import GROUND_TRUTH_PATH, GroundTruthRow
 # signatures are metrics.py's mapping form (query id -> ranked ids), which is
 # richer than the positional-list sketch in the spec: it supports more than
 # one relevant id per query and does not depend on two lists staying aligned.
-from evals.metrics import hit_rate_at_k, mrr_at_k
+from evals.metrics import hit_rate_at_k, hit_rate_book, mrr_at_k
 
 if TYPE_CHECKING:
     import psycopg
@@ -88,6 +88,7 @@ __all__ = [
     "GroundTruthRow",
     "QueryOutcome",
     "hit_rate_at_k",
+    "hit_rate_book",
     "load_indexed_chunk_ids",
     "load_questions",
     "mrr_at_k",
@@ -171,6 +172,12 @@ class QueryOutcome(BaseModel):
     arm_requested: str
     arm_used: str
     ranked_chunk_ids: list[str]
+    #: Same order/length as `ranked_chunk_ids` — the book id each ranked
+    #: chunk belongs to, taken straight from `Hit.book_id` (no extra lookup
+    #: needed: the index already attaches a chunk's book to every `Hit`).
+    #: Powers `hit_rate_book` in `_score_book`, which a chunk-exact miss can
+    #: still be a book-level hit against — see `evals/metrics.py`.
+    ranked_book_ids: list[str] = []
     latency_ms: int
 
     @property
@@ -205,6 +212,11 @@ class ArmMetrics(BaseModel):
     rewrite: bool
     hit_rate_at_5: float
     mrr_at_5: float
+    #: Book-level hit-rate@k (see `evals/metrics.py:hit_rate_book`): a hit if
+    #: ANY top-k chunk belongs to the same book as the ground-truth chunk,
+    #: not necessarily the labelled chunk itself. Always >= `hit_rate_at_5`
+    #: for the same run — a chunk-exact hit is also a book-level hit.
+    hit_rate_book_at_5: float
     per_book: dict[str, BookMetrics]
     n: int
     k: int
@@ -377,6 +389,7 @@ def _retrieve_one(
         arm_requested=arm,
         arm_used=arm_used,
         ranked_chunk_ids=[hit.chunk_id for hit in hits],
+        ranked_book_ids=[hit.book_id for hit in hits],
         latency_ms=int((time.monotonic() - started) * 1000),
     )
 
@@ -396,6 +409,17 @@ def _score(outcomes: Sequence[QueryOutcome], k: int) -> tuple[float, float]:
     results = {outcome.query_id: outcome.ranked_chunk_ids for outcome in outcomes}
     relevant = {outcome.query_id: [outcome.chunk_id] for outcome in outcomes}
     return hit_rate_at_k(results, relevant, k), mrr_at_k(results, relevant, k)
+
+
+def _score_book(outcomes: Sequence[QueryOutcome], k: int) -> float:
+    """Book-level hit-rate@k over `outcomes` — see `evals.metrics.hit_rate_book`.
+
+    Keyed by `query_id`, same as `_score`, for the same reason: two rows
+    that happen to share a question must not collapse into one query.
+    """
+    book_results = {outcome.query_id: outcome.ranked_book_ids for outcome in outcomes}
+    relevant_books = {outcome.query_id: [outcome.book_id] for outcome in outcomes}
+    return hit_rate_book(book_results, relevant_books, k)
 
 
 def _per_book(outcomes: Sequence[QueryOutcome], k: int) -> dict[str, BookMetrics]:
@@ -451,6 +475,7 @@ def run_arm(
         )
 
     hit_rate, mrr = _score(outcomes, k)
+    hit_rate_book_score = _score_book(outcomes, k)
 
     arms_used: dict[str, int] = {}
     for outcome in outcomes:
@@ -461,6 +486,7 @@ def run_arm(
         rewrite=rewrite,
         hit_rate_at_5=hit_rate,
         mrr_at_5=mrr,
+        hit_rate_book_at_5=hit_rate_book_score,
         per_book=_per_book(outcomes, k),
         n=len(outcomes),
         k=k,
@@ -566,15 +592,16 @@ def write_report(results: list[ArmMetrics], path: Path) -> None:
         f"Generated: {datetime.now(UTC).isoformat(timespec='seconds')}",
         *_coverage_lines(results),
         "",
-        "| arm | rewrite | n | hit-rate@5 | MRR@5 | degraded | mean latency (ms) |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     winner = _winner(results)
     for result in results:
         mark = " **(winner)**" if winner is not None and result.arm == winner.arm else ""
         lines.append(
             f"| `{result.arm}`{mark} | {'on' if result.rewrite else 'off'} | {result.n} | "
-            f"{result.hit_rate_at_5:.3f} | {result.mrr_at_5:.3f} | {result.degraded} | "
+            f"{result.hit_rate_at_5:.3f} | {result.hit_rate_book_at_5:.3f} | "
+            f"{result.mrr_at_5:.3f} | {result.degraded} | "
             f"{result.mean_latency_ms:.0f} |"
         )
     lines.append("")

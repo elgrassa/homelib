@@ -4,3 +4,5 @@
 {"git_sha": "8be2b40d946414d34f9af6fd1948a42bac1487d5", "metrics": {"judge.mean_faithfulness": 2.3666666666666667}, "regressions": ["judge.mean_faithfulness"], "ts": "2026-08-30T21:22:03.442882+00:00"}
 {"git_sha": "39b91460365a03167835c5ed656592de810061f3", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-03T13:10:37.828354+00:00"}
 {"git_sha": "39b91460365a03167835c5ed656592de810061f3", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-03T13:10:49.877947+00:00"}
+{"git_sha": "7f4a8c4fae7b5a0b74b4a1d43cc1714159df6286", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-06T21:47:05.422912+00:00"}
+{"git_sha": "7f4a8c4fae7b5a0b74b4a1d43cc1714159df6286", "metrics": {"hybrid_rerank.hit_rate_at_5": 0.6382978723404256, "hybrid_rerank.mrr_at_5": 0.5718439716312058}, "regressions": [], "ts": "2026-09-06T21:54:33.339888+00:00"}

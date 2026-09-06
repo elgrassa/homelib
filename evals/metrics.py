@@ -22,12 +22,25 @@ ids considered relevant to that query (`GroundTruth[query]`, one or more).
 Both metrics agree (and equal 1.0) when every query's first hit is at rank 1;
 they diverge whenever a hit exists but is not at rank 1 — hit-rate still
 counts it fully, MRR discounts it by `1/rank`.
+
+- **hit-rate-book@k** — the book-level counterpart of hit-rate@k: for one
+  query, 1 if the top-`k` results include *any* chunk from the same book as
+  a relevant id, else 0, averaged over all queries. It exists because
+  hit-rate@k is single-positive and chunk-exact — a neighbouring chunk from
+  the correct book, carrying equally relevant prose, scores as a total miss
+  (see `docs/adrs/ADR-001-retrieval-arm.md`, "correct book in top-5"). Same
+  contract as `hit_rate_at_k` (same `ValueError`s, same missing-query and
+  duplicate-id handling) — it is literally the same computation over a
+  different id space (book ids instead of chunk ids), so it is implemented
+  by calling `hit_rate_at_k` with book ids substituted for chunk ids at the
+  caller's boundary, not reimplemented.
 """
 
 from collections.abc import Mapping, Sequence
 
 QueryId = str
 ChunkId = str
+BookId = str
 
 #: query id -> ranked list of result chunk ids, best result first.
 RankedResults = Mapping[QueryId, Sequence[ChunkId]]
@@ -35,7 +48,26 @@ RankedResults = Mapping[QueryId, Sequence[ChunkId]]
 #: query id -> the chunk id(s) considered relevant to that query.
 GroundTruth = Mapping[QueryId, Sequence[ChunkId]]
 
-__all__ = ["ChunkId", "GroundTruth", "QueryId", "RankedResults", "hit_rate_at_k", "mrr_at_k"]
+#: query id -> ranked list of the *book* id each result chunk belongs to,
+#: same order and length as the chunk-id ranking it was derived from.
+RankedBooks = Mapping[QueryId, Sequence[BookId]]
+
+#: query id -> the book id(s) considered relevant to that query (normally
+#: the single book the ground-truth chunk belongs to).
+GroundTruthBooks = Mapping[QueryId, Sequence[BookId]]
+
+__all__ = [
+    "BookId",
+    "ChunkId",
+    "GroundTruth",
+    "GroundTruthBooks",
+    "QueryId",
+    "RankedBooks",
+    "RankedResults",
+    "hit_rate_at_k",
+    "hit_rate_book",
+    "mrr_at_k",
+]
 
 
 def _validate_k(k: int) -> None:
@@ -96,3 +128,18 @@ def mrr_at_k(results: RankedResults, relevant: GroundTruth, k: int) -> float:
         rank = _first_relevant_rank(topk, relevant_set)
         total += 1.0 / rank if rank is not None else 0.0
     return total / len(relevant)
+
+
+def hit_rate_book(results: RankedBooks, relevant: GroundTruthBooks, k: int) -> float:
+    """Book-level hit-rate@k: a hit if any of the top-`k` results' book ids
+    matches a relevant book id, regardless of which chunk within that book.
+
+    Signature and semantics deliberately mirror `hit_rate_at_k` exactly —
+    `results`/`relevant` are keyed the same way, just carrying book ids
+    instead of chunk ids — so this delegates to it rather than duplicating
+    the membership/empty/duplicate-id logic. The caller is responsible for
+    projecting a chunk-id ranking into the matching book-id ranking (e.g.
+    `[hit.book_id for hit in ranked_hits]`); see
+    `evals/retrieval_eval.py`'s `QueryOutcome.ranked_book_ids`.
+    """
+    return hit_rate_at_k(results, relevant, k)

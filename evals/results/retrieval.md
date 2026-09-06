@@ -1,16 +1,16 @@
 # Retrieval arm eval
 
-Generated: 2026-09-03T13:10:49+00:00
+Generated: 2026-09-06T21:54:33+00:00
 Ground truth: `evals/ground_truth.jsonl` — 235 row(s) loaded, 235 scored, 0 skipped because the labelled `chunk_id` is not in the current index (corpus drift; excluded rather than counted as a miss).
 Coverage: k=5, question budget = all rows (`--questions`), query rewrite = off (`--rewrite`).
 Arms compared: `lexical`, `vector`, `hybrid`, `hybrid_rerank`.
 
-| arm | rewrite | n | hit-rate@5 | MRR@5 | degraded | mean latency (ms) |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `lexical` | off | 235 | 0.064 | 0.055 | 0 | 12 |
-| `vector` | off | 235 | 0.630 | 0.473 | 0 | 45 |
-| `hybrid` | off | 235 | 0.638 | 0.483 | 0 | 11 |
-| `hybrid_rerank` **(winner)** | off | 235 | 0.638 | 0.572 | 0 | 68 |
+| arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lexical` | off | 235 | 0.064 | 0.077 | 0.055 | 0 | 67 |
+| `vector` | off | 235 | 0.630 | 0.906 | 0.473 | 0 | 65 |
+| `hybrid` | off | 235 | 0.638 | 0.906 | 0.483 | 0 | 27 |
+| `hybrid_rerank` **(winner)** | off | 235 | 0.638 | 0.906 | 0.572 | 0 | 149 |
 
 **Winner: `hybrid_rerank`** — highest hit-rate@5 (0.638), MRR@5 (0.572) breaking ties.
 

@@ -7,7 +7,15 @@ specs/evals-retrieval.md, not to itself.
 
 import pytest
 
-from evals.metrics import GroundTruth, RankedResults, hit_rate_at_k, mrr_at_k
+from evals.metrics import (
+    GroundTruth,
+    GroundTruthBooks,
+    RankedBooks,
+    RankedResults,
+    hit_rate_at_k,
+    hit_rate_book,
+    mrr_at_k,
+)
 
 
 def test_hit_rate_hand_computed() -> None:
@@ -44,6 +52,41 @@ def test_mrr_hand_computed() -> None:
     expected = (1 / 1 + 1 / 4 + 0) / 3
     assert mrr_at_k(results, relevant, k=5) == pytest.approx(expected)
     assert mrr_at_k(results, relevant, k=5) != pytest.approx(hit_rate_at_k(results, relevant, k=5))
+
+
+def test_hit_rate_book_counts_same_book_hit() -> None:
+    # q1: the top-5 chunk ranking is entirely WRONG chunk ids, but every one
+    #     of them belongs to the same book as the relevant chunk -> book hit,
+    #     even though chunk-level hit_rate_at_k would score this a total miss.
+    # q2: top-5 books never include the relevant book -> book miss.
+    # q3: the relevant book appears, but only at rank 4 -> still a hit at
+    #     k=5 (hit-rate does not discount by rank, unlike MRR).
+    book_results: RankedBooks = {
+        "q1": ["book-a", "book-a", "book-a", "book-a", "book-a"],
+        "q2": ["book-x", "book-y", "book-z", "book-w", "book-v"],
+        "q3": ["book-x", "book-y", "book-z", "book-b", "book-w"],
+    }
+    relevant_books: GroundTruthBooks = {"q1": ["book-a"], "q2": ["book-b"], "q3": ["book-b"]}
+
+    # Chunk-level hit-rate on the SAME q1 ranking is 0.0: none of the ranked
+    # chunk ids equal the relevant chunk id "c1", even though they share its
+    # book. This is the exact gap hit_rate_book exists to surface.
+    chunk_results: RankedResults = {"q1": ["x1", "x2", "x3", "x4", "x5"]}
+    chunk_relevant: GroundTruth = {"q1": ["c1"]}
+    assert hit_rate_at_k(chunk_results, chunk_relevant, k=5) == pytest.approx(0.0)
+
+    assert hit_rate_book(book_results, relevant_books, k=5) == pytest.approx(2 / 3)
+
+
+def test_hit_rate_book_matches_hit_rate_at_k_on_the_same_id_space() -> None:
+    # hit_rate_book is hit_rate_at_k over book ids rather than chunk ids —
+    # pin that it is not a silently different computation.
+    results: RankedBooks = {"q1": ["book-a", "book-b"], "q2": ["book-c"]}
+    relevant: GroundTruthBooks = {"q1": ["book-a"], "q2": ["book-d"]}
+
+    assert hit_rate_book(results, relevant, k=5) == pytest.approx(
+        hit_rate_at_k(results, relevant, k=5)
+    )
 
 
 def test_hit_rate_and_mrr_agree_when_relevant_always_rank_one() -> None:

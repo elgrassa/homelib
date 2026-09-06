@@ -26,6 +26,7 @@ from evals.retrieval_eval import (
     BookMetrics,
     QueryOutcome,
     hit_rate_at_k,
+    hit_rate_book,
     load_indexed_chunk_ids,
     load_questions,
     mrr_at_k,
@@ -71,6 +72,7 @@ def test_metrics_are_reexported_from_evals_metrics_not_reimplemented() -> None:
     # rule is meant to prevent — one hand-tested implementation, re-exported.
     assert hit_rate_at_k is metrics.hit_rate_at_k
     assert mrr_at_k is metrics.mrr_at_k
+    assert hit_rate_book is metrics.hit_rate_book
 
 
 def test_default_database_url_matches_the_index_module() -> None:
@@ -137,6 +139,25 @@ def test_run_arm_raises_on_zero_rows_rather_than_scoring_zero() -> None:
     # specs/evals-retrieval.md: an eval run over zero data is a bug, not a 0.0.
     with pytest.raises(ValueError, match="empty"):
         run_arm([], arm="lexical", retrieve=_fixed_retriever({}))  # type: ignore[arg-type]
+
+
+def test_run_arm_scores_book_level_hits_when_chunk_id_differs_but_book_matches() -> None:
+    # q1: the ranked chunks are all WRONG chunk ids from the CORRECT book ->
+    #     chunk-level miss, book-level hit.
+    # q2: the ranked chunks are wrong chunk ids from a WRONG book -> miss on
+    #     both metrics.
+    # hit_rate_at_5 = 0/2 = 0.0; hit_rate_book_at_5 = 1/2 = 0.5.
+    rows = [_row("q1", "c1", "book-a"), _row("q2", "c2", "book-b")]
+
+    def retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str]:
+        if query == "q1":
+            return [_hit("other-1", 1, "book-a"), _hit("other-2", 2, "book-a")], arm
+        return [_hit("other-3", 1, "book-x"), _hit("other-4", 2, "book-x")], arm
+
+    result = run_arm(rows, arm="hybrid", retrieve=retrieve)
+
+    assert result.hit_rate_at_5 == pytest.approx(0.0)
+    assert result.hit_rate_book_at_5 == pytest.approx(0.5)
 
 
 def test_per_book_breakdown_sums_to_overall_n() -> None:
@@ -338,12 +359,14 @@ def _arm_metrics(
     n: int = 10,
     degraded: int = 0,
     arms_used: dict[str, int] | None = None,
+    hit_rate_book_at_5: float | None = None,
 ) -> ArmMetrics:
     return ArmMetrics(
         arm=arm,
         rewrite=False,
         hit_rate_at_5=hit_rate,
         mrr_at_5=mrr,
+        hit_rate_book_at_5=hit_rate_book_at_5 if hit_rate_book_at_5 is not None else hit_rate,
         per_book={"book-a": BookMetrics(hit_rate_at_5=hit_rate, mrr_at_5=mrr, n=n)},
         n=n,
         k=DEFAULT_K,
@@ -375,6 +398,7 @@ def test_report_marks_the_best_arm_as_winner(tmp_path: Path) -> None:
     for arm in ARMS:
         assert f"`{arm}`" in text
     assert "hit-rate@5" in text
+    assert "hit@k (book)" in text
     assert "MRR@5" in text
 
 
