@@ -8,6 +8,7 @@ Observatory / Projection.
 from __future__ import annotations
 
 import contextlib
+import os
 from collections.abc import Callable
 from typing import Literal
 
@@ -43,10 +44,12 @@ from apps.ui.view_model import (
     normalize_official_language,
     normalize_projection_source,
     observatory_chart_titles,
+    official_viewer_enabled,
     parse_interests,
     persist_demo_session,
     playlist_visible_items,
     projection_wants_chrome_hidden,
+    read_port,
     record_vote,
     resolve_prerequisite_titles,
     steps_in_order,
@@ -284,29 +287,17 @@ def render_projection_tab(client: Client) -> None:
     source = st.session_state["projection_source"]
 
     projector = st.toggle("Enter projector mode", key="projector_mode")
-    # Shareable iPad AirPlay deep link — set once when missing, avoid param thrash.
+    # Shareable iPad AirPlay deep link — set once when missing, avoid param
+    # thrash. `main()` consumes (and deletes) both `projection` and `source`
+    # on the very next run, so `source` is only worth writing at the same
+    # moment `projection` itself is first written — writing it on every run
+    # would just re-add what main() deletes, guard-that-never-guards.
     if projector:
         if st.query_params.get("projection") not in {"1", "true", "yes"}:
             st.query_params["projection"] = "1"
-        want = "official" if source == "official" else "shelf"
-        if st.query_params.get("source") != want:
-            st.query_params["source"] = want
+            st.query_params["source"] = "official" if source == "official" else "shelf"
     elif st.query_params.get("projection") in {"1", "true", "yes"}:
         del st.query_params["projection"]
-
-    if projection_wants_chrome_hidden(
-        projector_mode=projector,
-        query_projection=st.query_params.get("projection"),
-    ):
-        st.markdown(
-            "<style>"
-            "header[data-testid='stHeader']{display:none!important}"
-            "[data-testid='stToolbar']{display:none!important}"
-            "#MainMenu{visibility:hidden}"
-            "footer{visibility:hidden}"
-            "</style>",
-            unsafe_allow_html=True,
-        )
 
     if source == "official":
         _render_official_preview(projector)
@@ -338,7 +329,7 @@ def _render_official_preview(projector: bool) -> None:
     st.link_button("Open Ukrainian PDF", book.pdf_url)
     st.link_button("Open HTML reader", book.reader_url)
     st.html(
-        build_official_preview_stage_html(book, projector=projector),
+        build_official_preview_stage_html(book, projector=projector, read_port=read_port()),
         unsafe_allow_javascript=True,
     )
     if projector:
@@ -370,7 +361,11 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
         format_func=lambda b: b.title,
         key="proj_book",
     )
-    ordinal = int(st.session_state.get("proj_ordinal", 0))
+    # Keyed per book: a global ordinal would carry, say, page 300 of a long
+    # book straight into a 12-block book and land past its end — the error
+    # path below only steps back one ordinal, not all the way to a valid one.
+    ordinal_key = f"proj_ordinal:{book.book_id}"
+    ordinal = int(st.session_state.get(ordinal_key, 0))
     cols = st.columns([1, 1, 2])
     with cols[0]:
         if st.button("Previous", key="proj_prev", use_container_width=True) and ordinal > 0:
@@ -378,18 +373,16 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
     with cols[1]:
         if st.button("Next", key="proj_next", use_container_width=True):
             ordinal += 1
-    st.session_state["proj_ordinal"] = ordinal
+    st.session_state[ordinal_key] = ordinal
 
     try:
         block = client.get_book_block(book.book_id, ordinal=ordinal)
     except (ApiClientError, ApiUnavailableError) as exc:
         if ordinal > 0:
-            st.session_state["proj_ordinal"] = max(0, ordinal - 1)
+            st.session_state[ordinal_key] = max(0, ordinal - 1)
             st.warning("End of book — stepped back one page.")
             try:
-                block = client.get_book_block(
-                    book.book_id, ordinal=st.session_state["proj_ordinal"]
-                )
+                block = client.get_book_block(book.book_id, ordinal=st.session_state[ordinal_key])
             except (ApiClientError, ApiUnavailableError) as exc2:
                 st.error(format_api_error_message(exc2))
                 return
@@ -419,11 +412,16 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
         f"</div>",
         unsafe_allow_html=True,
     )
-    read_hint = clean_read_url(book.book_id, ordinal=block.ordinal)
-    st.caption(
-        f"Speak Screen works on this stage. For Safari Listen to Page open the clean "
-        f"article at the same host{read_hint} (UI container port 8502)."
-    )
+    # The :8502 companion never exists on Streamlit Cloud (public demo) —
+    # only mention it when the viewer is explicitly on, or this isn't the
+    # demo deploy.
+    if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
+        port = read_port()
+        read_hint = clean_read_url(book.book_id, ordinal=block.ordinal, read_port=port)
+        st.caption(
+            f"Speak Screen works on this stage. For Safari Listen to Page open the clean "
+            f"article at the same host{read_hint} (UI container port {port})."
+        )
 
 
 def render_roadmap_tab(client: Client) -> None:
@@ -503,13 +501,23 @@ def main() -> None:
         )
         del st.query_params["door"]
     if "source" in st.query_params:
-        st.session_state["projection_source"] = normalize_projection_source(
-            st.query_params.get("source")
-        )
+        normalized_source = normalize_projection_source(st.query_params.get("source"))
+        st.session_state["projection_source"] = normalized_source
+        if (
+            "projection_source_radio" not in st.session_state
+            or st.session_state["projection_source_radio"] != normalized_source
+        ):
+            st.session_state["projection_source_radio"] = normalized_source
         del st.query_params["source"]
     if st.query_params.get("projection") in {"1", "true", "yes"}:
-        st.session_state["door"] = "Projection"
-        st.session_state["projector_mode"] = True
+        # Consume once: assigning `door`/`projector_mode` before the toggle
+        # widget is created on THIS run is fine, but leaving the param in
+        # place would force it back on again on every later rerun (the
+        # toggle-off branch in render_projection_tab could never stick).
+        if "projector_mode" not in st.session_state:
+            st.session_state["door"] = "Projection"
+            st.session_state["projector_mode"] = True
+        del st.query_params["projection"]
 
     door = normalize_door(st.session_state["door"])
     projector_active = bool(st.session_state.get("projector_mode")) and door == "Projection"

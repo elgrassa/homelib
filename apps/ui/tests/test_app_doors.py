@@ -79,3 +79,54 @@ def test_unknown_door_query_param_does_not_crash_the_crossroads() -> None:
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == "Ask"
     assert "Open door: Ask" in [c.value for c in at.caption]
+
+
+def test_projector_toggle_off_leaves_projector_mode() -> None:
+    """`?projection=1` must open projector mode exactly once. Regression for the
+    trap where `main()` re-asserted `projector_mode=True` on every rerun,
+    making the in-tab toggle-off unable to stick (BUG 1)."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.query_params["projection"] = "1"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["door"] == "Projection"
+    assert at.session_state["projector_mode"] is True
+    # Chrome (and with it the door grid) is hidden while projector mode is on.
+    with pytest.raises(KeyError):
+        at.button(key="door_Ask")
+
+    at.toggle(key="projector_mode").set_value(False).run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["projector_mode"] is False
+    assert "projection" not in at.query_params
+    assert at.button(key="door_Ask").label == "Ask"
+
+
+def test_source_param_consumed_once() -> None:
+    """`?source=` must be consumed into session state once, not re-added on
+    every rerun by the projector branch's stale guard (BUG 1b)."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.query_params["source"] = "shelf"
+    at.session_state["door"] = "Projection"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["projection_source"] == "shelf"
+    assert "source" not in at.query_params
+
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert "source" not in at.query_params
+
+
+def test_projection_ordinal_resets_when_book_changes() -> None:
+    """The Projection ordinal must be keyed per book, not global (BUG 2): a
+    stale global `proj_ordinal` left over from a long book could otherwise be
+    replayed against a much shorter one. The API is unreachable here, so this
+    pins the new per-book key shape rather than exercising pagination."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Projection"
+    at.session_state["projection_source"] = "shelf"
+    at.session_state["proj_ordinal:walden"] = 300
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert "proj_ordinal" not in at.session_state
