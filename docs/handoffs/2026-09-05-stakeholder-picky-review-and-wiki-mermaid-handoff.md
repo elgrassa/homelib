@@ -83,6 +83,23 @@
 | E #29 | `chore/graphify-out` @ `48a74fd` (owner-opened draft) | C | graph-guard + graph-refresh (`HEAD:${ref}` for `main`/`v2`), `.graphifyignore`, `CLAUDE.md` step 1bis, 4 hygiene tests; **no `graphify-out/` in the PR** | restacked onto the #28 head after the docs commit |
 | B2 #30 | `feat/streamlit-cloud-groq-files` | E #29 (`2b97f8f`) | **opened on owner GO (2026-09-06)** — Cloud files, in-process bridge over a real ASGI transport, demo-session write-back (the #25 MED), blank-key + Groq fallback; `just ci` **693 passed / 0 failed, coverage 90.59%** (ruff, ruff format, mypy --strict clean; 8 min once the box quietened); rehearsal in `docs/evidence.md` (degraded ask 27 s, RSS ~160 MB, no key) | bonus #11, never blocks rows 1–10 |
 
+### Redeploy + live verify on `main` (2026-09-06, owner: "ensure latest main redeployed locally and verify picky all features")
+
+`main` = `94eae69` (collapse PR #35) + graph tip `99428a5`. The user's compose stack was rebuilt from that SHA with `just up` (`--build`; api/ui images 14:35, ingest 14:40; Postgres and Ollama volumes kept, no `down -v`), then `just seed` and `just seed-sqlite` were re-run from the rebuilt ingest image.
+
+| Surface | Result |
+|---|---|
+| Seeds | Postgres 9168 chunks / 9168 embeddings / 3,061 catalog; SQLite 18 / 729 / 9168 / 9168 / 3,061 — both exit 0 |
+| `/health` | `ok`, 18 books / 9168 chunks, Ollama `qwen2.5:7b-instruct` reachable |
+| UI (browser) | 7 doors; rotunda rotates and Enter opens the chosen door; Shelf 18·729·9168; Observatory 6 charts populated; Projection loads a book; Coffee Table empty before the API pass |
+| Ask → cite → 👍 → Observatory | attempts 1–4 timed out at 330 s under host load 244–360 (other repos' CI + the Docker VM — not this stack); attempt 5 grounded `hybrid_rerank`, 3 citations, 71 s; first citation block resolves; feedback 200; `queries_over_time` 10 → 15 |
+| Coffee Table | add → re-fetch shows it → progress `read` 200 → delete → no longer active |
+| Mentor → path | intake 200 (84 s) with a one-step `proposed_path`; `POST /v1/paths` with those steps 200 `accepted: true`. The script's first attempt got a 422 because it posted an empty step list — my bug, the API refused correctly |
+| Roadmap · scene search · audio · demo session · books | 200 (130 s, Open Library steps) · 200 keyword hits · `can_generate=False` · 200 · 18 |
+| Forgejo on `94eae69` | PR run 13347 green on every lane; push run 13357 quick lane killed by the 20-min limit under load (ruff/mypy had passed — infra), heavy lane + graph-refresh green (`99428a5`) |
+
+Residuals: the ask latency under load is the same quiet-box story as drill #2 (§ Found while verifying); nothing in the pass failed for a product reason. Full evidence row: `docs/evidence.md` "Redeploy of `main` + live feature pass".
+
 ## 3. Talk track (5–8 min)
 
 1. **The library** (30 s): a private academic shelf you can ask, with citations that open the page. Doors, not tabs.

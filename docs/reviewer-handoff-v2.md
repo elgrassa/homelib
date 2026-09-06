@@ -31,10 +31,11 @@ live in [`docs/evidence.md`](evidence.md) addendum + CHECKLIST §I). Editions:
 
 **Safety:** tag `v1-fallback` = `535f58b` on `main` (verified Postgres stack).
 `v2` → `main` done 2026-09-06: `main` = `v2` = `eb4a4ff` (fast-forward; drill green on `ee0f318`, every train head green on Forgejo); re-synced after #32 (MagicLib design-sync inputs) — `main` follows every `v2` bot commit.
+**`v2` collapsed into `main` (2026-09-06, PR #35):** `main` is now the single long-lived branch; every PR targets it, graph-refresh commits on it, and the `v2` branch is deleted on Forgejo. The sentence above is history.
 
 ---
 
-## 2. Architecture & schema (v2 on `v2` branch)
+## 2. Architecture & schema (v2 — on `main` since the 2026-09-06 collapse)
 
 ### Store
 
@@ -207,8 +208,9 @@ Maintained as repo markdown under `docs/wiki/` (sync to Forgejo wiki is
 
 | Ref | SHA / note |
 |---|---|
-| `forgejo/v2` | `86ba349` — product tip; the stack below merges into it oldest-first |
+| `forgejo/main` | **`99428a5`** (2026-09-06) — the single branch: `94eae69` collapse PR #35 + its graph-refresh bot commit. `v2` deleted on Forgejo (was `8a0c6fc` = `main` at the time) |
+| `forgejo/v2` (historical) | `86ba349` — product tip before the train; the stack below merged into it oldest-first |
 | `main` / `v1-fallback` | `535f58b` |
 | Merged 2026-09-06 | `v2 ← #25 PR-A ← #26 PR-B ← #27 PR-D ← #28 PR-C ← #29 PR-E ← #30 PR-B2`, each green on Forgejo at its head and merged fast-forward-only; `v2` = `02a26ba`, linear. Then #31 (graph-refresh bootstrap) ff-merged and the bot committed the first graph: `main` = `v2` = `eb4a4ff`. Nothing is open. |
 
-Merge style: `tea pulls merge <n> --style rebase`. No force-push to `v2`/`main`.
+Merge style: fast-forward-only (`POST /pulls/{n}/merge` `Do: fast-forward-only`) into `main`. No force-push to `main`.
