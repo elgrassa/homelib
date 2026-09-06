@@ -1,91 +1,204 @@
 <style>
   #hl-rotunda {
-    /* The page theme is the parchment (light) theme in .streamlit/config.toml;
-       light-dark() must not follow the OS and paint a dark room on a light page. */
+    /* Dark jewel on the parchment Streamlit shell — MagicLib mockup language
+       (gold bloom, teal seal, warm candle light) without flipping page theme. */
     color-scheme: light;
-    --hl-ink: light-dark(#241c16, #f8f0df);
-    --hl-muted: light-dark(#756758, #c9baa5);
-    --hl-shell: light-dark(#f7f0e3, #15120f);
-    --hl-panel: light-dark(#fffaf0, #211b16);
-    --hl-panel-2: light-dark(#eee0c7, #30251d);
-    --hl-line: light-dark(#cab995, #66523d);
-    --hl-gold: light-dark(#8a5b13, #e2b85f);
-    --hl-gold-soft: light-dark(#ead8ac, #4a391f);
-    --hl-green: light-dark(#315c4b, #89b9a2);
+    --hl-ink: #f3e6c8;
+    --hl-muted: #c9baa5;
+    --hl-shell: #0c1612;
+    --hl-panel: #1a241c;
+    --hl-panel-2: #243028;
+    --hl-line: #66523d;
+    --hl-gold: #e2b85f;
+    --hl-gold-soft: #4a391f;
+    --hl-teal: #4fd1c5;
+    --hl-teal-dim: color-mix(in srgb, #4fd1c5 35%, transparent);
+    --hl-candle: #d4893a;
     color: var(--hl-ink);
     font-family: Georgia, "Times New Roman", serif;
     width: 100%;
+    /* Reserve height so Ask widgets below do not jump (CLS). */
+    min-height: 460px;
   }
   #hl-rotunda * { box-sizing: border-box; }
   #hl-rotunda .hl-room {
-    position: relative; height: 350px; max-width: 900px; margin: 0 auto; overflow: hidden;
-    border: 1px solid var(--hl-line); border-radius: 18px;
+    position: relative; height: 380px; max-width: 920px; margin: 0 auto; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--hl-gold) 45%, var(--hl-line));
+    border-radius: 20px;
     background:
-      linear-gradient(90deg, transparent 49.6%, color-mix(in srgb, var(--hl-gold) 26%, transparent) 50%, transparent 50.4%),
-      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 15%, transparent) 0 2px, transparent 2px 82px),
-      linear-gradient(var(--hl-panel-2), var(--hl-shell) 72%);
-    perspective: 900px;
+      radial-gradient(ellipse 55% 40% at 50% 108%, var(--hl-teal-dim), transparent 70%),
+      radial-gradient(circle at 12% 78%, color-mix(in srgb, var(--hl-candle) 38%, transparent), transparent 28%),
+      radial-gradient(circle at 88% 22%, color-mix(in srgb, var(--hl-gold) 18%, transparent), transparent 32%),
+      radial-gradient(ellipse at 50% 0%, color-mix(in srgb, #1e3a32 80%, transparent), transparent 55%),
+      linear-gradient(180deg, #15221c 0%, var(--hl-shell) 55%, #080e0c 100%);
+    perspective: 980px;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--hl-teal) 18%, transparent),
+      0 28px 60px color-mix(in srgb, #000 55%, transparent),
+      inset 0 0 80px color-mix(in srgb, #000 35%, transparent);
   }
+  /* Soft mote field — magic dust without a particle library. */
+  #hl-rotunda .hl-room::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: 0.55;
+    background-image:
+      radial-gradient(1.5px 1.5px at 12% 18%, var(--hl-gold), transparent),
+      radial-gradient(1px 1px at 28% 62%, #fff8, transparent),
+      radial-gradient(1.5px 1.5px at 44% 28%, var(--hl-teal), transparent),
+      radial-gradient(1px 1px at 61% 74%, var(--hl-gold), transparent),
+      radial-gradient(1.5px 1.5px at 76% 22%, #fff6, transparent),
+      radial-gradient(1px 1px at 88% 58%, var(--hl-teal), transparent),
+      radial-gradient(1px 1px at 18% 88%, var(--hl-gold), transparent),
+      radial-gradient(1.5px 1.5px at 52% 48%, #fff5, transparent);
+    animation: hl-motes 9s ease-in-out infinite alternate;
+  }
+  /* Floor seal / compass bloom (mockup teal geometry). */
   #hl-rotunda .hl-room::after {
-    content: ""; position: absolute; left: -10%; right: -10%; bottom: -95px; height: 185px;
-    border-top: 1px solid var(--hl-line); border-radius: 50%;
-    background: repeating-radial-gradient(ellipse at center, color-mix(in srgb, var(--hl-gold) 12%, transparent) 0 2px, transparent 2px 28px);
-    transform: rotateX(62deg);
+    content: ""; position: absolute; left: 50%; bottom: -40px; z-index: 2;
+    width: min(72%, 420px); height: 160px; transform: translateX(-50%) rotateX(68deg);
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--hl-teal) 55%, transparent);
+    box-shadow:
+      0 0 24px var(--hl-teal-dim),
+      0 0 60px color-mix(in srgb, var(--hl-teal) 22%, transparent),
+      inset 0 0 30px color-mix(in srgb, var(--hl-teal) 25%, transparent);
+    background:
+      repeating-conic-gradient(from 0deg, transparent 0 8deg, color-mix(in srgb, var(--hl-teal) 18%, transparent) 8deg 9deg),
+      radial-gradient(circle, color-mix(in srgb, var(--hl-teal) 22%, transparent) 0 18%, transparent 42%);
+    animation: hl-seal-pulse 3.6s ease-in-out infinite;
+    pointer-events: none;
   }
-  #hl-rotunda .hl-compass { position: absolute; top: 13px; left: 16px; z-index: 5; color: var(--hl-muted); font: 13px system-ui, sans-serif; }
+  #hl-rotunda .hl-compass {
+    position: absolute; top: 14px; left: 16px; z-index: 5;
+    color: var(--hl-muted); font: 13px system-ui, sans-serif;
+    letter-spacing: 0.04em; text-shadow: 0 0 12px color-mix(in srgb, var(--hl-teal) 40%, transparent);
+  }
   #hl-rotunda .hl-stage {
-    position: absolute; inset: 50% auto auto 50%; width: 0; height: 0;
+    position: absolute; inset: 50% auto auto 50%; width: 0; height: 0; z-index: 3;
     transform-style: preserve-3d; transition: transform 700ms cubic-bezier(.2,.75,.25,1);
   }
   #hl-rotunda .hl-door {
-    position: absolute; left: -68px; top: -115px; width: 136px; height: 230px;
+    position: absolute; left: -72px; top: -122px; width: 144px; height: 244px;
+    min-width: 44px; min-height: 44px;
     border: 0; padding: 0; color: var(--hl-ink); background: transparent; cursor: pointer;
     transform-style: preserve-3d; font: inherit;
   }
   #hl-rotunda .hl-door-face {
     position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
-    gap: 9px; padding: 16px 9px; border: 2px solid var(--hl-line); border-radius: 68px 68px 9px 9px;
+    gap: 8px; padding: 18px 10px; border: 2px solid color-mix(in srgb, var(--hl-gold) 40%, var(--hl-line));
+    border-radius: 72px 72px 10px 10px;
     background:
-      radial-gradient(circle at 76% 50%, var(--hl-gold) 0 4px, transparent 5px),
-      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 28%, transparent) 0 1px, transparent 1px 27px),
-      var(--hl-panel);
-    box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--hl-line) 22%, transparent), 0 20px 35px color-mix(in srgb, var(--hl-ink) 20%, transparent);
-    transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
-    backface-visibility: hidden; /* the far doors must not show mirrored labels */
+      radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--hl-gold) 22%, transparent), transparent 42%),
+      radial-gradient(circle at 76% 50%, var(--hl-gold) 0 3px, transparent 4px),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 35%, transparent) 0 1px, transparent 1px 26px),
+      linear-gradient(180deg, #2a3830 0%, #161e19 100%);
+    box-shadow:
+      inset 0 0 0 7px color-mix(in srgb, var(--hl-line) 30%, transparent),
+      0 18px 36px color-mix(in srgb, #000 45%, transparent);
+    transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease, filter 240ms ease;
+    backface-visibility: hidden;
   }
   #hl-rotunda .hl-door:hover .hl-door-face,
-  #hl-rotunda .hl-door:focus-visible .hl-door-face { transform: translateY(-5px); border-color: var(--hl-gold); }
+  #hl-rotunda .hl-door:focus-visible .hl-door-face {
+    transform: translateY(-6px);
+    border-color: var(--hl-gold);
+    filter: brightness(1.08);
+    box-shadow:
+      inset 0 0 0 7px color-mix(in srgb, var(--hl-gold) 28%, transparent),
+      0 0 28px color-mix(in srgb, var(--hl-gold) 35%, transparent);
+  }
   #hl-rotunda .hl-door[aria-pressed="true"] .hl-door-face {
     border-color: var(--hl-gold);
-    box-shadow: inset 0 0 0 8px var(--hl-gold-soft), 0 0 30px color-mix(in srgb, var(--hl-gold) 42%, transparent);
+    background:
+      radial-gradient(circle at 50% 18%, color-mix(in srgb, #fff6d5 55%, transparent), transparent 38%),
+      radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--hl-candle) 35%, transparent), transparent 55%),
+      radial-gradient(circle at 76% 50%, var(--hl-gold) 0 3px, transparent 4px),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--hl-line) 28%, transparent) 0 1px, transparent 1px 26px),
+      linear-gradient(180deg, #3a4a38 0%, #1a221c 100%);
+    box-shadow:
+      inset 0 0 0 8px color-mix(in srgb, var(--hl-gold) 40%, transparent),
+      0 0 36px color-mix(in srgb, var(--hl-gold) 55%, transparent),
+      0 0 72px color-mix(in srgb, var(--hl-candle) 30%, transparent);
+    animation: hl-door-glow 2.8s ease-in-out infinite;
   }
-  #hl-rotunda .hl-door-name { max-width: 110px; font-weight: 500; line-height: 1.15; text-align: center; }
-  #hl-rotunda .hl-door-kind { color: var(--hl-muted); font: 11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  #hl-rotunda .hl-door-name {
+    max-width: 118px; font-weight: 500; line-height: 1.15; text-align: center;
+    text-shadow: 0 0 18px color-mix(in srgb, var(--hl-gold) 35%, transparent);
+  }
+  #hl-rotunda .hl-door-kind {
+    color: var(--hl-muted); font: 11px system-ui, sans-serif;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
   #hl-rotunda .hl-turn {
-    position: absolute; right: 14px; top: 12px; z-index: 6; min-height: 36px; padding: 7px 10px;
-    border: 1px solid var(--hl-gold); border-radius: 10px; color: var(--hl-ink); background: var(--hl-panel);
+    position: absolute; right: 14px; top: 12px; z-index: 6; min-height: 44px; padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--hl-gold) 70%, transparent); border-radius: 10px;
+    color: var(--hl-ink); background: color-mix(in srgb, var(--hl-panel) 82%, transparent);
     font: 500 14px system-ui, sans-serif; cursor: pointer;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--hl-gold) 22%, transparent);
+    backdrop-filter: blur(6px);
+  }
+  #hl-rotunda .hl-turn:hover {
+    border-color: var(--hl-gold);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--hl-gold) 40%, transparent);
   }
   #hl-rotunda .hl-result {
-    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; max-width: 900px;
-    margin: 14px auto 0; padding: 14px 16px; border: 1px solid var(--hl-line); border-radius: 14px;
-    background: var(--hl-panel); font-family: system-ui, sans-serif;
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; max-width: 920px;
+    margin: 14px auto 0; padding: 16px 18px;
+    border: 1px solid color-mix(in srgb, var(--hl-gold) 35%, var(--hl-line));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--hl-panel) 88%, transparent);
+    box-shadow:
+      0 12px 40px color-mix(in srgb, #000 35%, transparent),
+      inset 0 0 40px color-mix(in srgb, var(--hl-teal) 6%, transparent);
+    font-family: system-ui, sans-serif;
+    backdrop-filter: blur(8px);
   }
-  #hl-rotunda .hl-result h2 { margin: 0 0 4px; font: 500 18px Georgia, serif; }
-  #hl-rotunda .hl-result p { margin: 0; color: var(--hl-muted); }
+  #hl-rotunda .hl-result h2 {
+    margin: 0 0 4px; font: 500 18px Georgia, serif; color: var(--hl-ink);
+    text-shadow: 0 0 20px color-mix(in srgb, var(--hl-gold) 30%, transparent);
+  }
+  #hl-rotunda .hl-result p { margin: 0; color: #d4c4a8; }
   #hl-rotunda .hl-enter-link {
-    display: inline-block; min-height: 44px; line-height: 44px; padding: 0 16px; border-radius: 10px;
-    border: 1px solid var(--hl-gold); color: var(--hl-panel); background: var(--hl-gold);
+    display: inline-block; min-height: 44px; line-height: 44px; padding: 0 18px; border-radius: 10px;
+    border: 1px solid var(--hl-gold); color: #1a140c; background: var(--hl-gold);
     font: 500 14px system-ui, sans-serif; text-decoration: none; white-space: nowrap;
+    box-shadow: 0 0 22px color-mix(in srgb, var(--hl-gold) 45%, transparent);
+  }
+  #hl-rotunda .hl-enter-link:hover {
+    box-shadow: 0 0 34px color-mix(in srgb, var(--hl-gold) 65%, transparent);
   }
   #hl-rotunda .hl-enter-link[hidden] { display: none; }
-  #hl-rotunda.hl-reduced .hl-stage, #hl-rotunda.hl-reduced .hl-door-face { transition: none; }
+  @keyframes hl-motes {
+    from { transform: translateY(0); opacity: 0.4; }
+    to { transform: translateY(-10px); opacity: 0.7; }
+  }
+  @keyframes hl-seal-pulse {
+    0%, 100% { opacity: 0.55; box-shadow: 0 0 20px var(--hl-teal-dim), inset 0 0 24px color-mix(in srgb, var(--hl-teal) 20%, transparent); }
+    50% { opacity: 0.95; box-shadow: 0 0 40px color-mix(in srgb, var(--hl-teal) 40%, transparent), inset 0 0 36px color-mix(in srgb, var(--hl-teal) 30%, transparent); }
+  }
+  @keyframes hl-door-glow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.12); }
+  }
+  #hl-rotunda.hl-reduced .hl-stage,
+  #hl-rotunda.hl-reduced .hl-door-face,
+  #hl-rotunda.hl-reduced .hl-room::before,
+  #hl-rotunda.hl-reduced .hl-room::after,
+  #hl-rotunda.hl-reduced .hl-door[aria-pressed="true"] .hl-door-face {
+    animation: none; transition: none;
+  }
   @media (prefers-reduced-motion: reduce) {
-    #hl-rotunda .hl-stage, #hl-rotunda .hl-door-face { transition: none; }
+    #hl-rotunda .hl-stage,
+    #hl-rotunda .hl-door-face,
+    #hl-rotunda .hl-room::before,
+    #hl-rotunda .hl-room::after,
+    #hl-rotunda .hl-door[aria-pressed="true"] .hl-door-face {
+      animation: none; transition: none;
+    }
   }
   @media (max-width: 720px) {
-    #hl-rotunda .hl-room { height: 380px; }
-    #hl-rotunda .hl-door { left: -58px; width: 116px; height: 205px; }
+    #hl-rotunda { min-height: 500px; }
+    #hl-rotunda .hl-room { height: 400px; }
+    #hl-rotunda .hl-door { left: -60px; width: 120px; height: 210px; }
     #hl-rotunda .hl-result { grid-template-columns: 1fr; }
   }
 </style>
@@ -139,7 +252,7 @@ __ENTER_LINKS__
     button.setAttribute('aria-pressed', index === active ? 'true' : 'false');
     const face = document.createElement('span');
     face.className = 'hl-door-face';
-    const glyph = document.createElement('span'); glyph.textContent = '▯'; glyph.setAttribute('aria-hidden', 'true');
+    const glyph = document.createElement('span'); glyph.textContent = '✧'; glyph.setAttribute('aria-hidden', 'true');
     const label = document.createElement('span'); label.className = 'hl-door-name'; label.textContent = name;
     const kind = document.createElement('span'); kind.className = 'hl-door-kind'; kind.textContent = 'door';
     face.append(glyph, label, kind);

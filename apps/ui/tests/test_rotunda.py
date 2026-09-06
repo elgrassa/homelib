@@ -50,7 +50,14 @@ def test_rotunda_is_an_inline_fragment_not_an_iframe_document() -> None:
         for line in css.splitlines()
         if "{" in line and not line.strip().startswith(("@", "/*", "*"))
     ]
-    unscoped = [r for r in rules if not r.startswith("#hl-rotunda")]
+    # @keyframes step selectors (from/to/0%) are not page-scoped rules.
+    unscoped = [
+        r
+        for r in rules
+        if not r.startswith("#hl-rotunda")
+        and not r.startswith(("from ", "to ", "from{", "to{"))
+        and "%" not in r.split("{", 1)[0]
+    ]
     assert not unscoped, unscoped
 
 
@@ -114,6 +121,20 @@ def test_rotunda_script_text_contains_no_markup_like_characters() -> None:
     start = doc.index("<script>") + len("<script>")
     end = doc.index("</script>")
     assert "<" not in doc[start:end]
+
+
+def test_rotunda_magic_effects_are_scoped_and_respect_reduced_motion() -> None:
+    """Mockup language (gold bloom, teal seal, motes) must stay inside #hl-rotunda
+    and shut off under prefers-reduced-motion / hl-reduced."""
+    doc = build_rotunda_html(CROSSROADS_DOORS, "Ask")
+    assert "hl-seal-pulse" in doc
+    assert "hl-door-glow" in doc
+    assert "hl-motes" in doc
+    assert "--hl-teal:" in doc
+    assert "min-height: 460px" in doc
+    reduced = build_rotunda_html(CROSSROADS_DOORS, "Ask", reduced_motion=True)
+    assert "hl-reduced" in reduced
+    assert "animation: none" in reduced
 
 
 def test_rotunda_rejects_unknown_active_and_single_door() -> None:

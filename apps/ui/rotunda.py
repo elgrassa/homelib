@@ -21,10 +21,10 @@ Why the shape is what it is:
 * The door set is injected from Python (`CROSSROADS_DOORS`), never hard-coded
   in the HTML fixture, so the rotunda and the grid cannot disagree.
 * The template is derived from `docs/mockups/homelib-magic-library-standalone.html`
-  (same parchment/gold tokens, same stage geometry), with every rule scoped
-  under `#hl-rotunda` because it now shares the page's stylesheet. The
-  fixture's regex "search" and its six named wings are **not** carried over —
-  retrieval belongs to the Ask door (specs/rotunda.md forbids the search arm).
+  and the MagicLib stills (gold bloom, teal floor seal, candle vignette). Rules
+  stay scoped under `#hl-rotunda` because the fragment shares the page CSS.
+  The room is a **dark jewel on the parchment Streamlit shell** — Projection /
+  Speak Screen keep the light page theme.
 """
 
 from __future__ import annotations
