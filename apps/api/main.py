@@ -182,23 +182,17 @@ def _maybe_rewrite(deps: Deps, req: AskRequest, tracer: trace.Tracer) -> tuple[s
 def _retrieve_with_spans(
     deps: Deps, tracer: trace.Tracer, query: str, k: int, arm: str
 ) -> tuple[list[Hit], str, bool]:
-    """Wraps `deps.retrieve` in a `retrieve` span, then — only when the arm
-    that actually served this request was `hybrid_rerank` — opens a `rerank`
-    span too.
+    """Wraps `deps.retrieve` in a `retrieve` span.
 
-    The production `retrieve` seam (`_default_retrieve`) reranks internally
-    as part of one call, so there is no separate rerank call to wrap; this
-    span still exists (with `arm_used` as an attribute) so the trace tree and
-    `time_per_stage` chart make "a rerank happened" visible, even though its
-    cost is folded into `retrieve` above rather than timed separately.
+    The production seam (`_default_retrieve`) opens the `rerank` child span
+    itself, around the real cross-encoder call, so a trace times reranking
+    rather than marking it; a scripted `retrieve` fake emits no `rerank` span.
     """
     with tracer.start_as_current_span("retrieve") as retrieve_span:
         hits, arm_used, degraded = deps.retrieve(query, k, arm)
         retrieve_span.set_attribute("hits", len(hits))
         retrieve_span.set_attribute("degraded", degraded)
-    if arm_used == "hybrid_rerank":
-        with tracer.start_as_current_span("rerank") as rerank_span:
-            rerank_span.set_attribute("arm_used", arm_used)
+        retrieve_span.set_attribute("arm_used", arm_used)
     return hits, arm_used, degraded
 
 
@@ -298,7 +292,13 @@ def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, boo
 
     degraded = mode_used != search_mode
     if use_rerank and not degraded and hits:
-        reranked = rerank(query, hits)
+        # The `rerank` stage span is opened here, around the real cross-encoder
+        # call, so `time_per_stage` shows what reranking actually costs; it
+        # nests under the caller's `retrieve` span.
+        with get_tracer().start_as_current_span("rerank") as rerank_span:
+            rerank_span.set_attribute("candidates", len(hits))
+            reranked = rerank(query, hits)
+            rerank_span.set_attribute("applied", reranked is not None)
         if reranked is not None:
             return reranked, "hybrid_rerank", False
     return hits, mode_used, degraded

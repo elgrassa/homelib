@@ -471,9 +471,12 @@ def _in_memory_tracer_provider() -> Any:
 
 
 def test_ask_emits_stage_spans(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A rewritten, reranked /v1/ask call emits every documented stage span:
-    the root `homelib.ask`, plus `rewrite`, `retrieve`, `rerank`, `llm`,
-    `cite` as children."""
+    """A rewritten /v1/ask call emits every stage span the handler owns: the
+    root `homelib.ask`, plus `rewrite`, `retrieve`, `llm`, `cite` as children.
+    `rerank` is emitted by the production retrieve seam around the real
+    cross-encoder call (see `test_default_retrieve_emits_timed_rerank_span`),
+    so a scripted `retrieve` fake — as here — never shows one: a trace must
+    never claim a stage that did not run."""
     from apps.api import tracing
 
     provider, exporter = _in_memory_tracer_provider()
@@ -495,7 +498,7 @@ def test_ask_emits_stage_spans(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert resp.status_code == 200
     span_names = {span.name for span in exporter.get_finished_spans()}
-    assert span_names == {"homelib.ask", "rewrite", "retrieve", "rerank", "llm", "cite"}
+    assert span_names == {"homelib.ask", "rewrite", "retrieve", "llm", "cite"}
 
 
 def test_ask_omits_optional_stage_spans_when_not_used() -> None:
@@ -869,6 +872,29 @@ def test_default_retrieve_applies_rerank_for_hybrid_rerank(monkeypatch: pytest.M
 
     assert arm_used == "hybrid_rerank"
     assert degraded is False
+
+
+def test_default_retrieve_emits_timed_rerank_span(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The `rerank` span wraps the real cross-encoder call inside the
+    production retrieve seam, so `time_per_stage` reports what reranking
+    costs (candidates in, whether it applied) instead of a zero-length
+    marker opened after the fact."""
+    from apps.api import tracing
+
+    provider, exporter = _in_memory_tracer_provider()
+    tracing.reset_tracer_for_tests(provider)
+    hit = _hit()
+    monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit, hit], "hybrid"))
+    monkeypatch.setattr(main, "rerank", lambda q, hits: list(reversed(hits)))
+
+    _hits, arm_used, _degraded = main._default_retrieve("q", 5, "hybrid_rerank")
+
+    assert arm_used == "hybrid_rerank"
+    spans = [s for s in exporter.get_finished_spans() if s.name == "rerank"]
+    assert len(spans) == 1
+    assert dict(spans[0].attributes or {}) == {"candidates": 2, "applied": True}
+    assert spans[0].end_time is not None and spans[0].start_time is not None
+    assert spans[0].end_time >= spans[0].start_time
 
 
 def test_default_retrieve_keeps_hybrid_order_when_rerank_unavailable(
