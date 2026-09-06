@@ -34,7 +34,7 @@ Architecture and operations documentation for the HomeLib capstone project. This
 
 ## Implementation status (v2 branch stack)
 
-Honest snapshot as of evidence through **WP11 + the 2026-09-05 readiness train (#25 PR-A → #26 PR-B → #27 PR-D → #28 PR-C → #29 PR-E, merged into `v2` on 2026-09-06, `v2` = `02a26ba`, nothing merged)** (see [`docs/evidence.md`](../evidence.md)
+Honest snapshot as of evidence through **WP11 + the 2026-09-05 readiness train (#25 PR-A → #26 PR-B → #27 PR-D → #28 PR-C → #29 PR-E, merged into `v2` on 2026-09-06 together with #30 PR-B2 and #31; `main` = `v2` = `eb4a4ff`)** (see [`docs/evidence.md`](../evidence.md)
 and [`docs/reviewer-handoff-v2.md`](../reviewer-handoff-v2.md)):
 
 | Work package | Branch (typical) | Status |

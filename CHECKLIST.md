@@ -132,7 +132,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Roadmap/Coffee Table/Shelf/Observatory/Projection (`DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`); rotunda PR-D |
 | **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save; rotunda shipped in PR-D (inline `st.html`, static grid kept beneath) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ on the train tip `ee0f318` (2026-09-05; #1 on `ae83d51` failed under load, see §E.9); docs synced on #28. **Train #25→#30 merged ff-only into `v2` = `02a26ba` (2026-09-06 ~05:00, every head green on Forgejo, smoke PASSED on the tip).** Residual owner Mon: `just publish`, Streamlit Cloud (Python 3.13, `GROQ_API_KEY` or `LLM_*` + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` secrets; **PR-B2 #30 opened 2026-09-06 on owner GO**, stacked on #29 — rehearsed cold-start + degraded ask, not with a key), submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ on the train tip `ee0f318` (2026-09-05; #1 on `ae83d51` failed under load, see §E.9); docs synced on #28. **Train #25→#30 merged ff-only into `v2` = `02a26ba` (2026-09-06 ~05:00, every head green on Forgejo, smoke PASSED on the tip). Follow-up #31 (graph-refresh bootstrap) merged ff-only; the bot committed the first `graphify-out/` graph as `eb4a4ff`; `main` fast-forwarded to `v2` = `eb4a4ff` on 2026-09-06 ~09:00 (owner ask), first push run 13289 lost to a runner-disk permission failure, re-run via the docs push.** Residual owner Mon: `just publish`, Streamlit Cloud (Python 3.13, `GROQ_API_KEY` or `LLM_*` + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` secrets; **PR-B2 #30 opened 2026-09-06 on owner GO**, stacked on #29 — rehearsed cold-start + degraded ask, not with a key), submit, peer×3 |
 
 **Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 
@@ -202,7 +202,7 @@ Pavlo merges **oldest → newest** (~10 PRs into `v2`). Agents do **not** merge 
   equivalent). Restack downstream feature branches after each merge.
 - **Draft newer PRs** until their base PR lands; avoid parallel review of
   dependent stacks.
-- **`v2` → `main`:** cold-clone drill green on `d6f9946` and on the train tip `ee0f318` — land the train into `v2` first (A → B → D → C → E), then merge when you’re ready (owner call).
+- **`v2` → `main`:** DONE 2026-09-06 — `main` = `v2` = `eb4a4ff` (fast-forward, no merge commit). Protocol from now on: push to `v2` first, wait for the `graph-refresh` bot commit (its push does not trigger a run), then fast-forward `main` to that tip so both branches carry the same graph commit and never diverge.
 - **PR #4** is closed history (WP00 landed via that merge).
 - **Sep 2 gate (addendum):** no public canary until Mon Sep 7 owner deploy;
   rehearse `APP_MODE=demo` locally instead (see [`docs/evidence.md`](docs/evidence.md)
