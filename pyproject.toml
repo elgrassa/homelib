@@ -12,7 +12,7 @@ version = "0.1.0"
 description = "Personal library: ingest any book format, ask it questions with block-level citations, get a reading roadmap"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
-license = { text = "Apache-2.0" }
+license = { text = "PolyForm-Noncommercial-1.0.0" }
 authors = [{ name = "Pavlo Korodziievskyi" }]
 
 dependencies = [

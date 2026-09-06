@@ -1,7 +1,0 @@
-{
-  "projectId": "fa4ad340-1ab4-4ecb-b2c7-3f1c3cb3d41f",
-  "shape": "manual",
-  "readmeHeader": ".design-sync/conventions.md",
-  "outDir": "ds-bundle",
-  "note": "No JS design system in this repo; the bundle is hand-authored from docs/mockups/homelib-magic-library-standalone.html, apps/ui/rotunda.py and .streamlit/config.toml. Project 'MagicLib' created 2026-09-06 after /design-login from a terminal session."
-}

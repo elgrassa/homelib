@@ -1,15 +1,15 @@
 # ADR-007 — Licence (provisional)
 
-- **Status:** Accepted (provisional — legal review before commercial launch)
+- **Status:** Accepted — implemented 2026-09-06 (PolyForm Noncommercial 1.0.0 for code, CC BY-NC-SA 4.0 for docs/images; legal review still recommended before any commercial launch)
 - **Date:** 2026-09-01
 - **Deciders:** Pavlo (owner)
-- **Related:** `specs/product.md` §4.6 and “Commercial split… (owner 2026-09-01)”, ADR-010, current tree `LICENSE` (Apache-2.0, v1)
+- **Related:** `specs/product.md` §4.6 and “Commercial split… (owner 2026-09-01)”, ADR-010, `LICENSE` = PolyForm Noncommercial 1.0.0, `LICENSE-docs.md` = CC BY-NC-SA 4.0
 
 ## Context
 
 The capstone must be a public GitHub repository. Public GitHub is **not** open source by default: GitHub requires an explicit licence to grant general rights to use, change, and distribute. GitHub terms still allow other users to **view and fork** a public repository. Public forks remain public if the origin is later made private. Technical secrecy therefore comes from never publishing premium source, not from trying to retract it.
 
-This tree currently ships **Apache-2.0** from v1. That is too permissive if Home/Pro is a paid private product. Changing the licence is an owner sign-off before `just publish`, not a silent rewrite of git history.
+This tree shipped **Apache-2.0** until 2026-09-06 (from v1). That was too permissive for Home/Pro as a paid private product. Changing the licence is an owner sign-off before `just publish`, not a silent rewrite of git history.
 
 ## Decision
 
@@ -29,4 +29,4 @@ This PR does not replace `LICENSE`. Owner signs off PolyForm-NC before the publi
 
 **Positive** — reviewers can study and run the capstone; commercial rights stay with Home/Pro; history stays free of premium blobs.
 
-**Negative** — Apache-2.0 remains on `main` until the pre-publish licence swap; dependencies keep their own licences (SBOM / notices still required); PolyForm-NC must be legally reviewed before launch; public GitHub forks stay public even after Forgejo is made private.
+**Negative** — Apache-2.0 shipped on `main` until the pre-publish licence swap landed 2026-09-06; dependencies keep their own licences (SBOM / notices still required); PolyForm-NC must be legally reviewed before launch; public GitHub forks stay public even after Forgejo is made private.
