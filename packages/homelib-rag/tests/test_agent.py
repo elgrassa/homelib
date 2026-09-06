@@ -19,6 +19,7 @@ from homelib_rag.agent import (
     ToolCallRecord,
     build_roadmap,
     get_block,
+    get_book_block,
     run_agent,
     search_catalog,
     search_shelf,
@@ -329,6 +330,36 @@ def test_get_block_not_found_raises_keyerror(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(KeyError):
         get_block("missing")
+
+
+def test_get_book_block_maps_pg_row_and_passes_params(monkeypatch: pytest.MonkeyPatch) -> None:
+    row = ("blk2", "book1", 1, ["Ch2"], "Page two text.", 10, 20, "epub", 5, 2, "anchor1")
+    cursor = _FakeCursor([row])
+    monkeypatch.setattr("homelib_rag.agent._connect", lambda: _FakeConnection(cursor))
+
+    block = get_book_block("book1", 1)
+
+    assert block.block_id == "blk2"
+    assert block.book_id == "book1"
+    assert block.ordinal == 1
+    assert block.section_path == ["Ch2"]
+    assert block.text == "Page two text."
+    assert block.char_start == 10
+    assert block.char_end == 20
+    assert block.provenance.format == "epub"
+    assert block.provenance.page == 5
+    assert block.provenance.spine_index == 2
+    assert block.provenance.anchor == "anchor1"
+    assert block.provenance.source_sha256 == ""
+    assert cursor.executed[0][1] == ("book1", 1)
+
+
+def test_get_book_block_raises_keyerror_when_no_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    cursor = _FakeCursor([])
+    monkeypatch.setattr("homelib_rag.agent._connect", lambda: _FakeConnection(cursor))
+
+    with pytest.raises(KeyError):
+        get_book_block("book1", 99)
 
 
 def test_build_roadmap_tool_wraps_roadmap_module(monkeypatch: pytest.MonkeyPatch) -> None:
