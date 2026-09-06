@@ -15,7 +15,9 @@ binding constraint is unchanged: **the UI never opens a database connection and
 never imports `homelib_rag` / `homelib_core` / `apps.store` internals — every
 action goes through `HomelibClient`** (`specs/client.md`). Selfhosted uses
 `HttpClient` (HTTP to FastAPI); demo uses `InProcessClient` (FastAPI in the same
-process over `httpx.ASGITransport`). The AST boundary test stays.
+process over `httpx.ASGITransport`). The AST boundary test stays. The same
+container also runs the `:8502` clean-read companion (`apps/ui/read_server.py`),
+an HTTP client of the API only.
 
 ## Public interface
 

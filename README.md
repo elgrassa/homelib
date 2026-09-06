@@ -75,14 +75,22 @@ Neither flag is optional, and both exist because the compose file lives in
 `just up && just seed && just seed-sqlite` does all of this for you and refuses
 to run without a `.env`, which is the recommended path.
 
-Ports (`API_PORT`, `UI_PORT`, `GRAFANA_PORT`, `POSTGRES_PORT`, `OLLAMA_PORT`)
-are overridable in `.env` if something already listens on a default.
+Ports (`API_PORT`, `UI_PORT`, `READ_PORT`, `GRAFANA_PORT`, `POSTGRES_PORT`,
+`OLLAMA_PORT`) are overridable in `.env` if something already listens on a
+default, as is the bind address (`HOMELIB_UI_BIND`).
 
 | Service | Default | What it is |
 |---|---|---|
 | UI | http://localhost:8501 | Streamlit: Crossroads doors (Ask, Mentor, Shelf, Observatory, …) |
+| Clean read (companion) | http://localhost:8502/read/{book_id} | Chrome-free article for Safari Listen to Page; same container as the UI |
 | API | http://localhost:8000/docs | FastAPI + Swagger — the full contract |
 | Grafana | http://localhost:3001 | v1 dashboard, 6 panels over the **Postgres** `query_log` — empty on the tip path, see below |
+
+**LAN / projector (optional).** `HOMELIB_UI_BIND=0.0.0.0` in `.env` publishes
+the UI and the companion on your home network (default is loopback).
+`HOMELIB_OFFICIAL_VIEWER=1` additionally enables the display-only two-page
+viewer for publisher previews; it is off by default and is never used by the
+public demo.
 
 **Reviewer notes.** Monitoring is the in-app **Observatory** door
 (`GET /v1/observatory`, six charts + thumbs feedback) — that is the v2 surface

@@ -44,6 +44,7 @@ Edit `.env` for port overrides if defaults are taken (`API_PORT`, `UI_PORT`, etc
 | `just fmt` | ruff format + fix |
 | `just up` | `docker compose -p homelib --env-file .env -f docker/docker-compose.yml up -d --build` |
 | `just seed` | One-shot ingest via compose profile |
+| `just seed-sqlite` | One-shot SQLite seed (`apps/ingest/sqlite_pipeline`) — the store the API reads |
 | `just down` | Stop stack |
 | `just eval-retrieval` | Retrieval bake-off |
 | `just eval-llm` | LLM prompt bake-off (bounded) |
@@ -57,7 +58,7 @@ Edit `.env` for port overrides if defaults are taken (`API_PORT`, `UI_PORT`, etc
 
 ```mermaid
 flowchart LR
-    SNAP[data/snapshot.jsonl<br/>18 public-domain books] --> DLT[dlt source/resources]
+    SNAP[data/corpus_snapshot.jsonl.gz<br/>18 public-domain books] --> DLT[dlt source/resources]
     CAT[data/catalog.jsonl + manifest.yaml<br/>rights per book] --> DLT
     DLT -->|just seed| STG_PG[staging → canonical<br/>Postgres + pgvector]
     DLT -->|just seed-sqlite<br/>python -m apps.ingest.sqlite_pipeline| STG_SQ[staging → canonical<br/>SQLite + FTS5 + float32 BLOB]
@@ -83,16 +84,16 @@ Default ports (override in `.env`):
 
 | Service | URL |
 |---|---|
-| UI (MagicLib) | http://localhost:8501 — on MiniPS set `HOMELIB_UI_BIND=0.0.0.0` and open **http://minips.local:8501** (same pattern as Forgejo `:3000`) |
+| UI (MagicLib) | http://localhost:8501 — on your LAN host set `HOMELIB_UI_BIND=0.0.0.0` and open **http://\<lan-host\>:8501** |
 | Clean read HTML | http://localhost:8502/read/{book_id} — Safari Listen to Page |
 | API | http://localhost:8000/docs (stay loopback; UI reaches it on Docker network) |
 | Grafana | http://localhost:3001 |
 
 ### iPad / AirPlay / Speak Screen
 
-1. MiniPS `.env`: `HOMELIB_UI_BIND=0.0.0.0`, recreate UI (`just up`).
-2. iPad Safari → `http://minips.local:8501` → MagicLib.
-3. **Projection** defaults to **Official preview** / Ukrainian (Pottermore HP) for the wall demo; switch to **This shelf** for seeded books.
+1. LAN host `.env`: `HOMELIB_UI_BIND=0.0.0.0`, recreate UI (`just up`).
+2. iPad Safari → `http://<lan-host>:8501` → MagicLib.
+3. **Projection** defaults to **This shelf** for seeded books; **Official preview** shows publisher links only by default. `HOMELIB_OFFICIAL_VIEWER=1` opts in to the chrome-free two-page viewer for those publisher previews (off by default, never used by the public demo).
 4. **Enter projector mode**, then Screen Mirroring to the projector.
 5. Speak Screen on the chrome-free stage; Listen to Page on `:8502/read/...` (shelf) or Pottermore `bookN/` (official).
 
