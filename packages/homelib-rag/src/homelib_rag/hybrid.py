@@ -16,6 +16,13 @@ repo's implementation:
 
 A chunk missing from one arm's top-k simply contributes 0 for that arm — it
 is not penalized further, not excluded.
+
+`K` ships as 60 (the value the RRF paper's authors settled on and this
+project's production default), but it is a keyword-only `rrf_k` parameter on
+`hybrid_search`/`_hybrid`/`_fuse` rather than a hardcoded constant, so
+`evals/retrieval_eval.py --rrf-k` can sweep it for `evals/results/retrieval.md`'s
+"RRF k sweep" table without touching production call sites (which never pass
+`rrf_k` and therefore keep getting 60).
 """
 
 from __future__ import annotations
@@ -40,19 +47,22 @@ def hybrid_search(
     k: int,
     *,
     mode: Literal["hybrid", "lexical", "vector"] = "hybrid",
+    rrf_k: int = _RRF_K,
 ) -> tuple[list[Hit], str]:
     """Search `q`, returning `(hits, mode_used)`.
 
     `mode="lexical"` or `mode="vector"` calls only that arm; a failure there
     raises directly — the caller asked for one specific arm, so there is
-    nothing to fall back to.
+    nothing to fall back to. `rrf_k` is unused in that case: there is no
+    fusion to tune.
 
-    `mode="hybrid"` (the default) calls both arms and fuses them with RRF.
-    If one arm raises, `hybrid_search` catches it and degrades to the other
-    arm alone, returning its raw hits and `mode_used` set to that arm's name
-    — it never raises for a single-arm failure. If *both* arms raise, there
-    is no working arm to degrade to, so `hybrid_search` re-raises the vector
-    arm's exception.
+    `mode="hybrid"` (the default) calls both arms and fuses them with RRF,
+    using `rrf_k` as the fusion constant `K` (default 60, matching
+    production and the RRF paper). If one arm raises, `hybrid_search` catches
+    it and degrades to the other arm alone, returning its raw hits and
+    `mode_used` set to that arm's name — it never raises for a single-arm
+    failure. If *both* arms raise, there is no working arm to degrade to, so
+    `hybrid_search` re-raises the vector arm's exception.
 
     `mode_used` is always the arm that actually produced the returned hits,
     never an echo of the requested `mode`.
@@ -61,10 +71,10 @@ def hybrid_search(
         return search_lexical(q, k), "lexical"
     if mode == "vector":
         return search_vector(q, k), "vector"
-    return _hybrid(q, k)
+    return _hybrid(q, k, rrf_k)
 
 
-def _hybrid(q: str, k: int) -> tuple[list[Hit], str]:
+def _hybrid(q: str, k: int, rrf_k: int = _RRF_K) -> tuple[list[Hit], str]:
     lexical_hits: list[Hit] = []
     vector_hits: list[Hit] = []
     lexical_ok = False
@@ -93,10 +103,12 @@ def _hybrid(q: str, k: int) -> tuple[list[Hit], str]:
         return lexical_hits, "lexical"
     if not lexical_ok:
         return vector_hits, "vector"
-    return _fuse(lexical_hits, vector_hits, k), "hybrid"
+    return _fuse(lexical_hits, vector_hits, k, rrf_k), "hybrid"
 
 
-def _fuse(lexical_hits: list[Hit], vector_hits: list[Hit], k: int) -> list[Hit]:
+def _fuse(
+    lexical_hits: list[Hit], vector_hits: list[Hit], k: int, rrf_k: int = _RRF_K
+) -> list[Hit]:
     """Reciprocal-Rank-Fuse two arms' hits, dedup by `chunk_id`, top `k`.
 
     Each arm's own `Hit.rank` (its 1-based position in that arm's ranking) is
@@ -104,13 +116,15 @@ def _fuse(lexical_hits: list[Hit], vector_hits: list[Hit], k: int) -> list[Hit]:
     A chunk present in both arms is deduped: its contributions are summed and
     it appears once in the output, with `text`/`section_path`/`page` taken
     from whichever arm's `Hit` was seen first (they describe the same chunk,
-    so both arms agree on those fields).
+    so both arms agree on those fields). `rrf_k` defaults to the production
+    constant so every existing call site (e.g. `homelib_rag.scene_search`,
+    which calls this positionally without `rrf_k`) keeps behaving identically.
     """
     scores: dict[str, float] = {}
     hit_by_id: dict[str, Hit] = {}
     for arm_hits in (lexical_hits, vector_hits):
         for hit in arm_hits:
-            contribution = 1.0 / (_RRF_K + hit.rank)
+            contribution = 1.0 / (rrf_k + hit.rank)
             scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + contribution
             hit_by_id.setdefault(hit.chunk_id, hit)
 

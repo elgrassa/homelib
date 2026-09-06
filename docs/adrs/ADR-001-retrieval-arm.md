@@ -162,6 +162,15 @@ cause; do not treat the absolute lift as a chunker win without a matched
 re-run on both stores. Gate floors in `evals/eval-baseline.json` updated to
 the SQLite measurement (notes record the supersession).
 
+**RRF k sweep (2026-09-06):** `hybrid_search` gained a keyword-only `rrf_k`
+parameter (default 60, unchanged) so the fusion constant could be measured
+rather than assumed; swept over `{1, 10, 60, 100, 200}` on the same SQLite
+corpus (`just eval-rrf-k`, hybrid arm, k=5, `evals/results/retrieval.md` §"RRF
+k sweep"), hit-rate@5/MRR@5/hit@5(book) came back **identical to three
+decimal places at every k** (0.638 / 0.483 / 0.906) — zero spread, so **k
+stays 60**, the RRF paper's default, since nothing in this corpus rewards
+moving it.
+
 ## Verification
 
 ```bash

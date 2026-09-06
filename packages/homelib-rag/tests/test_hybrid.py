@@ -217,6 +217,42 @@ def test_single_lexical_mode_does_not_fall_back(monkeypatch: pytest.MonkeyPatch)
         hybrid_search("q", 5, mode="lexical")
 
 
+def test_rrf_k_flag_changes_fusion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fusion with rrf_k=1 vs rrf_k=200 ranks the SAME two candidates differently.
+
+    A is lexical-rank-1 and absent from the vector arm; B is rank-5 in BOTH
+    arms (so it gets two contributions, A only one):
+
+        rrf(A, K) = 1/(K+1)                      (lexical only)
+        rrf(B, K) = 1/(K+5) + 1/(K+5) = 2/(K+5)   (both arms)
+
+    At K=1:   rrf(A) = 1/2   = 0.5000;  rrf(B) = 2/6   = 0.3333  -> A wins.
+    At K=200: rrf(A) = 1/201 = 0.00498; rrf(B) = 2/205 = 0.00976 -> B wins.
+
+    A's rank-1 placement dominates when the constant is small (a low rank
+    number matters a lot relative to a small K); at a large K every
+    contribution is squeezed toward 1/K, so B's two contributions beat A's
+    one regardless of A's better rank. That is exactly the effect `rrf_k`
+    controls, and it flips which chunk sorts first — not just the score gap.
+    """
+    monkeypatch.setattr(
+        hybrid_module, "search_lexical", _returning([_hit("A", rank=1), _hit("B", rank=5)])
+    )
+    monkeypatch.setattr(hybrid_module, "search_vector", _returning([_hit("B", rank=5)]))
+
+    hits_k1, _ = hybrid_search("q", 2, rrf_k=1)
+    hits_k200, _ = hybrid_search("q", 2, rrf_k=200)
+
+    assert [h.chunk_id for h in hits_k1] == ["A", "B"]
+    assert [h.chunk_id for h in hits_k200] == ["B", "A"]
+
+    # And the default (no rrf_k passed) matches the hardcoded K=60 behaviour.
+    hits_default, _ = hybrid_search("q", 2)
+    expected_default_scores = {"A": 1 / 61, "B": 2 / 65}
+    for hit in hits_default:
+        assert hit.score == pytest.approx(expected_default_scores[hit.chunk_id], abs=1e-9)
+
+
 def test_missing_from_one_arm_contributes_zero_not_excluded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

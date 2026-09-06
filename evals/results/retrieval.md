@@ -119,3 +119,14 @@ Arms compared: `lexical`, `vector`, `hybrid`, `hybrid_rerank`.
 | `thoreau-walden` | 10 | 0.700 | 0.483 |
 | `washington-up-from-slavery` | 10 | 0.700 | 0.650 |
 
+## RRF k sweep
+
+Hybrid arm only, retrieval depth k=5, varying the RRF fusion constant (`rrf_k`, keyword-only on `hybrid_search`; swept via `--rrf-k` / `just eval-rrf-k`). `hit@5 (book)` is `hit_rate_book` from `evals/metrics.py`. Re-run: `just eval-rrf-k`.
+
+| rrf_k | hit-rate@5 | hit@5 (book) | MRR@5 | n |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.638 | 0.906 | 0.483 | 235 |
+| 10 | 0.638 | 0.906 | 0.483 | 235 |
+| 60 | 0.638 | 0.906 | 0.483 | 235 |
+| 100 | 0.638 | 0.906 | 0.483 | 235 |
+| 200 | 0.638 | 0.906 | 0.483 | 235 |

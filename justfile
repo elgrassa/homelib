@@ -131,6 +131,11 @@ eval-retrieval:
 eval-llm:
     uv run python evals/llm_eval.py
 
+# RRF fusion-constant sweep: hybrid arm only, k in {1,10,60,100,200}, appends
+# (replaces on re-run) the "RRF k sweep" table in evals/results/retrieval.md.
+eval-rrf-k:
+    uv run python evals/retrieval_eval.py --rrf-k 1 --rrf-k 10 --rrf-k 60 --rrf-k 100 --rrf-k 200
+
 # ── demos (used as WP verify commands) ──────────────────────────────────────
 
 demo-ask Q:

@@ -87,6 +87,7 @@ __all__ = [
     "BookMetrics",
     "GroundTruthRow",
     "QueryOutcome",
+    "RrfSweepPoint",
     "hit_rate_at_k",
     "hit_rate_book",
     "load_indexed_chunk_ids",
@@ -94,8 +95,10 @@ __all__ = [
     "mrr_at_k",
     "run_all_arms",
     "run_arm",
+    "run_rrf_k_sweep",
     "split_on_index",
     "write_report",
+    "write_rrf_k_sweep_section",
 ]
 
 logger = logging.getLogger(__name__)
@@ -323,39 +326,62 @@ def split_on_index(
 # ── retrieval ───────────────────────────────────────────────────────────────
 
 
-def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str]:
-    """Production retrieval for `arm`, returning the arm that actually ran.
+# Mirrors `homelib_rag.hybrid._RRF_K` — the RRF fusion constant `hybrid_search`
+# uses when no `rrf_k` is given. Repeated rather than imported for the same
+# reason `DEFAULT_DATABASE_URL` is: importing `homelib_rag.hybrid` pulls in
+# `homelib_rag.index`, which pulls in `sentence_transformers`, at module import
+# time, and the unit tests must not pay for that just to see this constant.
+_DEFAULT_RRF_K = 60
+
+
+def _make_retrieve(rrf_k: int = _DEFAULT_RRF_K) -> Retriever:
+    """Build production retrieval closing over one RRF fusion constant.
+
+    `_default_retrieve` (below) is `_make_retrieve()` — the rrf_k=60 case
+    `run_arm` falls back to when no `retrieve` is supplied. `--rrf-k` builds
+    a second instance with a different `rrf_k` for the sweep in
+    `run_rrf_k_sweep`, without touching the arms that must keep running at
+    the production constant.
 
     `homelib_rag.hybrid` and `homelib_rag.rerank` are imported lazily because
     both pull in `sentence_transformers` (via `index`/`CrossEncoder`) at
     import time; keeping that out of module import means the unit tests,
     which never retrieve, do not pay for it.
     """
-    from homelib_rag.hybrid import hybrid_search
 
-    if arm == "lexical":
-        return hybrid_search(query, k, mode="lexical")
-    if arm == "vector":
-        return hybrid_search(query, k, mode="vector")
+    def _retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str]:
+        from homelib_rag.hybrid import hybrid_search
 
-    # Both remaining arms start from RRF. `mode_used` is what `hybrid_search`
-    # really ran: "lexical" or "vector" when one backend was down.
-    hits, mode_used = hybrid_search(query, k, mode="hybrid")
-    if arm == "hybrid":
-        return hits, mode_used
+        if arm == "lexical":
+            return hybrid_search(query, k, mode="lexical")
+        if arm == "vector":
+            return hybrid_search(query, k, mode="vector")
 
-    from homelib_rag.rerank import rerank
+        # Both remaining arms start from RRF. `mode_used` is what
+        # `hybrid_search` really ran: "lexical" or "vector" when one backend
+        # was down.
+        hits, mode_used = hybrid_search(query, k, mode="hybrid", rrf_k=rrf_k)
+        if arm == "hybrid":
+            return hits, mode_used
 
-    if not hits:
-        # Nothing to rerank. The fusion still ran, so the mode is honest.
-        return hits, mode_used
-    reranked = rerank(query, hits)
-    if reranked is None:
-        # Cross-encoder unavailable: the caller keeps the pre-rerank ranking,
-        # exactly as production does — and the row is labelled with what that
-        # ranking actually is, not with the arm that was requested.
-        return hits, mode_used
-    return reranked, f"{mode_used}_rerank"
+        from homelib_rag.rerank import rerank
+
+        if not hits:
+            # Nothing to rerank. The fusion still ran, so the mode is honest.
+            return hits, mode_used
+        reranked = rerank(query, hits)
+        if reranked is None:
+            # Cross-encoder unavailable: the caller keeps the pre-rerank
+            # ranking, exactly as production does — and the row is labelled
+            # with what that ranking actually is, not with the arm that was
+            # requested.
+            return hits, mode_used
+        return reranked, f"{mode_used}_rerank"
+
+    return _retrieve
+
+
+_default_retrieve: Retriever = _make_retrieve()
 
 
 def _retrieve_one(
@@ -533,6 +559,110 @@ def run_all_arms(
         )
         for arm in arms
     ]
+
+
+# ── RRF k sweep (`--rrf-k`) ──────────────────────────────────────────────────
+
+
+class RrfSweepPoint(BaseModel):
+    """One `rrf_k` value's metrics from the hybrid arm — see `run_rrf_k_sweep`."""
+
+    model_config = ConfigDict(extra="allow")
+
+    rrf_k: int
+    hit_rate_at_5: float
+    hit_rate_book_at_5: float
+    mrr_at_5: float
+    n: int
+
+
+def run_rrf_k_sweep(
+    rows: list[GroundTruthRow],
+    ks: Sequence[int],
+    *,
+    k: int = DEFAULT_K,
+    retrieve_factory: Callable[[int], Retriever] | None = None,
+) -> list[RrfSweepPoint]:
+    """Score the `hybrid` arm once per value in `ks`, varying `rrf_k` only.
+
+    Every other setting (rows, retrieval depth `k`, arm) is held fixed, so a
+    difference between rows is attributable to the fusion constant and
+    nothing else. `retrieve_factory` is the test seam (defaults to
+    `_make_retrieve`, production's real hybrid search); a test supplies a fake
+    factory so this never needs a database or a model download.
+    """
+    factory = retrieve_factory if retrieve_factory is not None else _make_retrieve
+    points: list[RrfSweepPoint] = []
+    for rrf_k in ks:
+        result = run_arm(rows, arm="hybrid", k=k, retrieve=factory(rrf_k))
+        points.append(
+            RrfSweepPoint(
+                rrf_k=rrf_k,
+                hit_rate_at_5=result.hit_rate_at_5,
+                hit_rate_book_at_5=result.hit_rate_book_at_5,
+                mrr_at_5=result.mrr_at_5,
+                n=result.n,
+            )
+        )
+    return points
+
+
+_RRF_SWEEP_HEADING = "## RRF k sweep"
+
+
+def _replace_or_append_section(text: str, heading: str, new_lines: Sequence[str]) -> str:
+    """Replace the section starting at `heading` (up to the next `## `
+    heading or EOF) with `new_lines`, or append it if `heading` is not
+    present. Keeps every OTHER section of `text` untouched, so re-running a
+    sweep updates only its own table rather than duplicating it or
+    clobbering the rest of the report.
+    """
+    lines = text.splitlines()
+    try:
+        start = lines.index(heading)
+    except ValueError:
+        prefix = lines
+        if prefix and prefix[-1] != "":
+            prefix = [*prefix, ""]
+        return "\n".join([*prefix, *new_lines]) + "\n"
+
+    end = start + 1
+    while end < len(lines) and not lines[end].startswith("## "):
+        end += 1
+    return "\n".join([*lines[:start], *new_lines, *lines[end:]]) + "\n"
+
+
+def write_rrf_k_sweep_section(points: Sequence[RrfSweepPoint], path: Path = REPORT_PATH) -> None:
+    """Upsert the "RRF k sweep" table into `path`, leaving the rest of the
+    report (the four-arm comparison, per-book breakdown, ...) untouched.
+
+    Raises `ValueError` on empty `points` — same "no data is a bug, not a
+    blank section" rule as `write_report`.
+    """
+    if not points:
+        raise ValueError("refusing to write an RRF k sweep section with no points")
+
+    lines = [
+        _RRF_SWEEP_HEADING,
+        "",
+        "Hybrid arm only, retrieval depth k=5, varying the RRF fusion constant "
+        "(`rrf_k`, keyword-only on `hybrid_search`; swept via `--rrf-k` / "
+        "`just eval-rrf-k`). `hit@5 (book)` is `hit_rate_book` from "
+        "`evals/metrics.py`. Re-run: `just eval-rrf-k`.",
+        "",
+        "| rrf_k | hit-rate@5 | hit@5 (book) | MRR@5 | n |",
+        "| ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for point in points:
+        lines.append(
+            f"| {point.rrf_k} | {point.hit_rate_at_5:.3f} | {point.hit_rate_book_at_5:.3f} | "
+            f"{point.mrr_at_5:.3f} | {point.n} |"
+        )
+
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    updated = _replace_or_append_section(existing, _RRF_SWEEP_HEADING, lines)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(updated, encoding="utf-8")
 
 
 # ── report ──────────────────────────────────────────────────────────────────
@@ -773,6 +903,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--report", type=Path, default=REPORT_PATH, help="report path (default: %(default)s)"
     )
+    parser.add_argument(
+        "--rrf-k",
+        dest="rrf_k",
+        action="append",
+        type=int,
+        help="sweep the RRF fusion constant instead of the four-arm comparison: "
+        "restricts the run to the `hybrid` arm, scored once per value given "
+        "(repeatable, e.g. `--rrf-k 1 --rrf-k 200`), and upserts the 'RRF k "
+        "sweep' section of the report rather than the full arm table. "
+        "`--arm` is ignored when this is set.",
+    )
     return parser.parse_args(argv)
 
 
@@ -798,6 +939,24 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     scoreable, drifted = split_on_index(rows, indexed)
+
+    if args.rrf_k:
+        print(
+            f"RRF k sweep: {len(scoreable)} scoreable row(s), {len(drifted)} skipped as "
+            f"corpus drift, retrieval depth k={args.k}, rrf_k values = {args.rrf_k}"
+        )
+        if not scoreable:
+            print(
+                f"✗ the index holds none of the {len(rows)} labelled chunk ids "
+                f"({len(indexed)} chunk(s) indexed); no sweep run, no report written."
+            )
+            return 1
+        points = run_rrf_k_sweep(scoreable, args.rrf_k, k=args.k)
+        write_rrf_k_sweep_section(points, args.report)
+        print(f"wrote RRF k sweep section to {args.report} in {time.monotonic() - started:.1f}s")
+        print(json.dumps([point.model_dump() for point in points], indent=2))
+        return 0
+
     print(
         f"{len(rows)} ground-truth row(s); {len(scoreable)} scoreable, "
         f"{len(drifted)} skipped as corpus drift; {len(arms)} arm(s), k={args.k}"

@@ -10,6 +10,7 @@ pinning.
 """
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,8 @@ from evals.retrieval_eval import (
     ArmMetrics,
     BookMetrics,
     QueryOutcome,
+    RrfSweepPoint,
+    _parse_args,
     hit_rate_at_k,
     hit_rate_book,
     load_indexed_chunk_ids,
@@ -32,8 +35,10 @@ from evals.retrieval_eval import (
     mrr_at_k,
     run_all_arms,
     run_arm,
+    run_rrf_k_sweep,
     split_on_index,
     write_report,
+    write_rrf_k_sweep_section,
 )
 
 
@@ -346,6 +351,83 @@ def test_run_all_arms_covers_the_four_named_arms() -> None:
 
     assert [result.arm for result in results] == list(ARMS)
     assert all(result.n == 1 for result in results)
+
+
+# ── RRF k sweep ──────────────────────────────────────────────────────────────
+
+
+def test_rrf_k_sweep_scores_the_hybrid_arm_once_per_k_value() -> None:
+    # A fake retrieve_factory keyed by rrf_k: rrf_k=1 finds the relevant
+    # chunk, rrf_k=999 never does — so the sweep must show a different
+    # hit-rate per point rather than reusing one retriever for every k.
+    rows = [_row("q1", "c1", "book-a")]
+
+    def factory(rrf_k: int) -> Callable[[str, int, str], tuple[list[Hit], str]]:
+        def retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str]:
+            if rrf_k == 1:
+                return [_hit("c1", 1, "book-a")], arm
+            return [_hit("other", 1, "book-x")], arm
+
+        return retrieve
+
+    points = run_rrf_k_sweep(rows, [1, 999], retrieve_factory=factory)
+
+    assert [p.rrf_k for p in points] == [1, 999]
+    assert points[0].hit_rate_at_5 == pytest.approx(1.0)
+    assert points[0].hit_rate_book_at_5 == pytest.approx(1.0)
+    assert points[1].hit_rate_at_5 == pytest.approx(0.0)
+    assert points[1].hit_rate_book_at_5 == pytest.approx(0.0)
+    assert all(p.n == 1 for p in points)
+
+
+def _sweep_points() -> list[RrfSweepPoint]:
+    return [
+        RrfSweepPoint(rrf_k=1, hit_rate_at_5=0.5, hit_rate_book_at_5=0.6, mrr_at_5=0.4, n=10),
+        RrfSweepPoint(rrf_k=60, hit_rate_at_5=0.6, hit_rate_book_at_5=0.7, mrr_at_5=0.5, n=10),
+    ]
+
+
+def test_write_rrf_k_sweep_section_appends_to_an_existing_report(tmp_path: Path) -> None:
+    path = tmp_path / "retrieval.md"
+    write_report(_four_arms(), path)
+
+    write_rrf_k_sweep_section(_sweep_points(), path)
+    text = path.read_text(encoding="utf-8")
+
+    assert "## RRF k sweep" in text
+    assert "**Winner: `hybrid_rerank`**" in text  # the original section survives
+    assert "| 1 | 0.500 | 0.600 | 0.400 | 10 |" in text
+    assert "| 60 | 0.600 | 0.700 | 0.500 | 10 |" in text
+
+
+def test_write_rrf_k_sweep_section_replaces_not_duplicates_on_rerun(tmp_path: Path) -> None:
+    path = tmp_path / "retrieval.md"
+    write_report(_four_arms(), path)
+    write_rrf_k_sweep_section(_sweep_points(), path)
+
+    # Re-run with different numbers: the section must be REPLACED, not
+    # appended a second time underneath the first.
+    rerun_points = [
+        RrfSweepPoint(rrf_k=1, hit_rate_at_5=0.9, hit_rate_book_at_5=0.9, mrr_at_5=0.9, n=10)
+    ]
+    write_rrf_k_sweep_section(rerun_points, path)
+    text = path.read_text(encoding="utf-8")
+
+    assert text.count("## RRF k sweep") == 1
+    assert "| 1 | 0.900 | 0.900 | 0.900 | 10 |" in text
+    # The stale first-run rows are gone entirely, not left alongside the new one.
+    assert "| 1 | 0.500 | 0.600 | 0.400 | 10 |" not in text
+    assert "| 60 | 0.600 | 0.700 | 0.500 | 10 |" not in text
+
+
+def test_write_rrf_k_sweep_section_refuses_empty_points(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="no points"):
+        write_rrf_k_sweep_section([], tmp_path / "retrieval.md")
+
+
+def test_parse_args_rrf_k_is_repeatable_and_defaults_to_none() -> None:
+    assert _parse_args([]).rrf_k is None
+    assert _parse_args(["--rrf-k", "1", "--rrf-k", "200"]).rrf_k == [1, 200]
 
 
 # ── report ──────────────────────────────────────────────────────────────────
