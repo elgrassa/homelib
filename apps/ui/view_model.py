@@ -377,7 +377,9 @@ def build_official_preview_stage_html(
 <div style="aspect-ratio:16/9;width:100%;border:1px solid #cab995;border-radius:12px;
  overflow:auto;background:#fffaf0;padding:1.5rem;box-sizing:border-box;font-size:{font};
  line-height:1.55;color:#241c16;font-family:Georgia,'Times New Roman',serif">
-  <p style="margin:0 0 0.35rem;font-size:0.85rem;color:#756758">Official preview · Pottermore Publishing</p>
+  <p style="margin:0 0 0.35rem;font-size:0.85rem;color:#756758">
+    Official preview · Pottermore Publishing
+  </p>
   <h2 style="margin:0 0 0.35rem;font-weight:500;font-size:1.35em">{title}</h2>
   <p style="margin:0 0 1rem;color:#756758">{authors}</p>
   <p style="margin:0 0 1.25rem">Publisher pages refuse iframes. Open the lawful source in a

@@ -94,17 +94,13 @@ def test_read_html_is_article_and_not_streamlit_shell() -> None:
 def test_official_preview_stage_opens_window_not_iframe() -> None:
     from apps.ui.view_model import (
         OFFICIAL_PREVIEW_WINDOW_NAME,
-        OfficialPreviewBook,
         build_official_preview_stage_html,
+        load_official_preview_books,
     )
 
-    book = OfficialPreviewBook(
-        id="hp-uk-1",
-        title="Гаррі Поттер і філософський камінь",
-        authors=("Дж. К. Ролінг",),
-        reader_url="https://www.pottermorepublishing.com/ukrainian-ebooks/book1/",
-        pdf_url="https://www.pottermorepublishing.com/wp-content/uploads/9781789391725_HP1_Ukrainian_v5.pdf",
-    )
+    books = load_official_preview_books("uk", fixture_path=FIXTURE)
+    assert books, "expected Ukrainian Pottermore fixture books"
+    book = books[0]
     doc = build_official_preview_stage_html(book, projector=True)
     assert "<iframe" not in doc.lower()
     assert "window.open(" in doc
