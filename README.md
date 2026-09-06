@@ -368,6 +368,11 @@ perspective and safe to ignore.
 
 [`docs/course-map.md`](docs/course-map.md) maps every LLM Zoomcamp 2026 module to
 where this project demonstrates it, with honest per-row status.
+[`docs/zoomcamp-2026-gap-report.md`](docs/zoomcamp-2026-gap-report.md) goes one
+level deeper: every technique the 2026 cohort teaches, where it lives here with
+`path:line`, and a numbered "FIXES gap LLM Zoomcamp 2026" list in which each
+gap ends in `DONE:` (what changed, test, measured number) or
+`Explanation_Skipped:` (why it was deliberately not adopted).
 
 ## Rubric self-audit
 

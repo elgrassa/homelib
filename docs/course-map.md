@@ -7,6 +7,8 @@ than written aspirationally at the end.
 
 Module list verified 2026-08-29 against the course repository on
 `raw.githubusercontent.com` (read as raw text, not summarized by a fetch tool).
+Technique-level coverage, and the resolution of every gap found on 2026-09-06,
+is in [`zoomcamp-2026-gap-report.md`](zoomcamp-2026-gap-report.md).
 
 | Module | Tools taught | Where homelib demonstrates it | Status |
 |---|---|---|---|
