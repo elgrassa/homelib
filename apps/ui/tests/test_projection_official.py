@@ -89,3 +89,26 @@ def test_read_html_is_article_and_not_streamlit_shell() -> None:
     assert "streamlit" not in doc.lower()
     assert "I went to the woods." in doc
     assert 'href="/read/walden?ordinal=1"' in doc
+
+
+def test_official_preview_stage_opens_window_not_iframe() -> None:
+    from apps.ui.view_model import (
+        OFFICIAL_PREVIEW_WINDOW_NAME,
+        OfficialPreviewBook,
+        build_official_preview_stage_html,
+    )
+
+    book = OfficialPreviewBook(
+        id="hp-uk-1",
+        title="Гаррі Поттер і філософський камінь",
+        authors=("Дж. К. Ролінг",),
+        reader_url="https://www.pottermorepublishing.com/ukrainian-ebooks/book1/",
+        pdf_url="https://www.pottermorepublishing.com/wp-content/uploads/9781789391725_HP1_Ukrainian_v5.pdf",
+    )
+    doc = build_official_preview_stage_html(book, projector=True)
+    assert "<iframe" not in doc.lower()
+    assert "window.open(" in doc
+    assert OFFICIAL_PREVIEW_WINDOW_NAME in doc
+    assert book.reader_url in doc
+    assert book.pdf_url in doc
+    assert "aspect-ratio:16/9" in doc.replace(" ", "")

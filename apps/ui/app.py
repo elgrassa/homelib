@@ -29,6 +29,7 @@ from apps.ui.view_model import (
     apply_streamlit_secrets_to_environ,
     block_id_for_citation,
     build_homelib_client,
+    build_official_preview_stage_html,
     clean_read_url,
     ensure_demo_session,
     format_api_error_message,
@@ -323,21 +324,16 @@ def _render_official_preview(projector: bool) -> None:
         format_func=lambda b: b.title,
         key="official_book",
     )
-    st.link_button("Open lawful source (Safari Listen to Page)", book.reader_url)
-    font = "1.4rem" if projector else "1.05rem"
-    # iframe the official PDF; if framing is blocked the browser shows empty —
-    # Open lawful source is the reliable path.
-    st.markdown(
-        f"<div style='aspect-ratio:16/9;width:100%;border:1px solid #cab995;"
-        f"border-radius:12px;overflow:hidden;background:#fffaf0'>"
-        f"<iframe title='{book.title}' src='{book.pdf_url}' "
-        f"style='width:100%;height:100%;border:0;font-size:{font}'></iframe>"
-        f"</div>",
-        unsafe_allow_html=True,
+    st.link_button("Open lawful source (new tab)", book.reader_url)
+    # Publisher sets X-Frame-Options / CSP frame-ancestors — never iframe.
+    # Click opens a named browser window (same target on re-click).
+    st.html(
+        build_official_preview_stage_html(book, projector=projector),
+        unsafe_allow_javascript=True,
     )
     st.caption(
-        "AirPlay mirrors video to the projector. For Ukrainian speech use Safari "
-        "Listen to Page on the official reader link (iframe text is often skipped)."
+        "AirPlay mirrors this stage. Speech: open the reader window, then Safari "
+        "Listen to Page (aA) or Speak Screen."
     )
 
 

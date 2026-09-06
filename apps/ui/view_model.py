@@ -14,6 +14,7 @@ guarantee a comment cannot give.
 
 from __future__ import annotations
 
+import html
 import json
 import os
 from collections.abc import Mapping, MutableMapping
@@ -287,6 +288,9 @@ DEFAULT_PROJECTION_SOURCE: ProjectionSource = "official"
 DEFAULT_OFFICIAL_LANGUAGE: ProjectionLanguage = "uk"
 POTTERMORE_HOST = "www.pottermorepublishing.com"
 _POTTERMORE_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "pottermore_uk_hp_preview.json"
+# Named window so re-clicks focus the same Pottermore tab instead of spawning many.
+OFFICIAL_PREVIEW_WINDOW_NAME = "magiclib-official-preview"
+OFFICIAL_PREVIEW_WINDOW_FEATURES = "noopener,noreferrer,width=1280,height=800"
 
 
 def normalize_projection_source(value: str | None) -> ProjectionSource:
@@ -354,6 +358,46 @@ def projection_wants_chrome_hidden(
     if projector_mode:
         return True
     return query_projection in {"1", "true", "yes"}
+
+
+def build_official_preview_stage_html(
+    book: OfficialPreviewBook,
+    *,
+    projector: bool = False,
+) -> str:
+    """16:9 stage that opens Pottermore in a real window — publishers block iframes."""
+    title = html.escape(book.title)
+    authors = html.escape(", ".join(book.authors))
+    reader_js = json.dumps(book.reader_url)
+    pdf_js = json.dumps(book.pdf_url)
+    win = json.dumps(OFFICIAL_PREVIEW_WINDOW_NAME)
+    features = json.dumps(OFFICIAL_PREVIEW_WINDOW_FEATURES)
+    font = "1.6rem" if projector else "1.15rem"
+    return f"""
+<div style="aspect-ratio:16/9;width:100%;border:1px solid #cab995;border-radius:12px;
+ overflow:auto;background:#fffaf0;padding:1.5rem;box-sizing:border-box;font-size:{font};
+ line-height:1.55;color:#241c16;font-family:Georgia,'Times New Roman',serif">
+  <p style="margin:0 0 0.35rem;font-size:0.85rem;color:#756758">Official preview · Pottermore Publishing</p>
+  <h2 style="margin:0 0 0.35rem;font-weight:500;font-size:1.35em">{title}</h2>
+  <p style="margin:0 0 1rem;color:#756758">{authors}</p>
+  <p style="margin:0 0 1.25rem">Publisher pages refuse iframes. Open the lawful source in a
+   browser window, then use Safari Listen to Page / Speak Screen.</p>
+  <p style="margin:0;display:flex;flex-wrap:wrap;gap:0.75rem">
+    <button type="button"
+      style="font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;cursor:pointer;
+       background:#8a5b13;color:#fffaf0;border:0;border-radius:8px"
+      onclick="window.open({reader_js}, {win}, {features})">
+      Open reader in window
+    </button>
+    <button type="button"
+      style="font:inherit;font-size:1em;padding:0.65rem 1.1rem;min-height:44px;cursor:pointer;
+       background:transparent;color:#8a5b13;border:1px solid #8a5b13;border-radius:8px"
+      onclick="window.open({pdf_js}, {win}, {features})">
+      Open PDF in window
+    </button>
+  </p>
+</div>
+"""
 
 
 def clean_read_url(book_id: str, *, ordinal: int = 0, read_port: int = 8502) -> str:
