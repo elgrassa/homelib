@@ -480,7 +480,98 @@ def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
     assert "HEAD:${ref}" in body or 'HEAD:"${ref}"' in body or "HEAD:${ref}" in body
     # Must not be the unadapted template that only ever targets main.
     assert "git push origin HEAD:main" not in body or "HEAD:${ref}" in body
-    assert "main|v2" in body
+    script = _graph_refresh_script()
+    assert "v2)" in script and "main)" in script, "refresh must branch on main vs v2"
+
+
+def _graph_refresh_script() -> str:
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    steps = workflow["jobs"]["graph-refresh"]["steps"]
+    return str(next(step["run"] for step in reversed(steps) if "run" in step))
+
+
+def _run_graph_refresh(tmp_path: Path, ref: str) -> tuple[int, str, bool, str]:
+    """Execute the graph-refresh step script in a scratch repo with a stub graphify.
+
+    Returns (exit code, combined output, whether graphify was invoked, and the
+    scratch remote's tip for `ref` or "" when nothing was pushed).
+    """
+    import os
+    import subprocess
+
+    # Git hooks export GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE; inherited, they
+    # make `git init` re-init the *hook's* repo (seen in the pre-push gate).
+    base_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    base_env["GIT_CONFIG_GLOBAL"] = str(tmp_path / "gitconfig-empty")
+    remote = tmp_path / "remote.git"
+    work = tmp_path / "work"
+
+    def run(args: list[str], cwd: Path) -> None:
+        subprocess.run(args, cwd=cwd, env=base_env, check=True)
+
+    run(["git", "init", "-q", "--bare", str(remote)], tmp_path)
+    run(["git", "init", "-q", "-b", ref, str(work)], tmp_path)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    (work / "README.md").write_text("scratch\n")
+    run([*git, "add", "README.md"], work)
+    run([*git, "commit", "-q", "-m", "seed"], work)
+    run(["git", "remote", "add", "origin", str(remote)], work)
+    run(["git", "push", "-q", "origin", f"HEAD:{ref}"], work)
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    marker = tmp_path / "graphify-called"
+    stub = bindir / "graphify"
+    stub.write_text(
+        "#!/bin/sh\n"
+        f"touch '{marker}'\n"
+        "mkdir -p graphify-out\n"
+        "sha=$(git rev-parse HEAD)\n"
+        'printf \'{"built_at_commit": "%s", "nodes": []}\n\' "$sha" '
+        "> graphify-out/graph.json\n"
+    )
+    stub.chmod(0o755)
+    env = {**base_env, "PATH": f"{bindir}:{base_env['PATH']}", "GITHUB_REF_NAME": ref}
+    proc = subprocess.run(
+        ["bash", "-e", "-c", _graph_refresh_script()],
+        cwd=work,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tip = subprocess.run(
+        ["git", "log", "-1", "--format=%s", ref],
+        cwd=remote,
+        env=base_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return proc.returncode, proc.stdout + proc.stderr, marker.exists(), tip
+
+
+def test_ci_graph_refresh_skips_main_so_main_stays_a_fast_forward_of_v2(
+    tmp_path: Path,
+) -> None:
+    """Behavioural: a push to main must not rebuild or commit the graph.
+
+    Rebuilds are not byte-stable (community ids, manifest mtimes and cache
+    paths differ per run), so a main-side refresh forked main from v2 on every
+    fast-forward (runs 13318/13319, 2026-09-06: main = v2 + one bot commit,
+    then v2 = main + one, ad infinitum). main is a pure fast-forward of v2.
+    """
+    code, out, called, tip = _run_graph_refresh(tmp_path, "main")
+    assert code == 0, out
+    assert not called, "graph-refresh must not invoke graphify on main"
+    assert tip == "seed", f"graph-refresh pushed to main: {tip!r}"
+
+
+def test_ci_graph_refresh_still_commits_on_v2(tmp_path: Path) -> None:
+    """Behavioural: the v2 push still rebuilds, commits and pushes the graph."""
+    code, out, called, tip = _run_graph_refresh(tmp_path, "v2")
+    assert code == 0, out
+    assert called, "graph-refresh must invoke graphify on v2"
+    assert tip == "chore(graph): refresh v2 post-merge", out
 
 
 def test_ci_graph_refresh_commits_the_bootstrap_graph() -> None:

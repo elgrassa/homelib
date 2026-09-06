@@ -26,7 +26,8 @@ local / Groq for the public demo behind the existing `OpenAIClient`.
    `GRAPH_REPORT.md` into context** (~14k / ~900k tokens measured 2026-09-05 —
    query only). Never install upstream `graphify-mcp` / the `[mcp]` extra —
    CLI indexer only. Branches never touch `graphify-out/` (graph-guard
-   hard-fails); `graph-refresh` regenerates it on `main`/`v2` after merge.
+   hard-fails); `graph-refresh` regenerates it on `v2` after merge; `main` is a pure
+   fast-forward of `v2` (a rebuild is not byte-stable, so `main` never refreshes).
    `just graph` is local inspection only — never commit its output. Until the
    first refresh lands, fall back to step 2.
 2. Latest handoff in `docs/handoffs/` (`YYYY-MM-DD-*-handoff.md`).

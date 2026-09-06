@@ -204,9 +204,10 @@ jobs:
           echo "graph generation OK"
 
   # Canonical post-merge graph refresh — see studio-kit ci/graphify/graph-refresh.yml.
-  # Homelib: push to the protected branch that was just pushed (main or v2),
-  # not always main. Feature-branch pushes never reach this job (workflow
-  # `on.push.branches` is [main, v2] only); the ref check is belt-and-braces.
+  # Homelib: the graph is refreshed on v2 only; main is always a pure
+  # fast-forward of v2 and inherits v2's graph commit. Feature-branch pushes
+  # never reach this job (workflow `on.push.branches` is [main, v2] only); the
+  # ref check is belt-and-braces.
   graph-refresh:
     if: ${{ github.event_name == 'push' }}
     runs-on: [macos-arm64, quick]
@@ -224,7 +225,14 @@ jobs:
         run: |
           ref="${GITHUB_REF_NAME:-}"
           case "$ref" in
-            main|v2) ;;
+            v2) ;;
+            main)
+              # Rebuilds are not byte-stable (community ids, manifest mtimes,
+              # cache paths differ per run), so refreshing here forked main
+              # from v2 on every fast-forward (runs 13318/13319, 2026-09-06).
+              echo "main is a pure fast-forward of v2 — graph refreshed on v2 only"
+              exit 0
+              ;;
             *)
               echo "::warning::graph-refresh refusing to push to non-protected ref $ref"
               exit 0
