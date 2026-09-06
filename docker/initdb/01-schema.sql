@@ -88,7 +88,11 @@ CREATE TABLE IF NOT EXISTS query_log (
     -- C6 (specs/monitoring.md "Online judge"): filled in by
     -- scripts/judge_recent.py, never by the API itself. NULL until judged.
     relevance            text,
-    judge_model          text
+    judge_model          text,
+    -- C5 (specs/monitoring.md "Tracing"): the OpenTelemetry trace covering
+    -- this request's retrieve/rerank/rewrite/llm/cite spans (see `spans`
+    -- below). NULL for rows logged before C5.
+    trace_id             text
 );
 CREATE INDEX IF NOT EXISTS ix_query_log_ts ON query_log (ts DESC);
 
@@ -101,3 +105,17 @@ CREATE TABLE IF NOT EXISTS answer_log (
     answer     text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- C5 (specs/monitoring.md "Tracing"): apps/api/tracing.SqliteSpanExporter's
+-- target. One row per finished span; trace_id groups a request's whole tree.
+CREATE TABLE IF NOT EXISTS spans (
+    trace_id       text NOT NULL,
+    span_id        text NOT NULL,
+    parent_span_id text,
+    name           text NOT NULL,
+    start_ns       bigint NOT NULL,
+    end_ns         bigint NOT NULL,
+    attributes     jsonb NOT NULL DEFAULT '{}'::jsonb,
+    PRIMARY KEY (trace_id, span_id)
+);
+CREATE INDEX IF NOT EXISTS ix_spans_trace_id ON spans (trace_id);

@@ -80,7 +80,7 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2, 3, 4, 5, 6}
+    assert versions == {1, 2, 3, 4, 5, 6, 7}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -458,6 +458,40 @@ def test_migration_6_adds_judge_columns_and_answer_log_table(tmp_path: Path) -> 
     assert "answer_log" in tables
     answer_log_columns = {row[1] for row in conn.execute("PRAGMA table_info(answer_log)")}
     assert answer_log_columns == {"request_id", "question", "answer", "created_at"}
+    conn.close()
+
+
+def test_migration_7_adds_spans_table_and_trace_id_column(tmp_path: Path) -> None:
+    """C5 (specs/monitoring.md "Tracing"): `query_log.trace_id` exists and
+    defaults to NULL, `spans` exists with the expected columns, and an
+    upgrade from version 6 preserves existing `query_log` rows."""
+    conn = connect(_fresh(tmp_path))
+    migrate(conn, target_version=6)
+    conn.execute(
+        "INSERT INTO query_log (request_id, ts, latency_ms, arm, k, query_sha256_prefix) "
+        "VALUES ('r-pre-c5', 't', 1, 'hybrid', 5, 'abc')"
+    )
+    conn.commit()
+
+    migrate(conn, target_version=None)
+
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(query_log)")}
+    assert "trace_id" in columns
+    row = conn.execute("SELECT trace_id FROM query_log WHERE request_id = 'r-pre-c5'").fetchone()
+    assert row[0] is None
+
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "spans" in tables
+    span_columns = {row[1] for row in conn.execute("PRAGMA table_info(spans)")}
+    assert span_columns == {
+        "trace_id",
+        "span_id",
+        "parent_span_id",
+        "name",
+        "start_ns",
+        "end_ns",
+        "attributes",
+    }
     conn.close()
 
 

@@ -12,6 +12,8 @@ import sqlite3
 import uuid
 from pathlib import Path
 
+import pytest
+
 from apps.store.observatory import build_observatory
 from apps.store.sqlite import connect, migrate
 
@@ -97,4 +99,47 @@ def test_observatory_relevance_chart_empty_when_nothing_judged(tmp_path: Path) -
     response = build_observatory(conn)
 
     chart = next(c for c in response.charts if c.id == "judged_relevance")
+    assert chart.points == []
+
+
+def _insert_span(
+    conn: sqlite3.Connection,
+    *,
+    trace_id: str,
+    span_id: str,
+    name: str,
+    start_ns: int,
+    end_ns: int,
+    parent_span_id: str | None = None,
+) -> None:
+    conn.execute(
+        "INSERT INTO spans (trace_id, span_id, parent_span_id, name, start_ns, end_ns, attributes) "
+        "VALUES (?, ?, ?, ?, ?, ?, '{}')",
+        (trace_id, span_id, parent_span_id, name, start_ns, end_ns),
+    )
+    conn.commit()
+
+
+def test_observatory_time_per_stage_chart(tmp_path: Path) -> None:
+    """C5: `time_per_stage` reports the mean duration (ms) per span name
+    across recent traces — two `retrieve` spans of 10ms and 30ms average to
+    20ms."""
+    conn = _db(tmp_path)
+    _insert_span(conn, trace_id="t1", span_id="s1", name="retrieve", start_ns=0, end_ns=10_000_000)
+    _insert_span(conn, trace_id="t2", span_id="s2", name="retrieve", start_ns=0, end_ns=30_000_000)
+
+    response = build_observatory(conn)
+
+    chart = next(c for c in response.charts if c.id == "time_per_stage")
+    assert chart.title == "Time per stage (mean, ms)"
+    point = next(p for p in chart.points if p.bucket == "retrieve")
+    assert point.value == pytest.approx(20.0)
+
+
+def test_observatory_time_per_stage_chart_empty_when_no_spans(tmp_path: Path) -> None:
+    conn = _db(tmp_path)
+
+    response = build_observatory(conn)
+
+    chart = next(c for c in response.charts if c.id == "time_per_stage")
     assert chart.points == []

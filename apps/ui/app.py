@@ -78,6 +78,11 @@ def render_ask_tab(client: Client) -> None:
     if banner is not None:
         st.warning(banner)
     st.write(last_ask.answer)
+    if last_ask.trace_id:
+        # C5 (specs/monitoring.md "Tracing"): GET /v1/traces/{trace_id} has
+        # this request's span tree; shown as a caption, not a link — the UI
+        # has no trace-viewer page of its own yet.
+        st.caption(f"trace: {last_ask.trace_id}")
 
     feedback_sent: set[str] = st.session_state.setdefault("feedback_sent", set())
     voted = has_voted(feedback_sent, last_ask.request_id)

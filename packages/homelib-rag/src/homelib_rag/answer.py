@@ -316,6 +316,12 @@ class AskResponse(BaseModel):
     degraded: bool
     latency_ms: int
     tokens: TokenUsage
+    # C5 (specs/monitoring.md "Tracing"): the OpenTelemetry trace covering
+    # this request, set by apps/api/main.py's post_ask via model_copy —
+    # answer() itself has no tracer and never sets this. Optional (not
+    # required in the OpenAPI schema) so evals/tests/test_openapi_snapshot.py's
+    # pinned required-field set for AskResponse does not need to change.
+    trace_id: str | None = None
 
 
 class CitationValidationError(Exception):

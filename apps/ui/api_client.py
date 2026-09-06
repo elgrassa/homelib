@@ -74,6 +74,9 @@ class AskResponse(BaseModel):
     degraded: bool
     latency_ms: int
     tokens: TokenUsage
+    # C5 (specs/monitoring.md "Tracing"): optional so an API predating C5
+    # (or one running without HOMELIB_SQLITE_PATH) still validates.
+    trace_id: str | None = None
 
 
 class Provenance(BaseModel):

@@ -40,6 +40,7 @@ from homelib_rag.models import Hit
 from homelib_rag.rerank import rerank
 from homelib_rag.rewrite import rewrite_query
 from homelib_rag.roadmap import RoadmapParseError
+from opentelemetry import trace
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
@@ -56,6 +57,7 @@ from apps.api.schemas import (
     RoadmapRequest,
     RoadmapResponse,
 )
+from apps.api.tracing import TraceResponse, build_span_tree, get_tracer, read_trace_spans
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -157,6 +159,49 @@ def _maybe_log_answer(request_id: str, question: str, answer: str) -> None:
     sqlite_deps.sqlite_log_answer(request_id, question, answer)
 
 
+def _trace_questions_enabled() -> bool:
+    """`HOMELIB_TRACE_QUESTIONS=1` (default off): opt-in to the raw question
+    text as a span attribute on the `homelib.ask` root span. Every other span
+    attribute this module sets uses `query_sha256_prefix` instead — see
+    specs/monitoring.md's "Tracing" section.
+    """
+    return os.environ.get("HOMELIB_TRACE_QUESTIONS", "").strip() == "1"
+
+
+def _maybe_rewrite(deps: Deps, req: AskRequest, tracer: trace.Tracer) -> tuple[str, bool]:
+    """The query to retrieve with, and whether a rewrite actually changed
+    it — wrapped in a `rewrite` span only when `req.rewrite` is set, so a
+    trace never shows a zero-cost stage that did not run."""
+    if not req.rewrite:
+        return req.query, False
+    with tracer.start_as_current_span("rewrite"):
+        rewritten = deps.rewrite_query(req.query)
+    return rewritten, rewritten != req.query
+
+
+def _retrieve_with_spans(
+    deps: Deps, tracer: trace.Tracer, query: str, k: int, arm: str
+) -> tuple[list[Hit], str, bool]:
+    """Wraps `deps.retrieve` in a `retrieve` span, then — only when the arm
+    that actually served this request was `hybrid_rerank` — opens a `rerank`
+    span too.
+
+    The production `retrieve` seam (`_default_retrieve`) reranks internally
+    as part of one call, so there is no separate rerank call to wrap; this
+    span still exists (with `arm_used` as an attribute) so the trace tree and
+    `time_per_stage` chart make "a rerank happened" visible, even though its
+    cost is folded into `retrieve` above rather than timed separately.
+    """
+    with tracer.start_as_current_span("retrieve") as retrieve_span:
+        hits, arm_used, degraded = deps.retrieve(query, k, arm)
+        retrieve_span.set_attribute("hits", len(hits))
+        retrieve_span.set_attribute("degraded", degraded)
+    if arm_used == "hybrid_rerank":
+        with tracer.start_as_current_span("rerank") as rerank_span:
+            rerank_span.set_attribute("arm_used", arm_used)
+    return hits, arm_used, degraded
+
+
 def _infer_provider(base_url: str) -> str:
     """Best-effort human-readable provider name for `/health`, from the
     configured `LLM_BASE_URL` — never the key, never anything secret."""
@@ -185,6 +230,7 @@ class QueryLogRow(BaseModel):
     query_sha256_prefix: str
     degraded: bool
     cost_usd: float = 0.0
+    trace_id: str | None = None
 
 
 # ── Dependency bundle ────────────────────────────────────────────────────────
@@ -330,8 +376,8 @@ def _default_log_query(row: QueryLogRow) -> None:
                 INSERT INTO query_log
                     (request_id, latency_ms, arm, k, rerank, rewrite, model,
                      tokens_prompt, tokens_completion, query_sha256_prefix, degraded,
-                     cost_usd)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     cost_usd, trace_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (request_id) DO NOTHING
                 """,
                 (
@@ -347,6 +393,7 @@ def _default_log_query(row: QueryLogRow) -> None:
                     row.query_sha256_prefix,
                     row.degraded,
                     row.cost_usd,
+                    row.trace_id,
                 ),
             )
     except Exception:
@@ -614,23 +661,40 @@ def get_health(deps: Deps = Depends(get_deps)) -> Health:
 @app.post("/v1/ask", response_model=AskResponse)
 def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
     start = time.monotonic()
+    tracer = get_tracer()
+    query_hash = _query_sha256_prefix(req.query)
 
-    query_for_retrieval = req.query
-    rewrite_used = False
-    if req.rewrite:
-        rewritten = deps.rewrite_query(req.query)
-        rewrite_used = rewritten != req.query
-        query_for_retrieval = rewritten
+    with tracer.start_as_current_span("homelib.ask") as root_span:
+        span_ctx = root_span.get_span_context()
+        trace_id = format(span_ctx.trace_id, "032x") if span_ctx else ""
+        root_span.set_attribute("query_sha256_prefix", query_hash)
+        if _trace_questions_enabled():
+            root_span.set_attribute("question", req.query)
 
-    resolved_arm = _resolve_arm(req.arm)
-    hits, arm_used, retrieval_degraded = deps.retrieve(query_for_retrieval, req.k, resolved_arm)
+        query_for_retrieval, rewrite_used = _maybe_rewrite(deps, req, tracer)
+        resolved_arm = _resolve_arm(req.arm)
+        hits, arm_used, retrieval_degraded = _retrieve_with_spans(
+            deps, tracer, query_for_retrieval, req.k, resolved_arm
+        )
 
-    result = answer_module.answer(req.query, hits, client=deps.llm_client, arm_used=arm_used)
-    if retrieval_degraded and not result.degraded:
-        result = result.model_copy(update={"degraded": True})
+        with tracer.start_as_current_span("llm") as llm_span:
+            result = answer_module.answer(
+                req.query, hits, client=deps.llm_client, arm_used=arm_used
+            )
+            cost_usd = _compute_cost_usd(result.tokens.prompt, result.tokens.completion)
+            llm_span.set_attribute("model", deps.llm_client.model)
+            llm_span.set_attribute("tokens_prompt", result.tokens.prompt)
+            llm_span.set_attribute("tokens_completion", result.tokens.completion)
+            llm_span.set_attribute("cost_usd", cost_usd)
+
+        if retrieval_degraded and not result.degraded:
+            result = result.model_copy(update={"degraded": True})
+
+        with tracer.start_as_current_span("cite") as cite_span:
+            cite_span.set_attribute("citations", len(result.citations))
 
     total_latency_ms = int((time.monotonic() - start) * 1000)
-    result = result.model_copy(update={"latency_ms": total_latency_ms})
+    result = result.model_copy(update={"latency_ms": total_latency_ms, "trace_id": trace_id})
 
     deps.log_query(
         QueryLogRow(
@@ -643,9 +707,10 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
             model=deps.llm_client.model,
             tokens_prompt=result.tokens.prompt,
             tokens_completion=result.tokens.completion,
-            query_sha256_prefix=_query_sha256_prefix(req.query),
+            query_sha256_prefix=query_hash,
             degraded=result.degraded,
-            cost_usd=_compute_cost_usd(result.tokens.prompt, result.tokens.completion),
+            cost_usd=cost_usd,
+            trace_id=trace_id,
         )
     )
     _maybe_log_answer(result.request_id, req.query, result.answer)
@@ -715,6 +780,27 @@ def get_book_block_endpoint(
         return deps.get_book_block(book_id, ordinal)
     except (KeyError, LookupError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/v1/traces/{trace_id}", response_model=TraceResponse)
+def get_trace(trace_id: str) -> TraceResponse:
+    """C5 (specs/monitoring.md "Tracing"): the span tree for one `/v1/ask`
+    request's `trace_id` (also returned on `AskResponse.trace_id`).
+
+    SQLite-only, same as `/v1/observatory` — there is no Postgres reader for
+    `spans` yet.
+    """
+    from apps.api import sqlite_deps
+
+    if sqlite_deps.sqlite_path() is None:
+        raise HTTPException(
+            status_code=503, detail="HOMELIB_SQLITE_PATH is required for /v1/traces"
+        )
+    with sqlite_deps.open_store() as conn:
+        records = read_trace_spans(conn, trace_id)
+    if not records:
+        raise HTTPException(status_code=404, detail=f"unknown trace_id: {trace_id!r}")
+    return TraceResponse(trace_id=trace_id, spans=build_span_tree(records))
 
 
 # v2 product surface (mentor / scene / Coffee Table / Observatory)

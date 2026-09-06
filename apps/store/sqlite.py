@@ -299,6 +299,25 @@ CREATE TABLE answer_log (
 );
 """
 
+# C5 (specs/monitoring.md "Tracing"): OpenTelemetry span storage
+# (apps/api/tracing.SqliteSpanExporter) plus the trace_id every /v1/ask
+# response and query_log row now carries.
+_SQL_V7 = """
+ALTER TABLE query_log ADD COLUMN trace_id TEXT;
+
+CREATE TABLE spans (
+    trace_id TEXT NOT NULL,
+    span_id TEXT NOT NULL,
+    parent_span_id TEXT,
+    name TEXT NOT NULL,
+    start_ns INTEGER NOT NULL,
+    end_ns INTEGER NOT NULL,
+    attributes TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (trace_id, span_id)
+);
+CREATE INDEX ix_spans_trace_id ON spans (trace_id);
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
@@ -306,6 +325,7 @@ MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (4, _SQL_V4),
     (5, _SQL_V5),
     (6, _SQL_V6),
+    (7, _SQL_V7),
 )
 
 

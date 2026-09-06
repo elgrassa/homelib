@@ -28,13 +28,14 @@ These paths are what `test_openapi_snapshot_matches` pins today.
 | Endpoint | Request | Response |
 |---|---|---|
 | `GET /health` | — | `Health {status, db: bool, llm: {provider, model, reachable: bool}, books: int, chunks: int}` |
-| `POST /v1/ask` | `AskRequest {query: str, k: int = 5, arm: "lexical"\|"vector"\|"hybrid"\|"hybrid_rerank"\|None, rewrite: bool = false}` | `AskResponse {request_id, answer, citations: list[Citation], arm_used: str, degraded: bool, latency_ms: int, tokens: {prompt: int, completion: int}}` |
+| `POST /v1/ask` | `AskRequest {query: str, k: int = 5, arm: "lexical"\|"vector"\|"hybrid"\|"hybrid_rerank"\|None, rewrite: bool = false}` | `AskResponse {request_id, answer, citations: list[Citation], arm_used: str, degraded: bool, latency_ms: int, tokens: {prompt: int, completion: int}, trace_id: str\|None}` |
 | `POST /v1/roadmap` | `RoadmapRequest {interests: list[str], level: "beginner"\|"intermediate"\|"advanced", goal: str, max_steps: int = 8}` | `RoadmapResponse {request_id, steps: list[RoadmapStep], rationale: str}` |
 | `POST /v1/ingest` | `IngestRequest {path: str} \| {source: "snapshot"}` | `IngestResponse {book_id, blocks: int, chunks: int, extraction: ExtractionResult}` |
 | `POST /v1/feedback` | `FeedbackRequest {request_id: str, feedback: "up"\|"down", comment: str\|None}` | `{ok: true}` |
 | `GET /v1/books` | — | `list[BookSummary {book_id, title, authors, blocks, chunks, format}]` |
 | `GET /v1/books/{book_id}/blocks` | `ordinal: int = 0` | `Block` (Projection page by dense ordinal) |
 | `GET /v1/blocks/{block_id}` | — | `Block` |
+| `GET /v1/traces/{trace_id}` | — | `TraceResponse {trace_id, spans: list[TraceSpanNode]}` (C5, specs/monitoring.md "Tracing"; SQLite-only, 503 without `HOMELIB_SQLITE_PATH`) |
 
 Supporting shapes:
 
@@ -301,6 +302,18 @@ this week.
 regenerating the snapshot in the same PR — deliberately, with the diff
 visible in review. WP01 does not add routes; leaving the snapshot on v1 is
 intentional, not drift.
+
+**Known gap (C5):** `GET /v1/traces/{trace_id}` was added and the snapshot
+regenerated in the same commit, per this rule — but
+`test_snapshot_covers_every_endpoint_in_api_md`'s `expected_paths` set is a
+literal list hardcoded in that same evals/ test file, and that file was out
+of scope for the C5 change (edits to anything under `evals/` other than
+importing `evals/judge.py` were explicitly disallowed for that work). That
+one assertion is red until a session in scope for `evals/` adds
+`/v1/traces/{trace_id}` to its `expected_paths` literal —
+`test_openapi_snapshot_matches` (the actual drift guard against the
+committed snapshot) and the two required-field tests are unaffected and
+green.
 
 ## Named red tests
 

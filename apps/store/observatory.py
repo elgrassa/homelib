@@ -16,6 +16,12 @@ __all__ = [
     "build_observatory",
 ]
 
+# C5's time_per_stage chart: how many of the most-recently-active traces to
+# average over. Bounds the query on a growing spans table without needing a
+# time window (spans.start_ns is a raw OTel epoch-ns int, not indexed by
+# calendar time here).
+_TIME_PER_STAGE_TRACE_LIMIT = 200
+
 
 class ObservatoryPoint(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -157,6 +163,36 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
             id="judged_relevance",
             title="Judged relevance",
             points=[ObservatoryPoint(bucket=str(r[0]), value=float(r[1])) for r in judged],
+        )
+    )
+
+    # 8. time_per_stage — C5 tracing (specs/monitoring.md). Mean duration per
+    # span name over the last N traces (grouped by trace_id's own most
+    # recent span, not row count, so one unusually deep trace cannot skew
+    # which traces count as "recent"). Empty until any /v1/ask call has run
+    # with tracing exporting to this store.
+    recent_traces = conn.execute(
+        "SELECT trace_id FROM ("
+        "  SELECT trace_id, MAX(start_ns) AS last_start FROM spans GROUP BY trace_id"
+        ") ORDER BY last_start DESC LIMIT ?",
+        (_TIME_PER_STAGE_TRACE_LIMIT,),
+    ).fetchall()
+    trace_ids = [str(r[0]) for r in recent_traces]
+    stage_points: list[ObservatoryPoint] = []
+    if trace_ids:
+        # `?`-only placeholders, not user strings — same shape as the
+        # documented exception for apps/ingest/sqlite_pipeline.py.
+        placeholders = ",".join("?" * len(trace_ids))
+        stage_sql = f"SELECT name, AVG(end_ns - start_ns) FROM spans WHERE trace_id IN ({placeholders}) GROUP BY name ORDER BY name"  # noqa: S608,E501
+        stage_rows = conn.execute(stage_sql, trace_ids).fetchall()
+        stage_points = [
+            ObservatoryPoint(bucket=str(r[0]), value=float(r[1]) / 1_000_000) for r in stage_rows
+        ]
+    charts.append(
+        ObservatoryChart(
+            id="time_per_stage",
+            title="Time per stage (mean, ms)",
+            points=stage_points,
         )
     )
 

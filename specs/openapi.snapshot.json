@@ -58,6 +58,9 @@
     ],
     "/v1/roadmap": [
       "post"
+    ],
+    "/v1/traces/{trace_id}": [
+      "get"
     ]
   },
   "schemas": {
@@ -270,6 +273,14 @@
     "TokenUsage": [
       "completion",
       "prompt"
+    ],
+    "TraceResponse": [
+      "trace_id"
+    ],
+    "TraceSpanNode": [
+      "duration_ms",
+      "name",
+      "span_id"
     ],
     "ValidationError": [
       "loc",

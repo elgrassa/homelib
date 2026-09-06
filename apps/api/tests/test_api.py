@@ -105,6 +105,21 @@ def _clear_overrides() -> Any:
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def _reset_tracer() -> Any:
+    """Every test gets a fresh tracer provider, built lazily on next
+    `get_tracer()` call from whatever env is set at that point — mirrors
+    `test_v2_routes.py`'s `_reset_api_deps` for `apps.api.main._deps_singleton`.
+    A test that wants to inspect spans overrides this via
+    `tracing.reset_tracer_for_tests(some_provider)` after this fixture runs.
+    """
+    from apps.api import tracing
+
+    tracing.reset_tracer_for_tests(None)
+    yield
+    tracing.reset_tracer_for_tests(None)
+
+
 def _hit(chunk_id: str = "c1", book_id: str = "b1", text: str = "The fox jumps high.") -> Hit:
     return Hit(
         chunk_id=chunk_id, book_id=book_id, score=1.0, rank=1, text=text, section_path=[], page=None
@@ -434,6 +449,165 @@ def test_answer_log_written_when_enabled(tmp_path: Any, monkeypatch: pytest.Monk
     assert row is not None
     assert row[0] == "does it jump?"
     assert row[1] == "It jumps."
+
+
+# ── C5: OpenTelemetry tracing (specs/monitoring.md "Tracing") ────────────
+
+
+def _in_memory_tracer_provider() -> Any:
+    """A `TracerProvider` wired to an `InMemorySpanExporter`, synchronously
+    (`SimpleSpanProcessor`) so a test can inspect spans right after the
+    request returns — no `force_flush()` needed, unlike the real
+    `BatchSpanProcessor` path used in selfhosted mode."""
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider(resource=Resource.create({"service.name": "test"}))
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    return provider, exporter
+
+
+def test_ask_emits_stage_spans(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A rewritten, reranked /v1/ask call emits every documented stage span:
+    the root `homelib.ask`, plus `rewrite`, `retrieve`, `rerank`, `llm`,
+    `cite` as children."""
+    from apps.api import tracing
+
+    provider, exporter = _in_memory_tracer_provider()
+    tracing.reset_tracer_for_tests(provider)
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid_rerank", False),
+        rewrite_query=lambda query: "rewritten " + query,
+        llm_client=_ScriptedClient(
+            [_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]
+        ),
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "does it jump?", "rewrite": True})
+
+    assert resp.status_code == 200
+    span_names = {span.name for span in exporter.get_finished_spans()}
+    assert span_names == {"homelib.ask", "rewrite", "retrieve", "rerank", "llm", "cite"}
+
+
+def test_ask_omits_optional_stage_spans_when_not_used() -> None:
+    """No rewrite requested and a non-reranking arm: `rewrite`/`rerank` never
+    appear — a trace never shows a stage that did not run."""
+    from apps.api import tracing
+
+    provider, exporter = _in_memory_tracer_provider()
+    tracing.reset_tracer_for_tests(provider)
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([], "lexical", False),
+        llm_client=_ScriptedClient([_llm_json("ok", [])]),
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "q", "arm": "lexical"})
+
+    assert resp.status_code == 200
+    span_names = {span.name for span in exporter.get_finished_spans()}
+    assert span_names == {"homelib.ask", "retrieve", "llm", "cite"}
+
+
+def test_spans_never_carry_raw_question_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    from apps.api import tracing
+
+    monkeypatch.delenv("HOMELIB_TRACE_QUESTIONS", raising=False)
+    provider, exporter = _in_memory_tracer_provider()
+    tracing.reset_tracer_for_tests(provider)
+    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
+
+    assert resp.status_code == 200
+    for span in exporter.get_finished_spans():
+        for value in (span.attributes or {}).values():
+            assert "xyz123" not in str(value)
+
+
+def test_spans_carry_question_when_opted_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    from apps.api import tracing
+
+    monkeypatch.setenv("HOMELIB_TRACE_QUESTIONS", "1")
+    provider, exporter = _in_memory_tracer_provider()
+    tracing.reset_tracer_for_tests(provider)
+    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
+
+    assert resp.status_code == 200
+    root = next(s for s in exporter.get_finished_spans() if s.name == "homelib.ask")
+    assert root.attributes is not None
+    assert root.attributes["question"] == "a very unique raw question xyz123"
+
+
+def test_traces_endpoint_returns_tree(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    from apps.api import tracing
+
+    db_path = tmp_path / "traces.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    # demo -> SimpleSpanProcessor, so the export is synchronous and the trace
+    # is already on disk by the time /v1/traces is called below.
+    monkeypatch.setenv("APP_MODE", "demo")
+    tracing.reset_tracer_for_tests(None)
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=_ScriptedClient(
+            [_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]
+        ),
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    ask_resp = client.post("/v1/ask", json={"query": "does it jump?"})
+    assert ask_resp.status_code == 200
+    trace_id = ask_resp.json()["trace_id"]
+    assert trace_id
+
+    trace_resp = client.get(f"/v1/traces/{trace_id}")
+
+    assert trace_resp.status_code == 200
+    body = trace_resp.json()
+    assert body["trace_id"] == trace_id
+    root = next(s for s in body["spans"] if s["name"] == "homelib.ask")
+    child_names = {child["name"] for child in root["children"]}
+    assert {"retrieve", "llm", "cite"} <= child_names
+    assert all("duration_ms" in s for s in [root, *root["children"]])
+
+
+def test_traces_without_sqlite_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HOMELIB_SQLITE_PATH", raising=False)
+    resp = client.get("/v1/traces/does-not-exist")
+    assert resp.status_code == 503
+
+
+def test_traces_unknown_trace_id_404(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_path = tmp_path / "empty_traces.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+
+    resp = client.get("/v1/traces/does-not-exist")
+
+    assert resp.status_code == 404
 
 
 # ── /v1/roadmap ──────────────────────────────────────────────────────────

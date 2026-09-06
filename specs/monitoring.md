@@ -169,3 +169,43 @@ traffic; `relevance` is the score Observatory actually charts. A row the
 judge fails to parse is left unjudged (not marked) so a later run retries
 it; a row already judged is never re-selected, so re-running the script is
 always safe.
+
+## Tracing (C5)
+
+Every `/v1/ask` call is one OpenTelemetry trace: a root span `homelib.ask`
+with child spans `rewrite` (only when `AskRequest.rewrite` is set),
+`retrieve`, `rerank` (only when the arm that served the request was
+`hybrid_rerank` — the production retrieval seam reranks internally as part
+of one call, so this span's own duration is nominal; it exists so the trace
+tree and `time_per_stage` chart still make "a rerank happened" visible),
+`llm` (attributes: `model`, `tokens_prompt`, `tokens_completion`, `cost_usd`),
+and `cite`. `apps/api/tracing.py` owns the tracer/exporter plumbing;
+`apps/api/main.py`'s `post_ask` is the only thing that opens these spans.
+
+**Privacy default, same shape as the query hash above:** no span carries the
+raw question text unless the operator sets `HOMELIB_TRACE_QUESTIONS=1`
+(default off). Every span attribute this codebase sets uses
+`query_sha256_prefix` instead.
+
+**Storage:** `SqliteSpanExporter` (`apps/api/tracing.py`, ~40 lines) writes
+finished spans to the `spans` table (migration 7 / Postgres equivalent in
+`docker/initdb/01-schema.sql`): `trace_id`, `span_id`, `parent_span_id`,
+`name`, `start_ns`, `end_ns`, `attributes` (JSON). It is fed a
+`connect: Callable[[], sqlite3.Connection]` — the same Deps-style seam as
+the rest of `apps/api` — so tests can point it at an in-memory-backed
+connection instead of touching disk. `query_log.trace_id` (same migration)
+links a logged request back to its trace, and `AskResponse.trace_id` (shown
+as a small caption under the Ask door in `apps/ui/app.py`) is how a reader
+finds it.
+
+**Processor choice:** `BatchSpanProcessor` for `APP_MODE=selfhosted`
+(compose, a long-lived separate process — batching is free); `Simple
+SpanProcessor` for `APP_MODE=demo` (in-process Streamlit, which can exit
+mid-batch and lose a `BatchSpanProcessor`'s queued spans).
+
+**Reading a trace:** `GET /v1/traces/{trace_id}` returns the span tree
+(name, `duration_ms`, `attributes`, nested `children`) — SQLite-only, same
+restriction as `/v1/observatory`. Observatory's `time_per_stage` chart is the
+aggregate view: mean duration per span name over the most-recently-active
+`_TIME_PER_STAGE_TRACE_LIMIT` (200) traces.
+
