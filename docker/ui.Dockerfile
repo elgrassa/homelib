@@ -1,5 +1,8 @@
 # homelib Streamlit UI. Deliberately thin: it holds no database driver and no
-# retrieval code, because the UI talks only through the public API (specs/ui.md).
+# retrieval code, because the UI talks only through the public API
+# (specs/ui.md). Two processes run in this image: Streamlit on 8501, and the
+# clean-read companion (apps/ui/read_server.py) on 8502 — an HTTP client of
+# the API only, same as Streamlit.
 FROM python:3.13-slim-bookworm
 
 # UV_NO_CACHE: uv's download cache is worth ~1.4 GB inside the dependency
@@ -42,6 +45,6 @@ EXPOSE 8501 8502
 COPY docker/ui-entrypoint.sh /ui-entrypoint.sh
 RUN chmod +x /ui-entrypoint.sh
 HEALTHCHECK --interval=10s --timeout=5s --retries=10 \
-    CMD curl -fs http://localhost:8501/_stcore/health || exit 1
+    CMD curl -fs http://localhost:8501/_stcore/health && curl -fs http://localhost:8502/health || exit 1
 
 CMD ["/ui-entrypoint.sh"]

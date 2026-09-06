@@ -141,15 +141,22 @@ services:
       APP_MODE: selfhosted
       # Clean /read HTML for iPad Safari Listen to Page (same container).
       READ_API_URL: http://api:8000
-    # LAN opt-in: MiniPS sets HOMELIB_UI_BIND=0.0.0.0 in .env (Forgejo-style
-    # http://minips.local:8501). Default stays loopback for reviewer compose.
+      # Host-facing port for link text only (apps/ui renders READ_PORT into
+      # /read/{book_id} URLs). The read server itself always binds 8502
+      # inside the container regardless of this value — see ui-entrypoint.sh.
+      READ_PORT: ${READ_PORT:-8502}
+      # Opt-in, off by default: enables the :8502 /pdf proxy + two-page
+      # viewer. Owner's LAN only; never set for the public demo.
+      HOMELIB_OFFICIAL_VIEWER: ${HOMELIB_OFFICIAL_VIEWER:-}
+    # home LAN: set HOMELIB_UI_BIND=0.0.0.0 in .env; reviewer default stays
+    # loopback.
     ports:
       - "${HOMELIB_UI_BIND:-127.0.0.1}:${UI_PORT:-8501}:8501"
       - "${HOMELIB_UI_BIND:-127.0.0.1}:${READ_PORT:-8502}:8502"
     depends_on:
       api: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8501/_stcore/health"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:8501/_stcore/health && curl -fs http://localhost:8502/health"]
       interval: 10s
       timeout: 5s
       retries: 10

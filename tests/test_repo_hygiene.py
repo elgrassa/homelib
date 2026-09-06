@@ -304,6 +304,49 @@ def test_compose_ui_bind_defaults_to_loopback() -> None:
         assert "127.0.0.1" in joined, f"{name} must stay loopback-bound: {ports}"
 
 
+def test_compose_ui_healthcheck_probes_read_server() -> None:
+    """A dead read server must not report the container healthy.
+
+    The ui healthcheck used to probe only Streamlit's /_stcore/health, so the
+    :8502 clean-read companion could crash and the container would still show
+    healthy. Both the compose healthcheck and the Dockerfile HEALTHCHECK must
+    probe both ports.
+    """
+    compose = yaml.safe_load((REPO_ROOT / "docker/docker-compose.yml").read_text())
+    ui_test = " ".join(str(t) for t in compose["services"]["ui"]["healthcheck"]["test"])
+    assert "8501/_stcore/health" in ui_test
+    assert "8502/health" in ui_test
+
+    dockerfile = (REPO_ROOT / "docker/ui.Dockerfile").read_text()
+    body = dockerfile[dockerfile.index("HEALTHCHECK") :]
+    assert "8502/health" in body, "ui.Dockerfile HEALTHCHECK must also probe the read server"
+
+
+def test_compose_ui_forwards_read_port_and_viewer_flag() -> None:
+    """The UI process renders READ_PORT into link text and gates the Official
+    viewer behind HOMELIB_OFFICIAL_VIEWER — both must reach the container, and
+    the viewer flag must default off rather than being silently enabled.
+    """
+    text = (REPO_ROOT / "docker/docker-compose.yml").read_text()
+    compose = yaml.safe_load(text)
+    env = compose["services"]["ui"]["environment"]
+    assert "READ_PORT" in env
+    assert "HOMELIB_OFFICIAL_VIEWER" in env
+
+    assert "HOMELIB_OFFICIAL_VIEWER: ${HOMELIB_OFFICIAL_VIEWER:-1}" not in text
+    assert 'HOMELIB_OFFICIAL_VIEWER: "1"' not in text
+
+
+def test_ui_entrypoint_pins_read_server_to_container_port() -> None:
+    """The read server's container-internal bind must stay 8502 regardless of
+    the host-facing READ_PORT value, or a non-default override would move it
+    off the port the compose mapping and healthcheck both target.
+    """
+    entrypoint = (REPO_ROOT / "docker/ui-entrypoint.sh").read_text()
+    assert "READ_PORT=8502 python -m apps.ui.read_server" in entrypoint
+    assert "exec streamlit run" in entrypoint
+
+
 def test_streamlit_page_title_is_magiclib() -> None:
     app_src = (REPO_ROOT / "apps/ui/app.py").read_text()
     assert 'page_title="MagicLib — HomeLib"' in app_src
