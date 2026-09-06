@@ -193,10 +193,6 @@
   "191": "test_specs_ui_door_list_matches_crossroads_doors",
   "192": "test_no_dotenv_file_is_tracked",
   "193": "test_ci_graph_guard_job_exists",
-  "194": "test_ci_graph_refresh_pushes_to_current_protected_branch",
-  "195": "test_ci_graph_refresh_commits_the_bootstrap_graph",
-  "196": "test_graphifyignore_excludes_generated_and_data_paths",
-  "197": "test_just_ci_includes_the_secret_scan",
   "198": "Any",
   "199": "AskResponse",
   "200": "Block",
@@ -380,7 +376,5 @@
   "378": "MonkeyPatch",
   "379": "Path",
   "380": "NOTES.md",
-  "381": "_PerQuestionClient",
-  "382": "_default_retrieve",
   "383": "design-sync notes — HomeLib / MagicLib"
 }
