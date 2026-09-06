@@ -63,6 +63,7 @@ def test_snapshot_covers_every_endpoint_in_api_md() -> None:
         "/v1/books",
         "/v1/books/{book_id}/blocks",
         "/v1/blocks/{block_id}",
+        "/v1/traces/{trace_id}",
         "/v1/mentor/intake",
         "/v1/paths",
         "/v1/resources",
