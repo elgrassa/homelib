@@ -26,6 +26,14 @@ land in SQLite, and the UI's Observatory door serves ≥5 charts in-app. A cloud
 API key is an optional override, never a requirement — there is nothing to sign
 up for.
 
+**Live demo:** _URL to be added after Cloud deploy_
+**Submission commit:** _SHA to be added_
+
+A screenshot of the Crossroads rotunda (the entry to the Ask door) lives in
+[`docs/screenshots/crossroads-rotunda-seven-doors.png`](docs/screenshots/crossroads-rotunda-seven-doors.png)
+(below); a transcript of one real cited answer is under "Which LLM answers"
+in Architecture, below.
+
 ---
 
 ## What it looks like
@@ -44,6 +52,19 @@ against the compose API). The HTML mockups in [`docs/mockups/`](docs/mockups/)
 are design intent — the rotunda's template came from them — not a pixel match.
 
 ## Quickstart
+
+**Prerequisites.**
+
+- **macOS:** `brew install just uv`, plus Docker Desktop (Compose v2 ships in it).
+- **Linux:** `curl -LsSf https://astral.sh/uv/install.sh | sh` for `uv`; see
+  [github.com/casey/just#installation](https://github.com/casey/just#installation)
+  for `just` (packaged on most distros, e.g. `apt install just`); Docker Engine
+  + the `docker compose` plugin (Compose v2) from your distro or docker.com.
+- Optional, only if you want to ingest your own DjVu-format books outside
+  Docker: `djvulibre` (`brew install djvulibre` / `apt install djvulibre-bin`)
+  — the ingest container already has it baked in.
+- `just ci` enforces a 90% test-coverage floor (`pyproject.toml`); a PR that
+  drops below it fails locally before it ever reaches CI.
 
 ```bash
 cp .env.example .env
@@ -103,6 +124,40 @@ and the one `just drill` asserts on ([ADR-005](docs/adrs/ADR-005-observatory-rep
 - Grafana only populates when the API runs with `HOMELIB_SQLITE_PATH` unset
   (the v1 Postgres path, tag `v1-fallback`). It stays in compose until the
   Observatory has been green through a drill; removing it is tracked, not done.
+
+### Run without Docker (SQLite-only)
+
+This is the exact runtime the public Streamlit demo uses: the committed
+SQLite seed (FTS5 for lexical search, plus a float32 embedding matrix for
+vector search — no Postgres, no pgvector) is inflated once, retrieval runs
+locally and sub-second, and the only network call made at request time is to
+the LLM.
+
+```bash
+uv sync --all-extras
+
+# Inflate the committed seed once (same bytes the Streamlit Cloud demo
+# inflates on cold start — see apps/inprocess_bridge.py).
+mkdir -p data && gunzip -k -c data/seed/homelib.sqlite.gz > data/homelib.sqlite
+
+export HOMELIB_SQLITE_PATH=data/homelib.sqlite
+export APP_MODE=demo
+unset DATABASE_URL
+export LLM_BASE_URL=http://localhost:11434/v1   # local Ollama by default
+export LLM_MODEL=qwen2.5:7b-instruct
+export LLM_API_KEY=ollama
+
+uv run --frozen uvicorn apps.api.main:app --host 127.0.0.1 --port 8000 &
+curl -fsS http://127.0.0.1:8000/health
+curl -fsS -X POST http://127.0.0.1:8000/v1/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "Who wrote Walden?", "rewrite": false, "k": 3}'
+```
+
+[`scripts/sqlite_only_smoke.sh`](scripts/sqlite_only_smoke.sh) runs this exact
+shape as an automated check (same env vars, port 18011 by default) and also
+proves a minted Coffee Table session persists across calls while a
+header-less request stays anonymous.
 
 ---
 
@@ -240,31 +295,52 @@ floor. Full reasoning in [ADR-003](docs/adrs/ADR-003-answer-prompt.md).
 history, and a rule that a metric missing from a run counts as a regression
 rather than being silently skipped.
 
+### Run the evaluations
+
+```bash
+just eval-retrieval   # 4 arms x 235 questions -> evals/results/retrieval.md
+just eval-llm         # 4 prompt arms x 30 questions, judge-scored -> evals/results/llm_eval.md
+just eval             # both, in sequence
+```
+
+Set `HOMELIB_SQLITE_PATH` first to run these against the SQLite tip store
+(the one the tables above and `evals/eval-baseline.json` gate on); leave it
+unset to run against Postgres instead. Full numbers and methodology:
+[`evals/results/retrieval.md`](evals/results/retrieval.md),
+[`evals/results/llm_eval.md`](evals/results/llm_eval.md).
+
+### See the monitoring dashboard
+
+```bash
+HOMELIB_SQLITE_PATH=data/homelib.sqlite uv run python scripts/demo_traffic.py --n 40
+```
+
+Then open the UI and turn the rotunda to the **Observatory** door (or call
+`GET /v1/observatory` directly) for six charts over the SQLite `query_log`
+plus thumbs-up/down feedback on every answer. On a freshly seeded store the
+charts are empty — that is expected, not a bug; `demo_traffic.py` above (or
+a real round of `/v1/ask`) is what fills them. Feedback recorded through the
+thumbs buttons (`POST /v1/feedback`) feeds the same charts as the synthetic
+traffic.
+
 ## Data
 
-**Shelf (full text).** 18 public-domain books from Project Gutenberg, chosen for
-an engineering / business / self-education narrative — Franklin, Adam Smith,
-Taylor, Ford, Thoreau, Mill, Strunk, and others. `data/manifest.yaml` pins each
-by exact source URL, sha256 and licence note; every hash was computed from a
-real download. Gutenberg's header/footer boilerplate is stripped so licence text
-doesn't pollute retrieval. **729 blocks → 9,168 chunks.**
+Two sources, both committed as pinned artefacts so a reviewer never has to
+re-download anything. **Project Gutenberg** (dataset) — 18 public-domain
+books (Franklin, Adam Smith, Taylor, Ford, Thoreau, Mill, Strunk and others),
+each pinned in `data/manifest.yaml` by exact source URL and a sha256 computed
+from a real download; parsed into 729 blocks / 9,168 chunks and committed as
+`data/corpus_snapshot.jsonl.gz` (6 MB). **Open Library Search API**
+(API-backed source) — 3,061 deduplicated works gathered across 14
+roadmap-relevant subjects, committed as `data/catalog.jsonl`; Internet
+Archive asserts no rights over this metadata. Two other candidate sources
+(Kaggle's "15K+ Books" and the Google Books API / UCSD Goodreads graph) are
+deliberately excluded on licensing grounds, and personal purchased ebooks
+stay local and git-ignored — only public-domain text is committed.
 
-The parsed corpus is committed as `data/corpus_snapshot.jsonl.gz` (6 MB), so
-reviewers seed the database offline and never re-download 18 books.
-
-**Catalog (metadata).** 3,061 deduplicated works from **Open Library**, gathered
-as curated `search.json` slices across 14 roadmap-relevant subjects. Internet
-Archive asserts no rights over this metadata.
-
-Two deliberate exclusions, recorded so they aren't quietly reintroduced: the
-Kaggle "15K+ Books" dataset is **banned** — it was scraped from the Google Books
-API, whose terms bar scraping and redistribution, and an uploader's CC0 badge
-cannot re-license someone else's data. The Google Books API and the UCSD
-Goodreads Book Graph are unusable for the same reason. A test greps the ingest
-tree to enforce it.
-
-Personal purchased ebooks stay local and git-ignored. Only public-domain text
-is committed.
+See [`docs/data-sources.md`](docs/data-sources.md) for the full page: every
+source at a glance, per-book provenance, model pins, and diagrams of how each
+one is fetched and consumed.
 
 ## Development
 
@@ -281,6 +357,12 @@ log — including the defects found along the way and one diagnosis I got wrong
 and had to retract.
 
 Developer architecture docs (v2 wiki): [`docs/wiki/README.md`](docs/wiki/README.md).
+
+`.forgejo/` holds this project's CI workflows for the private Forgejo
+instance it is developed on, `CLAUDE.md`/`AGENTS.md` are agent operating
+instructions, and `graphify-out/` is a generated code graph used by the
+maintainer's own tooling — all three are read-only from a reviewer's
+perspective and safe to ignore.
 
 ## Course map
 
@@ -306,18 +388,25 @@ strict there: `done` means verified by a command whose output is recorded in
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
 | Reproducibility | 2 | done | Pins, snapshot, digests; **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory 6 charts / 5 populated, `queries_over_time` 1 point). Earlier: PASSED on `v2` @ `d6f9946` (2026-09-04); the 2026-09-05 re-run on `ae83d51` passed clone/seeds/health and failed the ask step under host load (3/5 timeouts) — recorded, not hidden — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
-| Cloud deployment (bonus) | 2 | not done | No public URL from this tree. The Cloud files (root `streamlit_app.py`, committed seed, Python 3.13 in Advanced settings, Groq secrets) are drafted and held until the drill re-run passes; the owner creates the Streamlit Community Cloud app on Mon Sep 7 — [`docs/submission.md`](docs/submission.md) |
+| Cloud deployment (bonus) | 2 | not done | No public URL from this tree. The Cloud files (root `streamlit_app.py`, committed seed, Python 3.13 in Advanced settings, Groq secrets) are drafted and held until the drill re-run passes; the Streamlit Community Cloud app is created after this snapshot merges — [`docs/submission.md`](docs/submission.md) |
 | Extras (bonus) | 1 | partial | Mentor agent with abstention, eval regression gate with an append-only history, Coffee Table state machine, the rotunda — the reviewer's call |
 
 Floor without any bonus, on the statuses above: **21/21** done, with row 9
 flagged for a quiet-box drill re-run. See `CHECKLIST.md` for the
 engineering-quality checklist behind this table.
 
-**Public demo URL:** none yet — owner deploy Mon Sep 7 (bonus row above).
-**Submission commit:** the `v2` tip after the stack merges, recorded in
-[`docs/evidence.md`](docs/evidence.md) at submission time.
+**Public demo URL:** none yet — see "Live demo" at the top of this README
+(bonus row above).
+**Submission commit:** to be recorded in [`docs/evidence.md`](docs/evidence.md)
+at submission time (see "Submission commit" at the top of this README).
 
 ## License
 
-Apache-2.0. Demo corpus is public-domain text only; catalog metadata from Open
-Library. Per-source provenance in [`data/manifest.yaml`](data/manifest.yaml).
+Code is licensed under [PolyForm Noncommercial 1.0.0](LICENSE); docs, images
+and screenshots (README, `docs/`, `docs/mockups/`, `docs/screenshots/`) under
+[CC BY-NC-SA 4.0](LICENSE-docs.md). Free for personal and non-commercial use;
+no commercial use. Reasoning in
+[ADR-007](docs/adrs/ADR-007-licence-provisional.md).
+
+Demo corpus is public-domain text only; catalog metadata from Open Library.
+Per-source provenance in [`data/manifest.yaml`](data/manifest.yaml).

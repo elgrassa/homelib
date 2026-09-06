@@ -10,13 +10,13 @@ Module list verified 2026-08-29 against the course repository on
 
 | Module | Tools taught | Where homelib demonstrates it | Status |
 |---|---|---|---|
-| **01 Agentic RAG** | minsearch, sqlitesearch, OpenAI API, ToyAIKit-style agent loop, **function calling** | `homelib_rag.agent`: an explicit tool-calling loop over `search_shelf` / `search_catalog` / `build_roadmap` / `get_block` | **done** — 7 endpoints, agent loop, roadmap, grounded citations shipped and verified; author-hallucination closed structurally (WP-14) |
-| **02 Vector Search** | sentence-transformers, numpy from scratch, minsearch VectorSearch, sqlitesearch, **pgvector**, `all-MiniLM-L6-v2` | pgvector cosine index + the course's own embedding model; lexical-vs-vector arms measured against each other | **done** — pgvector + `all-MiniLM-L6-v2` live against the real corpus; lexical/vector/hybrid arms measured (WP-09/10/12) |
+| **01 Agentic RAG** | minsearch, sqlitesearch, OpenAI API, ToyAIKit-style agent loop, **function calling** | `homelib_rag.agent.run_agent`: an explicit tool-calling loop over `search_shelf` / `search_catalog` / `build_roadmap` / `get_block` | **done** — 7 endpoints, roadmap, grounded citations shipped and verified; author-hallucination closed structurally (WP-14). `run_agent` itself is exercised by `packages/homelib-rag/tests/test_agent.py` / `test_mentor.py`, not by a live endpoint today — the Ask door / `POST /v1/ask` retrieves and answers directly through `homelib_rag.answer` and does not call `run_agent`, and `scripts/demo_ask.py` drives `/v1/ask` over HTTP, not the agent loop |
+| **02 Vector Search** | sentence-transformers, numpy from scratch, minsearch VectorSearch, sqlitesearch, **pgvector**, `all-MiniLM-L6-v2` | pgvector cosine index (Postgres v1 store) + the course's own embedding model; the SQLite tip-path reimplements the same cosine search from scratch over a normalized float32 matrix — `packages/homelib-rag/src/homelib_rag/sqlite_index.py::search_vector`, no pgvector/faiss; lexical-vs-vector arms measured on both stores | **done** — pgvector + `all-MiniLM-L6-v2` live against the real corpus; lexical/vector/hybrid arms measured (WP-09/10/12) |
 | **03 Orchestration** | Kestra flows, AI copilot, multi-agent YAML | Ingestion is orchestrated with **dlt**. See "Why dlt and not Kestra" below | **done** — dlt pipeline verified: 37 tests, 0 skipped, against a live Postgres (WP-09) |
 | **Workshop: dlt** | **dlt**, DuckDB, marimo, Pydantic AI + Logfire | `apps/ingest/pipeline.py` is a real dlt pipeline with idempotent loading | **done** — same pipeline: 37 tests, 0 skipped, against a live Postgres (WP-09) |
 | **04 Evaluation** | LLM-as-a-judge, **hit rate, MRR**, LLM-generated ground truth, structured outputs | Ground-truth generator, 4-arm retrieval eval, 3-prompt judge eval | **done** — retrieval: 4 arms × 235 questions, winner recorded in ADR-001 (WP-12). LLM judge: 4-arm bake-off × 30 questions, **null result** — incumbent kept, per ADR-003 (WP-15) |
-| **05 Monitoring** | Streamlit chat + dashboard, PostgreSQL, **Grafana**, token/cost tracking, 👍/👎 feedback | `query_log` + in-UI feedback + Grafana (Postgres) and Observatory ≥5 charts (SQLite tip path) | **done** — Grafana 6 panels + Observatory/feedback verified; with `HOMELIB_SQLITE_PATH`, new feedback is in SQLite/Observatory (WP-16 / WP10) |
-| **06 Best Practices** | Elasticsearch hybrid, LangChain retriever, **RRF** reranking | RRF hybrid, cross-encoder rerank, and query rewriting — all three | **done** — all three implemented and measured; rewrite **rejected on evidence** on a matched sample (WP-11/13) |
+| **05 Monitoring** | Streamlit chat + dashboard, PostgreSQL, **Grafana**, token/cost tracking, 👍/👎 feedback | `query_log` + in-UI feedback + Grafana (Postgres) and Observatory ≥5 charts (SQLite tip path) | **done** — the Observatory is the scored monitoring surface on the SQLite tip path (6 charts + thumbs feedback); Grafana (Postgres) is the v1 surface and stays empty there (ADR-005) (WP-16 / WP10). **Not yet built:** OpenTelemetry stage tracing, an online judge scoring live traffic, and $ cost tracking — landing in a follow-up PR |
+| **06 Best Practices** | Elasticsearch hybrid, LangChain retriever, **RRF** reranking | RRF fusion (`homelib_rag.hybrid.hybrid_search`) and cross-encoder rerank (`homelib_rag.rerank.rerank`) are two distinct stages — fusion merges the lexical/vector rankings, rerank re-scores the fused candidates on top; query rewriting (`homelib_rag.rewrite`) exists and was measured | **done** — all three implemented and measured; rewrite **measured and rejected** in ADR-001 (kept off in production) on a matched sample (WP-11/13) |
 | **07 Project example** | fitness-assistant: Flask, compose, PG logging, Grafana | homelib mirrors its structure at a higher bar: FastAPI, an eval regression gate, an agentic layer | **done** — build + CI green; cold-clone drill **PASSED** on `v2` @ `d6f9946` ([`docs/evidence.md`](evidence.md)); cloud/submit remain owner Mon |
 
 ## How we run each piece
@@ -34,9 +34,9 @@ cloud provider swaps it with no code change; no account is required to run this
 project.
 
 **Token and cost tracking.** `query_log` records prompt and completion tokens on
-every request. Cost is zero under the local default, and priced when a cloud key
-is configured. The columns stay either way, because the interesting question is
-tokens per answer, not the bill.
+every request. Dollar cost is **not** computed today — there is no per-provider
+pricing table in `apps/api/main.py` — so the columns are tokens in/out, not a
+bill; a $ cost column is a follow-up, not part of this submission.
 
 **Why dlt and not Kestra.** The rubric names both as 2-point ingestion tools, so
 this is a choice between equals rather than a substitution. homelib's ingestion
