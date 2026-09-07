@@ -333,7 +333,7 @@ def render_library_tab(client: Client) -> None:
         st.caption(f"Retrieval mode: {mode_used} (related passages OK — not exact-phrase only)")
     selected = book_by_id.get(str(last_scene.get("book_id") or ""))
     port = read_port()
-    for hit in hits:
+    for idx, hit in enumerate(hits):
         if not isinstance(hit, dict):
             continue
         anchor = str(hit.get("open_anchor") or hit.get("block_id") or "")
@@ -357,8 +357,9 @@ def render_library_tab(client: Client) -> None:
         with st.expander(label, expanded=False):
             st.write(quote)
             st.caption(f"block `{block.block_id}`")
-            passage_key = f"scene_passage_{anchor}"
-            ordinal_key = f"scene_ordinal_{anchor}"
+            # Index disambiguates when multiple hits share open_anchor/block_id.
+            passage_key = f"scene_passage_{idx}_{anchor}"
+            ordinal_key = f"scene_ordinal_{idx}_{anchor}"
             if st.button("Open this passage", key=f"open_{passage_key}"):
                 st.session_state[passage_key] = True
                 st.session_state[ordinal_key] = int(block.ordinal)
@@ -413,7 +414,17 @@ def render_observatory_tab(client: Client) -> None:
         st.subheader(chart.get("title") or chart.get("id"))
         points = chart.get("points") or []
         if not points:
-            st.write("(no data yet — run `uv run python scripts/demo_traffic.py --n 40`)")
+            chart_id = str(chart.get("id") or "")
+            if chart_id == "judged_relevance":
+                st.write(
+                    "(empty until an operator runs "
+                    "`uv run python scripts/judge_recent.py` — off by default)"
+                )
+            else:
+                st.write(
+                    "(no data yet — run `uv run python scripts/demo_traffic.py --n 40` "
+                    "or make asks so query_log/spans populate)"
+                )
             continue
         st.bar_chart(
             {
