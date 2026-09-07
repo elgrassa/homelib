@@ -546,7 +546,8 @@ class GutenbergLiveConnector:
             for person in book.get("authors") or []:
                 if isinstance(person, dict) and person.get("name"):
                     authors.append(str(person["name"]))
-            formats = book.get("formats") if isinstance(book.get("formats"), dict) else {}
+            formats_raw = book.get("formats")
+            formats: dict[str, Any] = formats_raw if isinstance(formats_raw, dict) else {}
             has_text = any(
                 isinstance(mime, str) and mime.startswith("text/plain") for mime in formats
             )
@@ -609,7 +610,8 @@ class GoogleBooksLiveConnector:
             if not isinstance(item, dict):
                 continue
             volume_id = item.get("id")
-            info = item.get("volumeInfo") if isinstance(item.get("volumeInfo"), dict) else {}
+            volume_info_raw = item.get("volumeInfo")
+            info: dict[str, Any] = volume_info_raw if isinstance(volume_info_raw, dict) else {}
             title = info.get("title")
             if not volume_id or not title:
                 continue
@@ -672,7 +674,8 @@ def _hardcover_hits_from_results(results: Any, *, limit: int) -> list[ConnectorH
         if not isinstance(row, dict):
             continue
         # Typesense-style hits nest document fields under "document".
-        doc = row.get("document") if isinstance(row.get("document"), dict) else row
+        document_raw = row.get("document")
+        doc: dict[str, Any] = document_raw if isinstance(document_raw, dict) else row
         title = doc.get("title")
         slug = doc.get("slug")
         book_id = doc.get("id")
@@ -752,6 +755,8 @@ class HardcoverLiveConnector:
             return []
         if payload.get("errors"):
             raise ConnectorTimeout(f"hardcover graphql errors: {payload['errors']}")
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-        search = data.get("search") if isinstance(data.get("search"), dict) else {}
+        data_raw = payload.get("data")
+        data: dict[str, Any] = data_raw if isinstance(data_raw, dict) else {}
+        search_raw = data.get("search")
+        search: dict[str, Any] = search_raw if isinstance(search_raw, dict) else {}
         return _hardcover_hits_from_results(search.get("results"), limit=self._limit)
