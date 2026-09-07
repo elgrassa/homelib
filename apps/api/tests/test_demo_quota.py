@@ -237,6 +237,54 @@ def test_demo_mentor_returns_429_when_principal_already_at_limit(
     assert "Daily demo LLM limit" in denied.json()["detail"]
 
 
+def test_demo_ask_without_session_header_does_not_spend_llm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Missing X-Demo-Session must not mint a throwaway principal.
+
+    A new principal per request would never hit HOMELIB_DEMO_LLM_DAILY_LIMIT,
+    so a header-less caller could spend Groq unbounded on the public demo.
+    """
+    _demo_db(tmp_path, monkeypatch, mode="demo", limit="100")
+    fake_llm = _ScriptedClient([_llm_json("nope", [{"passage": 1, "quote": "fox jumps"}])])
+    app.dependency_overrides[get_deps] = lambda: _base_deps(llm_client=fake_llm)
+
+    denied = client.post("/v1/ask", json={"query": "q", "arm": "lexical"})
+    whitespace = client.post(
+        "/v1/ask",
+        json={"query": "q2", "arm": "lexical"},
+        headers={"X-Demo-Session": "   "},
+    )
+
+    assert denied.status_code == 401
+    assert whitespace.status_code == 401
+    assert fake_llm.calls == 0
+
+
+def test_demo_cached_ask_without_session_header_is_still_401(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A populated demo cache must not let a header-less caller skip identity."""
+    _demo_db(tmp_path, monkeypatch, mode="demo", limit="100")
+    fake_llm = _ScriptedClient([_llm_json("cached", [{"passage": 1, "quote": "fox jumps"}])])
+    app.dependency_overrides[get_deps] = lambda: _base_deps(llm_client=fake_llm)
+    headers = _mint(client)
+    body = {"query": "same question", "arm": "hybrid"}
+    assert client.post("/v1/ask", json=body, headers=headers).status_code == 200
+    denied = client.post("/v1/ask", json=body)
+    assert denied.status_code == 401
+    assert fake_llm.calls == 1
+
+
+def test_demo_llm_daily_limit_ignores_non_integer_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.api.demo_quota import DEFAULT_DEMO_LLM_DAILY_LIMIT, demo_llm_daily_limit
+
+    monkeypatch.setenv("HOMELIB_DEMO_LLM_DAILY_LIMIT", "not-a-number")
+    assert demo_llm_daily_limit() == DEFAULT_DEMO_LLM_DAILY_LIMIT
+
+
 def test_demo_mentor_intake_counts_toward_daily_limit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

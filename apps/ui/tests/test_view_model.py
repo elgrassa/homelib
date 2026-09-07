@@ -366,6 +366,15 @@ def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
     assert label == "Acres of Diamonds · Russell H. Conwell · — · block 5"
 
 
+def test_format_shelf_read_markdown_keeps_space_before_bold_url() -> None:
+    from apps.ui.view_model import format_shelf_read_markdown
+
+    line = format_shelf_read_markdown("http://127.0.0.1:8502/read/walden", port=8502)
+    assert "host **" in line
+    assert "host**" not in line
+    assert "http://127.0.0.1:8502/read/walden" in line
+
+
 def test_ask_metric_captions_include_latency_and_token_breakdown() -> None:
     from apps.ui.view_model import ask_metric_captions
 

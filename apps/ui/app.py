@@ -40,6 +40,7 @@ from apps.ui.view_model import (
     format_citation_label,
     format_degraded_banner,
     format_scene_hit_label,
+    format_shelf_read_markdown,
     has_voted,
     library_summary,
     load_official_preview_books,
@@ -95,7 +96,12 @@ def render_ask_tab(client: Client) -> None:
         if st.button("👎", key=f"vote_down_{last_ask.request_id}", disabled=voted):
             _cast_vote(client, last_ask.request_id, "down")
 
-    for citation in last_ask.citations:
+    _render_citation_expanders(client, last_ask.citations)
+
+
+def _render_citation_expanders(client: Client, citations: list[Citation]) -> None:
+    """Ask and Mentor both resolve a citation to GET /v1/blocks/{id}."""
+    for citation in citations:
         with st.expander(format_citation_label(citation)):
             st.write(citation.quote)
             block_key = f"block_{citation.chunk_id}"
@@ -170,13 +176,15 @@ def render_mentor_tab(client: Client) -> None:
             if not isinstance(step, dict):
                 continue
             st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+    parsed_citations: list[Citation] = []
     for raw in last.get("citations") or []:
         try:
-            citation = raw if isinstance(raw, Citation) else Citation.model_validate(raw)
+            parsed_citations.append(
+                raw if isinstance(raw, Citation) else Citation.model_validate(raw)
+            )
         except ValidationError:
             continue
-        with st.expander(format_citation_label(citation)):
-            st.write(citation.quote)
+    _render_citation_expanders(client, parsed_citations)
 
 
 def render_coffee_table_tab(client: Client) -> None:
@@ -312,10 +320,7 @@ def render_library_tab(client: Client) -> None:
             st.caption(f"block `{block.block_id}` · open_anchor resolves via GET /v1/blocks/")
             if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
                 read_hint = clean_read_url(block.book_id, ordinal=block.ordinal, read_port=port)
-                st.markdown(
-                    f"Open at the same host**{read_hint}** "
-                    f"(clean article / Listen to Page — port {port})."
-                )
+                st.markdown(format_shelf_read_markdown(read_hint, port=port))
 
 
 def render_observatory_tab(client: Client) -> None:

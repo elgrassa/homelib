@@ -235,6 +235,13 @@ def format_scene_hit_label(
     return f"{book_title} · {author} · {section} · {place}"
 
 
+def format_shelf_read_markdown(read_hint: str, *, port: int) -> str:
+    """Shelf hit link copy. Spaces around ``**`` are required or Streamlit
+    glues 'host' onto the URL.
+    """
+    return f"Open at the same host **{read_hint}** (clean article / Listen to Page — port {port})."
+
+
 def parse_interests(raw: str) -> list[str]:
     """Split a free-text, comma-separated interests field into a clean list."""
     return [item.strip() for item in raw.split(",") if item.strip()]

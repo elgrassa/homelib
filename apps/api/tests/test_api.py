@@ -579,8 +579,9 @@ def test_traces_endpoint_returns_tree(tmp_path: Any, monkeypatch: pytest.MonkeyP
         ),
     )
     app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
 
-    ask_resp = client.post("/v1/ask", json={"query": "does it jump?"})
+    ask_resp = client.post("/v1/ask", json={"query": "does it jump?"}, headers=headers)
     assert ask_resp.status_code == 200
     trace_id = ask_resp.json()["trace_id"]
     assert trace_id
@@ -704,9 +705,14 @@ def test_demo_ask_serves_cached_answer_on_repeat(
         llm_client=fake_llm,
     )
     app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
 
-    first = client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
-    second = client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+    first = client.post(
+        "/v1/ask", json={"query": "does it jump?", "arm": "hybrid"}, headers=headers
+    )
+    second = client.post(
+        "/v1/ask", json={"query": "does it jump?", "arm": "hybrid"}, headers=headers
+    )
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -792,9 +798,10 @@ def test_cache_hit_is_logged_and_flagged(tmp_path: Any, monkeypatch: pytest.Monk
         log_query=logged.append,
     )
     app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
 
-    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
-    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"})
+    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"}, headers=headers)
+    client.post("/v1/ask", json={"query": "does it jump?", "arm": "hybrid"}, headers=headers)
 
     assert len(logged) == 2
     assert logged[0].cache_hit is False

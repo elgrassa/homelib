@@ -138,3 +138,6 @@ def test_mentor_tab_renders_area_wing_path_and_citations() -> None:
     expanders = at.get("expander")
     labels = [getattr(item, "label", None) or getattr(item, "value", "") for item in expanders]
     assert any("Walden" in str(label) for label in labels)
+    buttons = at.button
+    button_labels = [getattr(item, "label", None) or getattr(item, "value", "") for item in buttons]
+    assert any("Show full source block" in str(label) for label in button_labels)

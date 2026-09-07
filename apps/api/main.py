@@ -45,7 +45,7 @@ from opentelemetry import trace
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
-from apps.api.demo_quota import enforce_demo_llm_quota
+from apps.api.demo_quota import enforce_demo_llm_quota, require_demo_session
 from apps.api.schemas import (
     AskRequest,
     AskResponse,
@@ -740,6 +740,7 @@ def post_ask(
             cache_span.set_attribute("hit", cached is not None)
 
         if cached is not None:
+            require_demo_session(x_demo_session)
             result = cached
         else:
             enforce_demo_llm_quota(x_demo_session)

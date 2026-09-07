@@ -9,7 +9,6 @@ from fastapi import HTTPException
 from apps.api import sqlite_deps
 from apps.runtime_settings import AppMode, read_app_mode
 from apps.store.demo_llm_quota import DemoLlmQuotaExceeded, consume_demo_llm_quota
-from apps.store.sqlite import create_demo_session
 
 DEFAULT_DEMO_LLM_DAILY_LIMIT = 100
 
@@ -18,7 +17,39 @@ def demo_llm_daily_limit() -> int:
     raw = os.environ.get("HOMELIB_DEMO_LLM_DAILY_LIMIT", str(DEFAULT_DEMO_LLM_DAILY_LIMIT)).strip()
     if not raw:
         return DEFAULT_DEMO_LLM_DAILY_LIMIT
-    return int(raw)
+    try:
+        return int(raw)
+    except ValueError:
+        return DEFAULT_DEMO_LLM_DAILY_LIMIT
+
+
+def _demo_principal_id(x_demo_session: str | None) -> str | None:
+    """Resolve the demo principal, or None when the cap does not apply.
+
+    Missing / blank / unknown ``X-Demo-Session`` is 401 — never mint a
+    throwaway principal. A new principal per request would never hit the
+    daily cap, so Groq spend on the public demo would be unbounded.
+    """
+    if read_app_mode() is not AppMode.DEMO:
+        return None
+    if sqlite_deps.sqlite_path() is None:
+        return None
+    token = (x_demo_session or "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="demo session required")
+    with sqlite_deps.open_store() as conn:
+        row = conn.execute(
+            "SELECT principal_id FROM demo_session WHERE id = ?",
+            (token,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=401, detail="unknown demo session")
+        return str(row[0])
+
+
+def require_demo_session(x_demo_session: str | None) -> None:
+    """401 on a demo host when the visitor has no valid session (cache hits too)."""
+    _demo_principal_id(x_demo_session)
 
 
 def enforce_demo_llm_quota(x_demo_session: str | None) -> None:
@@ -26,21 +57,10 @@ def enforce_demo_llm_quota(x_demo_session: str | None) -> None:
 
     Count *before* Groq. Over the cap → 429, no LLM spend.
     """
-    if read_app_mode() is not AppMode.DEMO:
-        return
-    if sqlite_deps.sqlite_path() is None:
+    principal_id = _demo_principal_id(x_demo_session)
+    if principal_id is None:
         return
     with sqlite_deps.open_store() as conn:
-        if x_demo_session:
-            row = conn.execute(
-                "SELECT principal_id FROM demo_session WHERE id = ?",
-                (x_demo_session,),
-            ).fetchone()
-            if row is None:
-                raise HTTPException(status_code=401, detail="unknown demo session")
-            principal_id = str(row[0])
-        else:
-            principal_id = create_demo_session(conn).principal_id
         try:
             consume_demo_llm_quota(conn, principal_id, limit=demo_llm_daily_limit())
         except DemoLlmQuotaExceeded as exc:
