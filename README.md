@@ -1,4 +1,4 @@
-# homelib
+# homelib https://homelib.streamlit.app/
 
 **Your bookshelf is unsearchable, and your reading order is unplanned.**
 
