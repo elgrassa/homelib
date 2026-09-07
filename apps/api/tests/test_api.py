@@ -360,6 +360,135 @@ def test_ask_validation_rejects_unknown_field() -> None:
     assert resp.status_code == 422
 
 
+def test_ask_walden_still_uses_passage_citation_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Passage content Q must still retrieve + cite; shelf-meta must not short-circuit."""
+    retrieve_calls: list[str] = []
+    hit = Hit(
+        chunk_id="c-walden",
+        book_id="b-walden",
+        score=1.0,
+        rank=1,
+        text="by Henry David Thoreau",
+        section_path=["Economy"],
+        page=1,
+        block_ids=["blk-1"],
+    )
+
+    def _retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, bool]:
+        retrieve_calls.append(query)
+        return ([hit], arm, False)
+
+    monkeypatch.setattr(
+        answer_module,
+        "_book_metadata",
+        lambda book_ids: {bid: ("Walden", ["Henry David Thoreau"]) for bid in book_ids},
+    )
+    llm = _ScriptedClient(
+        [_llm_json("Henry David Thoreau", [{"passage": 1, "quote": "by Henry David Thoreau"}])]
+    )
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=llm,
+        list_books=lambda: [
+            BookSummary(
+                book_id="b-walden",
+                title="Walden",
+                authors=["Henry David Thoreau"],
+                blocks=1,
+                chunks=1,
+                format="txt",
+            )
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "Who wrote Walden?"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert retrieve_calls == ["Who wrote Walden?"]
+    assert body["answer"] == "Henry David Thoreau"
+    assert body["arm_used"] != "shelf_meta"
+    assert len(body["citations"]) == 1
+    assert body["citations"][0]["quote"] == "by Henry David Thoreau"
+
+
+def test_ask_what_do_you_have_uses_shelf_metadata_not_passage_abstain() -> None:
+    """Inventory Ask must list books via list_books — never empty passage refuse."""
+    retrieve_calls: list[str] = []
+
+    def _retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, bool]:
+        retrieve_calls.append(query)
+        return ([], arm, False)
+
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([]),  # must not be called
+        list_books=lambda: [
+            BookSummary(
+                book_id="b1",
+                title="Walden, and On The Duty Of Civil Disobedience",
+                authors=["Henry David Thoreau"],
+                blocks=10,
+                chunks=20,
+                format="txt",
+            ),
+            BookSummary(
+                book_id="b2",
+                title="Meditations",
+                authors=["Marcus Aurelius"],
+                blocks=5,
+                chunks=8,
+                format="txt",
+            ),
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "what do you have"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert retrieve_calls == []
+    assert body["arm_used"] == "shelf_meta"
+    assert body["degraded"] is False
+    assert body["citations"] == []
+    assert "Walden" in body["answer"]
+    assert "Meditations" in body["answer"]
+    assert body["answer"].strip() != ""
+
+
+def test_ask_romance_from_available_lists_shelf_instead_of_empty_abstain() -> None:
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: (_ for _ in ()).throw(AssertionError("no retrieve")),
+        llm_client=_ScriptedClient([]),
+        list_books=lambda: [
+            BookSummary(
+                book_id="b1",
+                title="The Prince",
+                authors=["Niccolò Machiavelli"],
+                blocks=3,
+                chunks=4,
+                format="txt",
+            )
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post(
+        "/v1/ask", json={"query": "which available romance book should I read?"}
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["arm_used"] == "shelf_meta"
+    assert "romance" in body["answer"].lower()
+    assert "The Prince" in body["answer"]
+    assert body["citations"] == []
+
+
 # ── C1: cost in $ (specs/monitoring.md) ─────────────────────────────────
 
 

@@ -35,6 +35,7 @@ from homelib_core.normalize import parse_file
 from homelib_rag import agent as agent_module
 from homelib_rag import answer as answer_module
 from homelib_rag import roadmap as roadmap_module
+from homelib_rag import shelf_meta as shelf_meta_module
 from homelib_rag.answer import LLMUnreachableError, OpenAICompatibleClient
 from homelib_rag.hybrid import hybrid_search
 from homelib_rag.models import Hit
@@ -742,6 +743,34 @@ def post_ask(
         if cached is not None:
             require_demo_session(x_demo_session)
             result = cached
+        elif shelf_meta_module.is_shelf_meta_intent(req.query):
+            # Collection / shelf-meta asks use list_books (+ optional catalog),
+            # not passage RAG — no Groq call, so session-check only (no LLM quota).
+            require_demo_session(x_demo_session)
+            with tracer.start_as_current_span("shelf_meta") as shelf_span:
+                book_rows = deps.list_books()
+                shelf_books = [
+                    shelf_meta_module.ShelfBookRef.from_parts(row.title, row.authors)
+                    for row in book_rows
+                ]
+                catalog_entries: list[CatalogEntry] = []
+                try:
+                    catalog_entries = list(deps.catalog_search(req.query, None)[:5])
+                except Exception as exc:
+                    logger.warning("shelf_meta catalog_search failed: %s", exc)
+                result = shelf_meta_module.answer_shelf_meta(
+                    req.query,
+                    shelf_books,
+                    arm_used="shelf_meta",
+                    catalog_entries=catalog_entries,
+                )
+                arm_used = "shelf_meta"
+                shelf_span.set_attribute("book_count", len(shelf_books))
+                shelf_span.set_attribute("catalog_hits", len(catalog_entries))
+            with tracer.start_as_current_span("cite") as cite_span:
+                cite_span.set_attribute("citations", 0)
+            if not result.degraded:
+                _maybe_cache_store(req.query, resolved_arm, deps.llm_client.model, result)
         else:
             enforce_demo_llm_quota(x_demo_session)
             query_for_retrieval, rewrite_used = _maybe_rewrite(deps, req, tracer)
