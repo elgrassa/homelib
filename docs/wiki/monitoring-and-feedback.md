@@ -8,7 +8,7 @@ flowchart LR
     L -->|yes — compose default, Cloud demo| SQ[(SQLite query_log + feedback)]
     L -->|no — v1 Postgres path| PG[(Postgres query_log)]
     FB[POST /v1/feedback 👍👎] --> L
-    SQ --> OBS[GET /v1/observatory<br/>6 charts]
+    SQ --> OBS[GET /v1/observatory<br/>9 chart defs]
     OBS --> DOOR[Observatory door]
     PG --> GRAF[Grafana :3001<br/>6 provisioned panels]
     DRILL[just drill] -->|asserts ≥5 charts and<br/>queries_over_time has the drill's ask| OBS
@@ -20,6 +20,6 @@ flowchart LR
 | Observatory door (`GET /v1/observatory`) | SQLite `query_log`, feedback | Always on the tip path (compose sets `HOMELIB_SQLITE_PATH`) | `scripts/cold_clone_drill.sh` monitoring step; `apps/store/tests` |
 | Grafana dashboard | Postgres `query_log` | Only with `HOMELIB_SQLITE_PATH` unset (tag `v1-fallback`) | nothing on the tip path — its panels are empty there |
 
-The six Observatory charts: `queries_over_time`, `latency_p50_p95`, `retrieval_mode_usage`, `feedback_ratio`, `degraded_or_no_result`, `token_or_cost_estimate` (`apps/store/observatory.py`). `scripts/demo_traffic.py --n 40` fills them on a fresh seed.
+The nine Observatory chart definitions: `queries_over_time`, `latency_p50_p95`, `retrieval_mode_usage`, `feedback_ratio`, `degraded_or_no_result`, `token_or_cost_estimate`, `judged_relevance`, `time_per_stage`, `cache_hits_vs_live` (`apps/store/observatory.py`). `scripts/demo_traffic.py --n 40` fills the traffic-backed ones on a fresh seed.
 
 Until 2026-09-05 the drill "verified monitoring" by counting Grafana's provisioned panels — a check that passes with zero traffic. It now requires the ask it just made to appear in `queries_over_time` ([ADR-005 addendum](../adrs/ADR-005-observatory-replaces-grafana.md)). Removing the `grafana` service from compose is an owner decision, not done.

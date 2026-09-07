@@ -48,7 +48,7 @@ def main() -> None
 | Roadmap | `build_roadmap` | steps **in `order`** with prerequisites resolved to titles |
 | Coffee Table | `get_playlist`, `add_playlist_item`, `accept_playlist`, `remove_playlist_item`, `save_progress` | current stack; `proposed` items need acceptance before they count |
 | Shelf | `list_books` | table (`title`, `authors`, `blocks`, `chunks`, `format`) + ingest summary line |
-| Observatory | `get_observatory` | ≥5 charts (six shipped) + the feedback loop |
+| Observatory | `get_observatory` | ≥5 charts (nine chart defs shipped) + the feedback loop |
 | Projection | `get_block`, `save_progress` | one-page reader with "Enter projector mode" |
 
 Navigation: `st.session_state["door"]` holds the open door. It changes from the

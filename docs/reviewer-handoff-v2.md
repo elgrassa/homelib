@@ -112,7 +112,7 @@ Status vocabulary matches CHECKLIST: `done` = command recorded in
 | 4 | LLM evaluation | done (v1) | ADR-003 null result |
 | 5 | Interface UI or API | done | FastAPI (18 paths) + Streamlit Crossroads: **seven doors** behind the rotunda (PR-B, PR-D), static grid always rendered |
 | 6 | Ingestion dlt | done | v1 Postgres; v2 SQLite pipeline tests + seed |
-| 7 | Monitoring ≥5 charts + feedback | done | Observatory (`GET /v1/observatory`, 6 charts over SQLite `query_log`) + thumbs; asserted by the drill. Grafana charts Postgres only — empty on the tip path (ADR-005 addendum) |
+| 7 | Monitoring ≥5 charts + feedback | done | Observatory (`GET /v1/observatory`, 9 chart defs over SQLite `query_log` / `spans`) + thumbs; asserted by the drill. Grafana charts Postgres only — empty on the tip path (ADR-005 addendum) |
 | 8 | Containerization | done (v1) | `docker/` compose |
 | 9 | Reproducibility | done (train tip `ee0f318`) | `just drill` PASSED 2026-09-04 on `d6f9946` (quiet box) and 2026-09-05 on `ee0f318` (attempt 2/5 under load); the 2026-09-05 re-run on `ae83d51` failed the ask step under load — all three in `docs/evidence.md` |
 | 10 | Hybrid + rerank + rewrite | done | rewrite rejected on evidence |
