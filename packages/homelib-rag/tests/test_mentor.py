@@ -120,6 +120,27 @@ def _intake_json(**overrides: Any) -> LLMResponse:
     )
 
 
+def _tool_then_intake(*extra: LLMResponse) -> list[LLMResponse]:
+    """Scripted agent: one tool round, then final intake JSON.
+
+    Mentor honesty refuses a proposed path when ``tool_calls`` is empty
+    (LIVE #M1 signature), so happy-path fixtures must call a tool first.
+    """
+    tool_call = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "get_block", "arguments": '{"block_id": "blk1"}'},
+    }
+    return [
+        LLMResponse(
+            content="",
+            tool_calls=[tool_call],
+            usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+        ),
+        *extra,
+    ]
+
+
 def test_tool_dispatch_scripted_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Port v1: scripted fake LLM dispatches real tool functions in order."""
     calls: list[str] = []
@@ -164,7 +185,7 @@ def test_intake_never_creates_active_state(tmp_path: Path) -> None:
     seed(conn, repo_root=REPO_ROOT)
     before = {key: row_counts(conn)[key] for key in ("areas", "wings", "playlist", "playlist_item")}
 
-    client = _ScriptedClient([_intake_json()])
+    client = _ScriptedClient(_tool_then_intake(_intake_json()))
     try:
         mentor_intake(
             "learn stoicism",
@@ -173,6 +194,7 @@ def test_intake_never_creates_active_state(tmp_path: Path) -> None:
             client=client,
             catalog=lambda _goal, _subjects: [_catalog_entry()],
             shelf_search=lambda _query, _k: [_hit()],
+            get_block=_get_block_fixture,
         )
         after = {
             key: row_counts(conn)[key] for key in ("areas", "wings", "playlist", "playlist_item")
@@ -206,7 +228,7 @@ def test_path_schema_fail_closed() -> None:
 
 
 def test_citations_resolve() -> None:
-    client = _ScriptedClient([_intake_json()])
+    client = _ScriptedClient(_tool_then_intake(_intake_json()))
     response = mentor_intake(
         "learn stoicism",
         ["philosophy"],
@@ -214,6 +236,7 @@ def test_citations_resolve() -> None:
         client=client,
         catalog=lambda _goal, _subjects: [_catalog_entry()],
         shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
     )
     assert isinstance(response, MentorIntakeResponse)
     assert len(response.citations) == 1
@@ -224,7 +247,9 @@ def test_citations_resolve() -> None:
 def test_high_stakes_note() -> None:
     notice = detect_high_stakes_notice("Should I take this medication?", [])
     assert notice is not None
-    client = _ScriptedClient([_intake_json()])
+    # Off-topic shelf/catalog for a medical goal → early abstention; notice
+    # is still attached. Scripted path is unused.
+    client = _ScriptedClient(_tool_then_intake(_intake_json()))
     response = mentor_intake(
         "medical diagnosis for chest pain",
         ["health"],
@@ -232,6 +257,7 @@ def test_high_stakes_note() -> None:
         client=client,
         catalog=lambda _goal, _subjects: [_catalog_entry()],
         shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
     )
     assert response.high_stakes_notice is not None
     assert "informational" in response.high_stakes_notice.lower()
@@ -241,21 +267,7 @@ def test_mentor_response_reports_tool_calls() -> None:
     """A scripted fake LLM calls `get_block` once before its final proposal
     (`run_agent`'s loop, wired in on the Mentor path since 2026-09-06); the
     response surfaces the tool name and the number of rounds it took."""
-    tool_call = {
-        "id": "c1",
-        "type": "function",
-        "function": {"name": "get_block", "arguments": '{"block_id": "blk1"}'},
-    }
-    client = _ScriptedClient(
-        [
-            LLMResponse(
-                content="",
-                tool_calls=[tool_call],
-                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
-            ),
-            _intake_json(),
-        ]
-    )
+    client = _ScriptedClient(_tool_then_intake(_intake_json()))
 
     response = mentor_intake(
         "learn stoicism",
@@ -326,6 +338,71 @@ def test_mentor_miss_m1_modern_swe_job_is_out_of_corpus() -> None:
     assert response.citations == []
     assert "enough indexed sources" in response.rationale.lower()
     assert client._responses  # LLM never consumed — early abstention
+
+
+def test_mentor_miss_m1_abstains_on_off_topic_industrial_shelf_hits() -> None:
+    """LIVE #M1 honesty failure: off-topic industrial/historical shelf hits
+    must not yield an invented modern SWE / labour-market path.
+
+    Provenance: ``ford-my-life-and-work`` chunk text in ``data/homelib.sqlite``
+    (Project Gutenberg Ford — farm tractor / ploughing / threshing). The live
+    miss returned an agricultural-tractors path with ``tool_calls=[]``,
+    ``rounds_used=1``.
+    """
+    tractor_hit = _hit(
+        text=(
+            "It occurred to me, as I remember somewhat vaguely, that precisely "
+            "the same idea might be applied as a tractor to attend to the "
+            "excessively hard labour of ploughing. They were sometimes used as "
+            "tractors to pull heavy loads and, if the owner also happened to be "
+            "in the threshing-machine business, he hitched his threshing machine "
+            "to them."
+        ),
+        chunk_id="ford-tractor-m1-fixture",
+    )
+    invented_off_topic = _intake_json(
+        proposed_area={"name": "Agricultural Machinery", "copy": "Farm engines"},
+        proposed_wing={
+            "name": "Threshing shelf",
+            "area_name": "Agricultural Machinery",
+            "copy": None,
+        },
+        proposed_path={
+            "title": "Path into agricultural tractors",
+            "kind": "learning",
+            "steps": [
+                {
+                    "order": 0,
+                    "title": "Study farm tractors and ploughing",
+                    "why": "Ford describes tractors for threshing-machine work",
+                    "est_effort": "medium",
+                }
+            ],
+        },
+        rationale="Grounded in Ford tractor passages.",
+        citations=[
+            {
+                "passage": 1,
+                "quote": "tractor to attend to the excessively hard labour of ploughing",
+            }
+        ],
+    )
+    client = _ScriptedClient([invented_off_topic])
+    response = mentor_intake(
+        "Land AI engineer job",
+        ["software interviews", "leetcode"],
+        "intermediate",
+        client=client,
+        catalog=lambda _goal, _subjects: [],
+        shelf_search=lambda _query, _k: [tractor_hit],
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.proposed_area is None
+    assert response.proposed_wing is None
+    assert response.citations == []
+    assert "enough indexed sources" in response.rationale.lower()
+    assert client._responses  # early abstention — invented path never accepted
 
 
 def test_mentor_stops_at_two_rounds_and_abstains_on_empty_json() -> None:

@@ -66,6 +66,25 @@ _ABSTENTION_RATIONALE = (
     "goal yet. Try narrowing the topic or importing relevant books to My Shelf."
 )
 
+# Goal-phrasing / function words that must not count as topical evidence.
+# "land"/"job"/"career" alone would let historical shelf noise (Ford farm
+# tractors, Taylor pig-iron) look "on goal" for modern SWE goals (#M1).
+_GOAL_STOPWORDS = frozenset(
+    {
+        "a", "an", "the", "and", "or", "to", "of", "for", "in", "on", "at", "by",
+        "is", "are", "be", "as", "it", "its", "my", "me", "i", "we", "you", "your",
+        "with", "from", "into", "about", "how", "what", "when", "where", "why",
+        "this", "that", "these", "those",
+        "land", "get", "got", "find", "make", "become", "learn", "study", "start",
+        "help", "want", "need", "build", "create",
+        "job", "jobs", "career", "careers", "work", "path", "paths", "goal",
+        "goals", "role", "roles", "plan", "plans",
+    }
+)
+
+# search_* only — get_block fetches a known block and is not a relevance signal.
+_SEARCH_TOOL_NAMES = frozenset({"search_shelf", "search_catalog"})
+
 
 class MentorIntakeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -181,6 +200,119 @@ def detect_high_stakes_notice(goal: str, interests: list[str]) -> str | None:
     return None
 
 
+def _goal_content_tokens(goal: str, interests: list[str]) -> set[str]:
+    """Topical tokens from the stated goal + interests (word-boundary safe)."""
+    blob = " ".join([goal, *interests])
+    return {
+        token.lower()
+        for token in re.findall(r"\w+", blob, flags=re.UNICODE)
+        if len(token) > 1 and token.lower() not in _GOAL_STOPWORDS
+    }
+
+
+def _blob_has_goal_tokens(blob: str, tokens: set[str]) -> bool:
+    if not tokens or not blob:
+        return False
+    words = {token.lower() for token in re.findall(r"\w+", blob, flags=re.UNICODE)}
+    return bool(tokens & words)
+
+
+def _evidence_blob(hits: list[Hit], candidates: list[CatalogEntry]) -> str:
+    parts: list[str] = [hit.text for hit in hits]
+    for entry in candidates:
+        parts.append(entry.title)
+        parts.extend(entry.authors)
+        parts.extend(entry.subjects)
+        if entry.description:
+            parts.append(entry.description)
+    return " ".join(parts)
+
+
+def _has_on_goal_evidence(
+    goal: str,
+    interests: list[str],
+    hits: list[Hit],
+    candidates: list[CatalogEntry],
+) -> bool:
+    """True when shelf/catalog text shares at least one topical goal token.
+
+    Non-empty but off-topic hits (e.g. Ford farm tractors for "Land AI
+    engineer job") must not count as evidence — LIVE Mentor #M1.
+    """
+    tokens = _goal_content_tokens(goal, interests)
+    if not tokens:
+        return bool(hits or candidates)
+    return _blob_has_goal_tokens(_evidence_blob(hits, candidates), tokens)
+
+
+def _proposal_aligns_with_goal(
+    goal: str,
+    interests: list[str],
+    parsed: _LLMIntakeOutput,
+) -> bool:
+    """False when a proposal names books/areas unrelated to the stated goal."""
+    tokens = _goal_content_tokens(goal, interests)
+    if not tokens:
+        return True
+    parts: list[str] = []
+    if parsed.proposed_area is not None:
+        parts.append(parsed.proposed_area.name)
+        if parsed.proposed_area.area_copy:
+            parts.append(parsed.proposed_area.area_copy)
+    if parsed.proposed_wing is not None:
+        parts.append(parsed.proposed_wing.name)
+        if parsed.proposed_wing.area_name:
+            parts.append(parsed.proposed_wing.area_name)
+        if parsed.proposed_wing.wing_copy:
+            parts.append(parsed.proposed_wing.wing_copy)
+    if parsed.proposed_path is not None:
+        parts.append(parsed.proposed_path.title)
+        for step in parsed.proposed_path.steps:
+            parts.append(step.title)
+            parts.append(step.why)
+    if not parts:
+        return True
+    return _blob_has_goal_tokens(" ".join(parts), tokens)
+
+
+def _search_tool_results_on_goal(
+    goal: str,
+    interests: list[str],
+    tool_records: list[Any],
+) -> bool | None:
+    """None if no search tools ran; else whether any result looks on-goal."""
+    retrieval = [
+        record
+        for record in tool_records
+        if getattr(record, "tool_name", None) in _SEARCH_TOOL_NAMES
+        and not getattr(record, "error", None)
+    ]
+    if not retrieval:
+        return None
+    tokens = _goal_content_tokens(goal, interests)
+    if not tokens:
+        return True
+    blob = " ".join(getattr(record, "result_summary", "") or "" for record in retrieval)
+    return _blob_has_goal_tokens(blob, tokens)
+
+
+def _abstention_response(
+    *,
+    notice: str | None,
+    tool_calls: list[str] | None = None,
+    rounds_used: int = 0,
+) -> MentorIntakeResponse:
+    return MentorIntakeResponse(
+        request_id=str(uuid.uuid4()),
+        rationale=_ABSTENTION_RATIONALE,
+        citations=[],
+        degraded=True,
+        high_stakes_notice=notice,
+        tool_calls=list(tool_calls or []),
+        rounds_used=rounds_used,
+    )
+
+
 def _passage_citations(raw: list[_RawPassageCitation], hits: list[Hit]) -> list[Citation]:
     citations: list[Citation] = []
     for item in raw:
@@ -292,14 +424,13 @@ def mentor_intake(
     hits = shelf_search(goal, 5) if shelf_search is not None else []
     candidates = catalog(goal, interests or None)
 
+    # Empty shelf+catalog, or non-empty but off-topic hits (LIVE #M1: Ford
+    # farm-tractor passages for "Land AI engineer job") → abstain; do not ask
+    # the LLM to invent a modern labour-market / SWE path from weak noise.
     if not hits and not candidates:
-        return MentorIntakeResponse(
-            request_id=str(uuid.uuid4()),
-            rationale=_ABSTENTION_RATIONALE,
-            citations=[],
-            degraded=True,
-            high_stakes_notice=notice,
-        )
+        return _abstention_response(notice=notice)
+    if not _has_on_goal_evidence(goal, interests, hits, candidates):
+        return _abstention_response(notice=notice)
 
     prompt = _build_intake_prompt(goal, interests, level, hits, candidates)
     schema_hint = (
@@ -346,14 +477,15 @@ def mentor_intake(
     rounds_used = agent_result.rounds_used
 
     if agent_result.degraded or not (agent_result.final_message or "").strip():
-        return MentorIntakeResponse(
-            request_id=str(uuid.uuid4()),
-            rationale=_ABSTENTION_RATIONALE,
-            citations=[],
-            degraded=True,
-            high_stakes_notice=notice,
-            tool_calls=tool_calls,
-            rounds_used=rounds_used,
+        return _abstention_response(
+            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
+        )
+
+    # Search tools ran but returned only off-topic summaries → abstain.
+    search_on_goal = _search_tool_results_on_goal(goal, interests, agent_result.tool_calls)
+    if search_on_goal is False:
+        return _abstention_response(
+            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
         )
 
     try:
@@ -361,14 +493,25 @@ def mentor_intake(
         parsed = _LLMIntakeOutput.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("mentor intake parse failed: %s", exc)
-        return MentorIntakeResponse(
-            request_id=str(uuid.uuid4()),
-            rationale=_ABSTENTION_RATIONALE,
-            citations=[],
-            degraded=True,
-            high_stakes_notice=notice,
-            tool_calls=tool_calls,
-            rounds_used=rounds_used,
+        return _abstention_response(
+            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
+        )
+
+    has_proposal = (
+        parsed.proposed_path is not None
+        or parsed.proposed_area is not None
+        or parsed.proposed_wing is not None
+    )
+    # Prefer honesty: unrelated books/goals in the proposal, or a path with
+    # empty tool_calls (LIVE #M1 signature tool_calls=[], rounds_used=1) →
+    # force abstention rather than invent a labour-market path.
+    if has_proposal and not _proposal_aligns_with_goal(goal, interests, parsed):
+        return _abstention_response(
+            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
+        )
+    if parsed.proposed_path is not None and not tool_calls:
+        return _abstention_response(
+            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
         )
 
     try:
