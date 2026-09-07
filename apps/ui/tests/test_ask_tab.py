@@ -7,10 +7,19 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from apps.ui.api_client import AskResponse, TokenUsage
+from apps.ui.api_client import ApiUnavailableError, AskResponse, TokenUsage
 
 APP_PATH = Path(__file__).resolve().parent.parent / "app.py"
 CLOSED_PORT_API = "http://127.0.0.1:9"
+
+
+def _stub_list_books_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ask fallback calls list_books; closed-port HTTP can stall AppTest."""
+
+    def _boom(self):  # type: ignore[no-untyped-def]
+        raise ApiUnavailableError("api unreachable")
+
+    monkeypatch.setattr("apps.ui.api_client.ApiClient.list_books", _boom)
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +54,8 @@ def test_ask_filled_query_against_closed_port_is_unreachable_without_question_er
     assert not any("question" in e.lower() for e in errors)
 
 
-def test_ask_empty_answer_renders_refuse_not_blank() -> None:
+def test_ask_empty_answer_renders_refuse_not_blank(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stub_list_books_unavailable(monkeypatch)
     at = AppTest.from_file(str(APP_PATH), default_timeout=30)
     at.session_state["door"] = "Ask"
     at.session_state["last_ask"] = AskResponse(
@@ -64,9 +74,12 @@ def test_ask_empty_answer_renders_refuse_not_blank() -> None:
     assert "do not answer" in visible.lower() or "passages do not answer" in visible.lower()
 
 
-def test_ask_empty_degraded_answer_renders_refuse_and_degraded_banner() -> None:
+def test_ask_empty_degraded_answer_renders_refuse_and_degraded_banner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """#A1 inventory miss after Groq json_validate: empty degraded body must
     still show refuse (not a blank door) plus the degraded banner."""
+    _stub_list_books_unavailable(monkeypatch)
     at = AppTest.from_file(str(APP_PATH), default_timeout=30)
     at.session_state["door"] = "Ask"
     at.session_state["last_ask"] = AskResponse(
@@ -87,8 +100,9 @@ def test_ask_empty_degraded_answer_renders_refuse_and_degraded_banner() -> None:
     assert "do not answer" in visible.lower() or "passages do not answer" in visible.lower()
 
 
-def test_ask_nonempty_abstention_renders_abstention_text() -> None:
+def test_ask_nonempty_abstention_renders_abstention_text(monkeypatch: pytest.MonkeyPatch) -> None:
     """Non-empty abstention must remain visible (not wiped to a blank door)."""
+    _stub_list_books_unavailable(monkeypatch)
     at = AppTest.from_file(str(APP_PATH), default_timeout=30)
     at.session_state["door"] = "Ask"
     at.session_state["last_ask"] = AskResponse(

@@ -119,4 +119,3 @@ def test_sqlite_health_snapshot_returns_reachable_and_counts(sqlite_env: Path) -
     assert ok is True
     assert books == 1
     assert chunks == 0
-
