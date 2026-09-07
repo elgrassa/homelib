@@ -328,6 +328,7 @@ def mentor_intake(
         agent_result = run_agent(
             messages,
             client=client,
+            max_rounds=2,
             max_tokens=1200,
             tools=mentor_tools,
             tool_schemas=mentor_schemas,
@@ -344,6 +345,17 @@ def mentor_intake(
     tool_calls = [record.tool_name for record in agent_result.tool_calls]
     rounds_used = agent_result.rounds_used
 
+    if agent_result.degraded or not (agent_result.final_message or "").strip():
+        return MentorIntakeResponse(
+            request_id=str(uuid.uuid4()),
+            rationale=_ABSTENTION_RATIONALE,
+            citations=[],
+            degraded=True,
+            high_stakes_notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
+
     try:
         payload = json.loads(agent_result.final_message or "{}")
         parsed = _LLMIntakeOutput.model_validate(payload)
@@ -351,7 +363,7 @@ def mentor_intake(
         logger.warning("mentor intake parse failed: %s", exc)
         return MentorIntakeResponse(
             request_id=str(uuid.uuid4()),
-            rationale="Could not parse a grounded mentor proposal.",
+            rationale=_ABSTENTION_RATIONALE,
             citations=[],
             degraded=True,
             high_stakes_notice=notice,

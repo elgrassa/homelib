@@ -115,9 +115,9 @@ def test_apply_streamlit_secrets_copies_groq_key_for_cloud_one_secret_form(
         "APP_MODE": "demo",
         "HOMELIB_SQLITE_PATH": "data/homelib.sqlite",
         "GROQ_API_KEY": "gsk_test_cloud_secret",
-        "GROQ_MODEL": "llama-3.3-70b-versatile",
+        "GROQ_MODEL": "openai/gpt-oss-120b",
     }
     apply_streamlit_secrets_to_environ(secrets)
     assert os.environ["GROQ_API_KEY"] == "gsk_test_cloud_secret"
-    assert os.environ["GROQ_MODEL"] == "llama-3.3-70b-versatile"
+    assert os.environ["GROQ_MODEL"] == "openai/gpt-oss-120b"
     assert os.environ.get("LLM_API_KEY", "") == ""

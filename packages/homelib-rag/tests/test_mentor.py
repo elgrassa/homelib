@@ -306,3 +306,80 @@ def test_abstention_on_no_evidence() -> None:
     assert response.citations == []
     assert response.proposed_path is None
     assert "enough indexed sources" in response.rationale.lower()
+
+
+def test_mentor_miss_m1_modern_swe_job_is_out_of_corpus() -> None:
+    """Golden #M1 — modern SWE / AI-engineer job loop is not in the 18
+    Gutenberg books. Empty shelf+catalog must abstain with no invented path."""
+    client = _ScriptedClient([_intake_json()])  # would invent a path if called
+    response = mentor_intake(
+        "Land AI engineer job",
+        ["software interviews", "leetcode"],
+        "intermediate",
+        client=client,
+        catalog=lambda _goal, _subjects: [],
+        shelf_search=lambda _query, _k: [],
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.proposed_area is None
+    assert response.citations == []
+    assert "enough indexed sources" in response.rationale.lower()
+    assert client._responses  # LLM never consumed — early abstention
+
+
+def test_mentor_stops_at_two_rounds_and_abstains_on_empty_json() -> None:
+    """Bound: max_rounds=2. Empty/unparseable final JSON must not invent a path."""
+    empty = LLMResponse(content="", usage=LLMUsage(prompt_tokens=1, completion_tokens=1))
+    client = _ScriptedClient([empty])
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.rounds_used == 1
+    assert "enough indexed sources" in response.rationale.lower()
+
+
+def test_mentor_unknown_tool_twice_stops_within_two_rounds() -> None:
+    """A repeated unknown tool must stop the loop and abstain — no career path."""
+    bad = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "invent_career", "arguments": "{}"},
+    }
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                content="",
+                tool_calls=[bad],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+            LLMResponse(
+                content="",
+                tool_calls=[bad],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+            _intake_json(),  # must never be reached if bound holds
+        ]
+    )
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.rounds_used <= 2
+    assert "enough indexed sources" in response.rationale.lower()
+    assert len(client._responses) == 1  # third scripted reply unused

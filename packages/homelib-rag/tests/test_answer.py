@@ -704,7 +704,7 @@ def test_openai_client_falls_back_to_groq_when_llm_api_key_is_empty(
     monkeypatch.delenv("GROQ_MODEL", raising=False)
     client = OpenAIClient()
     assert client.base_url == "https://api.groq.com/openai/v1"
-    assert client.model == "llama-3.3-70b-versatile"
+    assert client.model == "openai/gpt-oss-120b"
     assert client._client.api_key == "gsk-test"
 
 

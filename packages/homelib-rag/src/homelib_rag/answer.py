@@ -71,7 +71,7 @@ _DEFAULT_MODEL = "qwen2.5:7b-instruct"
 # the compose/Ollama configuration. Not a provider chain: the choice is made
 # once, at construction, by which key is present.
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-_GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+_GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
 _DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/homelib"
 # Measured on the pure-compose stack (CPU-only Ollama in the Docker VM):
 # prefill ~49 tok/s, generation ~7.4 tok/s uncontended, so a real /v1/ask
@@ -174,7 +174,7 @@ def _resolve_llm_env() -> tuple[str, str, str]:
     1. `LLM_API_KEY` non-empty → the `LLM_*` triple (compose / Ollama, or a
        fully spelled-out provider).
     2. otherwise `GROQ_API_KEY` non-empty → Groq's OpenAI-compatible endpoint
-       with `GROQ_MODEL` (default `llama-3.3-70b-versatile`) — the public
+       with `GROQ_MODEL` (default `openai/gpt-oss-120b`) — the public
        demo needs one secret, and a blank `LLM_API_KEY` does not hide it.
     3. otherwise the Ollama placeholder key, so an unreachable LLM degrades
        the answer at call time. The OpenAI SDK refuses `""` at construction,

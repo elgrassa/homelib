@@ -23,8 +23,10 @@ from apps.ui.api_client import (
 from apps.ui.view_model import (
     CROSSROADS_DOORS,
     DEFAULT_API_URL,
+    LibrarySummary,
     block_id_for_citation,
     format_api_error_message,
+    format_ask_answer_body,
     format_book_choice_label,
     format_citation_label,
     format_degraded_banner,
@@ -202,6 +204,14 @@ def test_healthy_response_has_no_banner() -> None:
     healthy = _make_ask_response(degraded=False)
 
     assert format_degraded_banner(healthy) is None
+
+
+def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:
+    """Inventory questions often get answer=\"\" — that must not render blank."""
+    body = format_ask_answer_body("", LibrarySummary(book_count=18, total_blocks=729, total_chunks=9168))
+    assert "do not answer" in body.lower()
+    assert "18 books" in body
+    assert format_ask_answer_body("Henry David Thoreau", None) == "Henry David Thoreau"
 
 
 # --------------------------------------------------------------------------

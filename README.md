@@ -30,6 +30,21 @@ door serves the in-app charts. Never commit an API key.
 **Live demo:** _URL to be added after Cloud deploy_
 **Submission commit:** _SHA to be added_
 
+### DO-NOT-CLAIM (public / LinkedIn)
+
+Safe if true: local RAG · citations that open the page · eval tables in
+[`EVAL.md`](EVAL.md) · Streamlit Crossroads · Ollama default locally / Groq for
+the demo. Tradeoffs: [`TRADEOFFS.md`](TRADEOFFS.md). Cost/latency:
+[`COST-LATENCY.md`](COST-LATENCY.md).
+
+**Unsafe until shipped / measured:** “production hybrid RAG” · “LangGraph agent
+in prod” · “AI mentor that plans a career” · “production vector DB” · “eval in
+CI fails the build” (gate code exists; not in `just ci` yet).
+
+Happy path: Ask “Who wrote Walden?” → citation → Show full source block.
+Known miss: Ask “what do you have?” (#A1) → refuse + shelf counts; Mentor
+“Land AI engineer job” (#M1) → abstain, no invented path.
+
 A screenshot of the Crossroads rotunda (the entry to the Ask door) lives in
 [`docs/screenshots/crossroads-rotunda-seven-doors.png`](docs/screenshots/crossroads-rotunda-seven-doors.png)
 (below); a transcript of one real cited answer is under "Which LLM answers"
