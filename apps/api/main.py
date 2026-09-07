@@ -362,8 +362,8 @@ def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, boo
 
 # `/health` must stay snappy during a long `/v1/ask` (Groq/Ollama can sit near
 # LLM_TIMEOUT_SECONDS). A fresh provider `/models` probe every healthcheck was
-# measured at 1.2–1.9s alone on compose and stacked behind Ask into client
-# timeouts — cache briefly and keep the probe short.
+# measured at 1.2-1.9s alone on compose and stacked behind Ask into client
+# timeouts - cache briefly and keep the probe short.
 _LLM_REACHABLE_TTL_SECONDS = 30.0
 _LLM_REACHABLE_PROBE_TIMEOUT_SECONDS = 0.5
 _llm_reachable_cache: tuple[str, float, bool] | None = None

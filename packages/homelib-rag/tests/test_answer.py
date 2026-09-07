@@ -843,9 +843,7 @@ def test_bare_integer_citations_do_not_become_trusted_uncited_answers() -> None:
 def test_honest_passage_abstention_with_empty_citations_stays_trusted() -> None:
     """Legitimate refuse wording may keep citations=[] without degrading."""
     hits = [_hit()]
-    client = _ScriptedClient(
-        [_llm_json("None of the provided passages answer this question.", [])]
-    )
+    client = _ScriptedClient([_llm_json("None of the provided passages answer this question.", [])])
 
     result = answer("q", hits, client=client, arm_used="hybrid")
 

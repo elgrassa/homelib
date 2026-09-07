@@ -1340,7 +1340,7 @@ def test_default_llm_reachable_false_on_connection_error() -> None:
 
 @respx.mock
 def test_default_llm_reachable_caches_probe_so_health_stays_cheap() -> None:
-    """Regression: uncached Groq `/models` probes made solo `/health` 1.2–1.9s
+    """Regression: uncached Groq `/models` probes made solo `/health` 1.2-1.9s
     and timed out during Ask; a short TTL cache keeps liveness under 2s."""
     main._reset_llm_reachable_cache_for_tests()
     route = respx.get("http://llm.test/v1/models").mock(

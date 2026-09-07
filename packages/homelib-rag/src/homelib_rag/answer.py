@@ -672,12 +672,11 @@ def answer(
     # Empty citations are only honest for an abstention. A non-empty claim
     # with `citations: []` (or after bare markers like `[1]` failed open) must
     # not be trusted as a grounded answer.
-    if parsed.answer.strip() and not parsed.citations:
-        if not is_passage_abstention(parsed.answer):
-            return _degraded_response(
-                arm_used,
-                "uncited factual answer rejected; empty citations with a claim",
-            )
+    if parsed.answer.strip() and not parsed.citations and not is_passage_abstention(parsed.answer):
+        return _degraded_response(
+            arm_used,
+            "uncited factual answer rejected; empty citations with a claim",
+        )
 
     # Only the passages actually shown to the model are citable. Slicing the
     # same way `_build_context_prompt` does keeps the two in step.

@@ -215,9 +215,7 @@ def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -
             f"This shelf currently has {summary.book_count} books · "
             f"{summary.total_blocks} blocks · {summary.total_chunks} chunks."
         )
-        lines.append(
-            "Ask what is on the shelf, or a question about a title listed there."
-        )
+        lines.append("Ask what is on the shelf, or a question about a title listed there.")
     return "\n\n".join(lines)
 
 
