@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
+import homelib_rag.shelf_meta as shelf_meta_module
 import httpx
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -35,7 +36,6 @@ from homelib_core.normalize import parse_file
 from homelib_rag import agent as agent_module
 from homelib_rag import answer as answer_module
 from homelib_rag import roadmap as roadmap_module
-from homelib_rag import shelf_meta as shelf_meta_module
 from homelib_rag.answer import LLMUnreachableError, OpenAICompatibleClient
 from homelib_rag.hybrid import hybrid_search
 from homelib_rag.models import Hit
