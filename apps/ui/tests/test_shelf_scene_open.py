@@ -29,9 +29,7 @@ def _demo_http_client(monkeypatch: pytest.MonkeyPatch) -> None:
 @respx.mock
 def test_demo_shelf_scene_hit_offers_open_this_passage() -> None:
     respx.post(f"{API}/v1/demo/session").mock(
-        return_value=httpx.Response(
-            200, json={"demo_session_id": "sess", "principal_id": "p"}
-        )
+        return_value=httpx.Response(200, json={"demo_session_id": "sess", "principal_id": "p"})
     )
     respx.get(f"{API}/v1/books").mock(
         return_value=httpx.Response(

@@ -250,7 +250,11 @@ def test_answer_drops_bare_integer_citations_without_full_degrade() -> None:
         ],
     }
     client = _ScriptedClient(
-        [LLMResponse(content=json.dumps(payload), usage=LLMUsage(prompt_tokens=10, completion_tokens=5))]
+        [
+            LLMResponse(
+                content=json.dumps(payload), usage=LLMUsage(prompt_tokens=10, completion_tokens=5)
+            )
+        ]
     )
 
     result = answer("Who wrote Walden?", hits, client=client, arm_used="hybrid_rerank")

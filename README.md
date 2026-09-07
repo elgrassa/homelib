@@ -41,11 +41,11 @@ the demo. Tradeoffs: [`TRADEOFFS.md`](TRADEOFFS.md). Cost/latency:
 in prod” · “AI mentor that plans a career” · “production vector DB” · “eval in
 CI fails the build” (gate code exists; not in `just ci` yet).
 
-Happy path: Shelf → search a phrase → **Open this passage** → next/previous or
-**Continue in Projection**. Ask “Who wrote Walden?” → citation → Show full
-source block (Groq structured-output smoke required).
-Known miss: Ask “what do you have?” (#A1) → refuse + shelf counts; Mentor
-“Land AI engineer job” (#M1) → abstain, no invented path.
+### Try
+
+1. **Find-and-Read** (no LLM quota): Shelf → search a phrase → **Open this passage** → next/previous or **Continue in Projection**.
+2. **Ask** (needs Groq structured-output smoke): “Who wrote Walden?” → citation → Show full source block.
+3. Known miss: Ask “what do you have?” (#A1) → refuse + shelf counts; Mentor “Land AI engineer job” (#M1) → abstain, no invented path.
 
 A screenshot of the Crossroads rotunda (the entry to the Ask door) lives in
 [`docs/screenshots/crossroads-rotunda-seven-doors.png`](docs/screenshots/crossroads-rotunda-seven-doors.png)
@@ -128,6 +128,13 @@ default, as is the bind address (`HOMELIB_UI_BIND`).
 | Clean read (companion) | http://localhost:8502/read/{book_id} | Chrome-free article for Safari Listen to Page; same container as the UI |
 | API | http://localhost:8000/docs | FastAPI + Swagger — the full contract |
 | Grafana | http://localhost:3001 | v1 dashboard, 6 panels over the **Postgres** `query_log` — empty on the tip path, see below |
+
+OpenAPI contract: browse [`http://localhost:8000/docs`](http://localhost:8000/docs), or:
+
+```bash
+curl -fsS http://localhost:8000/openapi.json | head -c 200
+curl -fsS http://localhost:8000/health
+```
 
 **LAN / projector (optional).** `HOMELIB_UI_BIND=0.0.0.0` in `.env` publishes
 the UI and the companion on your home network (default is loopback).
@@ -394,9 +401,10 @@ books (Franklin, Adam Smith, Taylor, Ford, Thoreau, Mill, Strunk and others),
 each pinned in `data/manifest.yaml` by exact source URL and a sha256 computed
 from a real download; parsed into 729 blocks / 9,168 chunks and committed as
 `data/corpus_snapshot.jsonl.gz` (6 MB). **Open Library Search API**
-(API-backed source) — 3,061 deduplicated works gathered across 14
-roadmap-relevant subjects, committed as `data/catalog.jsonl`; Internet
-Archive asserts no rights over this metadata. Two other candidate sources
+(API-backed source) — a **catalog snapshot** of 3,061 deduplicated works
+(title/authors/subjects/year **metadata only** — not full-text reading)
+gathered across 14 roadmap-relevant subjects, committed as `data/catalog.jsonl`;
+Internet Archive asserts no rights over this metadata. Two other candidate sources
 (Kaggle's "15K+ Books" and the Google Books API / UCSD Goodreads graph) are
 deliberately excluded on licensing grounds, and personal purchased ebooks
 stay local and git-ignored — only public-domain text is committed.
@@ -454,7 +462,7 @@ strict there: `done` means verified by a command whose output is recorded in
 | Ingestion pipeline (e.g. dlt) | 2 | done | Real dlt source/resources, ELT into the canonical schema, 37 tests against a live Postgres — [`apps/ingest/pipeline.py`](apps/ingest/pipeline.py) |
 | Monitoring (feedback + ≥5-chart dashboard) | 2 | done | Observatory door: 9 charts over SQLite `query_log` + `spans` (incl. OpenTelemetry time-per-stage, USD cost, online-judge relevance, cache hits) + thumbs feedback, asserted by `just drill`; Grafana (Postgres) is the v1 surface and is empty on the tip path — [ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md), [`docs/evidence.md`](docs/evidence.md) |
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
-| Reproducibility | 2 | done | Pins, snapshot, digests; **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory 6 charts / 5 populated, `queries_over_time` 1 point). Earlier: PASSED on `v2` @ `d6f9946` (2026-09-04); the 2026-09-05 re-run on `ae83d51` passed clone/seeds/health and failed the ask step under host load (3/5 timeouts) — recorded, not hidden — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
+| Reproducibility | 2 | done | Pins, snapshot, digests; **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory then 6 charts / 5 populated — tip now **9 chart defs**, `queries_over_time` 1 point). Earlier: PASSED on `v2` @ `d6f9946` (2026-09-04); the 2026-09-05 re-run on `ae83d51` passed clone/seeds/health and failed the ask step under host load (3/5 timeouts) — recorded, not hidden — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 | Cloud deployment (bonus) | 2 | not done | No public URL from this tree. The Cloud files (root `streamlit_app.py`, committed seed, Python 3.13 in Advanced settings, Groq secrets) are drafted and held until the drill re-run passes; the Streamlit Community Cloud app is created after this snapshot merges — [`docs/submission.md`](docs/submission.md) |
 | Extras (bonus) | 1 | partial | Mentor agent with abstention, eval regression gate with an append-only history, Coffee Table state machine, the rotunda — the reviewer's call |
@@ -476,5 +484,6 @@ and screenshots (README, `docs/`, `docs/mockups/`, `docs/screenshots/`) under
 no commercial use. Reasoning in
 [ADR-007](docs/adrs/ADR-007-licence-provisional.md).
 
-Demo corpus is public-domain text only; catalog metadata from Open Library.
+Demo corpus is public-domain text only; Open Library contributes a **catalog
+snapshot** (bibliographic metadata), not full-text.
 Per-source provenance in [`data/manifest.yaml`](data/manifest.yaml).

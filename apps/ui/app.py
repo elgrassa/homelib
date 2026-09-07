@@ -374,7 +374,10 @@ def render_library_tab(client: Client) -> None:
                 st.text(reading.text)
                 nav_prev, nav_next, nav_proj = st.columns(3)
                 with nav_prev:
-                    if st.button("Previous passage", key=f"prev_{passage_key}") and read_ordinal > 0:
+                    if (
+                        st.button("Previous passage", key=f"prev_{passage_key}")
+                        and read_ordinal > 0
+                    ):
                         st.session_state[ordinal_key] = read_ordinal - 1
                         st.rerun()
                 with nav_next:
