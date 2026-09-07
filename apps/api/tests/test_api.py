@@ -477,9 +477,7 @@ def test_ask_romance_from_available_lists_shelf_instead_of_empty_abstain() -> No
     )
     app.dependency_overrides[get_deps] = lambda: deps
 
-    resp = client.post(
-        "/v1/ask", json={"query": "which available romance book should I read?"}
-    )
+    resp = client.post("/v1/ask", json={"query": "which available romance book should I read?"})
 
     assert resp.status_code == 200
     body = resp.json()
