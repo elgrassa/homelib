@@ -50,6 +50,9 @@ jobs:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
       UV_PYTHON: "3.13"
+      # Discover connectors: fixtures only in CI (no Open Library / Gutendex /
+      # Google Books / Hardcover network). Live mode remains the local default.
+      HOMELIB_CONNECTOR_MODE: fixture
       # pytest basetemps inside the job workdir, never the runner's shared temp
       # dir. A job the daemon SIGKILLs leaves its basetemp locked and pytest
       # never reclaims it — 2,951 of those were 108GB on the internal disk on
@@ -132,6 +135,7 @@ jobs:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
       UV_PYTHON: "3.13"
+      HOMELIB_CONNECTOR_MODE: fixture
       # pytest basetemps inside the job workdir, never the runner's shared temp
       # dir. A job the daemon SIGKILLs leaves its basetemp locked and pytest
       # never reclaims it — 2,951 of those were 108GB on the internal disk on

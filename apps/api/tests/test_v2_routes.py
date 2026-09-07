@@ -243,3 +243,54 @@ def test_demo_mode_same_header_shares_principal_and_missing_header_does_not(
 
         unknown = client.get("/v1/playlists/current", headers={"X-Demo-Session": "nope"})
         assert unknown.status_code == 401
+
+
+def test_discover_resources_returns_federated_fixture_hits(
+    sqlite_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "fixture")
+    with TestClient(app) as client:
+        empty = client.get("/v1/resources", params={"source": "discover"})
+        assert empty.status_code == 200
+        assert empty.json()["items"] == []
+        assert empty.json()["unique_count"] == 0
+
+        resp = client.get("/v1/resources", params={"source": "discover", "q": "meditations"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["unique_count"] >= 1
+        assert body["degraded"] is False
+        assert "open_library" in body["approximate_provider_counts"]
+        hit = body["items"][0]
+        assert hit["source"] == "discover"
+        assert hit["title"] == "Meditations"
+        assert hit["can_index_text"] is False
+        assert hit["provider_url"]
+        assert hit["book_id"] is None
+
+
+def test_discover_resources_degrades_when_one_connector_times_out(
+    sqlite_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pathlib import Path as PathType
+
+    from homelib_rag.connectors import ConnectorName, FixtureConnector, SlowConnector
+
+    fixture_dir = PathType(__file__).resolve().parents[3] / (
+        "packages/homelib-rag/tests/fixtures/connectors"
+    )
+
+    def _mixed(**_kwargs: object) -> list[object]:
+        return [
+            SlowConnector(),
+            FixtureConnector(ConnectorName.OPEN_LIBRARY, fixture_dir / "open_library.jsonl"),
+        ]
+
+    monkeypatch.setattr("homelib_rag.connectors.build_discover_connectors", _mixed)
+    with TestClient(app) as client:
+        resp = client.get("/v1/resources", params={"source": "discover", "q": "republic"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["degraded"] is True
+        assert body["unique_count"] >= 1
+        assert body["items"][0]["title"] == "The Republic"

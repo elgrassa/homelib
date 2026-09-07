@@ -485,5 +485,7 @@ no commercial use. Reasoning in
 [ADR-007](docs/adrs/ADR-007-licence-provisional.md).
 
 Demo corpus is public-domain text only; Open Library contributes a **catalog
-snapshot** (bibliographic metadata), not full-text.
+snapshot** (bibliographic metadata), not full-text. Live Discover may also
+query Open Library, Gutenberg (Gutendex), and optional Google Books / Hardcover
+APIs for metadata and lawful source links — never as Ask corpus ingest.
 Per-source provenance in [`data/manifest.yaml`](data/manifest.yaml).

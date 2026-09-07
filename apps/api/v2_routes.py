@@ -94,6 +94,7 @@ class ResourceSummary(BaseModel):
     can_index_text: bool
     full_text_available: bool
     format: str | None = None
+    provider_url: str | None = None
 
 
 class ResourceList(BaseModel):
@@ -194,12 +195,62 @@ def post_scene_search(resource_id: str, req: SceneSearchRequest) -> SceneSearchR
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def _discover_resources(q: str | None) -> ResourceList:
+    """Federate lawful catalog connectors; empty query returns no hits."""
+    import hashlib
+
+    from homelib_rag.connectors import build_discover_connectors, federate_connectors
+
+    needle = (q or "").strip()
+    if not needle:
+        return ResourceList(
+            items=[],
+            unique_count=0,
+            approximate_provider_counts={},
+            degraded=False,
+        )
+
+    result = federate_connectors(build_discover_connectors(), needle)
+    items: list[ResourceSummary] = []
+    for item in result.items:
+        primary = item.attributions[0]
+        if item.work_key:
+            resource_id = str(item.work_key)
+        else:
+            digest = hashlib.sha256(f"{item.title}|{primary.provider_url}".encode()).hexdigest()[
+                :16
+            ]
+            resource_id = f"discover-{digest}"
+        items.append(
+            ResourceSummary(
+                id=resource_id,
+                book_id=None,
+                title=item.title,
+                authors=list(item.authors),
+                source="discover",
+                rights_status=item.rights_status,
+                can_index_text=False,
+                full_text_available=item.full_text_available,
+                provider_url=primary.provider_url,
+            )
+        )
+    return ResourceList(
+        items=items,
+        unique_count=result.unique_count,
+        approximate_provider_counts=result.approximate_provider_counts,
+        degraded=result.degraded,
+    )
+
+
 @router.get("/v1/resources", response_model=ResourceList)
 def get_resources(
     source: Literal["shelf", "discover"] | None = None,
     q: str | None = None,
 ) -> ResourceList:
     _require_sqlite()
+    if source == "discover":
+        return _discover_resources(q)
+
     with sqlite_deps.open_store() as conn:
         sql = "SELECT book_id, title, authors, rights_status FROM books"
         params: list[Any] = []
@@ -229,8 +280,6 @@ def get_resources(
                 full_text_available=indexable,
             )
         )
-    if source == "discover":
-        items = []
     return ResourceList(items=items, unique_count=len(items))
 
 

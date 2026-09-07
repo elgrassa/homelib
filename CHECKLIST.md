@@ -146,7 +146,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 2. Memory Sphere particles and polish
 3. two-page projection (keep one-page)
 4. custom rotating-room (keep static door grid)
-5. live Standard Ebooks/Gutenberg (keep fixtures + live OL)
+5. live Standard Ebooks (OL + Gutenberg + optional Google Books / Hardcover live; fixtures in CI)
 6. full audio generation (keep one preview)
 7. rewrite in production if eval does not justify it (v1 already evaluated and rejected)
 

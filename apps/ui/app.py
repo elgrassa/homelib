@@ -295,6 +295,45 @@ def render_library_tab(client: Client) -> None:
         ]
     )
 
+    st.subheader("Discover (lawful catalogs)")
+    st.caption(
+        "Open Library, Project Gutenberg, and optional Google Books / Hardcover — "
+        "metadata and open-source links only; not the Ask reading corpus."
+    )
+    discover_q = st.text_input("Search catalogs", key="discover_q")
+    if st.button("Search catalogs", key="discover_go") and discover_q.strip():
+        try:
+            discovered = client.list_resources(q=discover_q.strip(), source="discover")
+        except (ApiClientError, ApiUnavailableError) as exc:
+            st.error(format_api_error_message(exc))
+        else:
+            st.session_state["last_discover"] = discovered
+    last_discover = st.session_state.get("last_discover")
+    if isinstance(last_discover, dict):
+        if last_discover.get("degraded"):
+            st.warning("One or more catalog providers timed out; showing partial results.")
+        counts = last_discover.get("approximate_provider_counts") or {}
+        if counts:
+            approx = ", ".join(f"~{name}: {n}" for name, n in counts.items())
+            st.caption(f"{last_discover.get('unique_count', 0)} unique works · {approx}")
+        for hit in last_discover.get("items") or []:
+            if not isinstance(hit, dict):
+                continue
+            authors = ", ".join(hit.get("authors") or [])
+            title = hit.get("title", "")
+            line = f"**{title}** — {authors}" if authors else f"**{title}**"
+            url = hit.get("provider_url")
+            if url:
+                st.markdown(f"{line} · [Open lawful source]({url})")
+            else:
+                st.markdown(line)
+            rights = hit.get("rights_status") or "metadata_only"
+            if hit.get("full_text_available"):
+                ft = "provider has full text"
+            else:
+                ft = "metadata / preview link only"
+            st.caption(f"{rights} · {ft}")
+
     st.subheader("Scene search")
     if not books:
         return

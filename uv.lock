@@ -503,6 +503,7 @@ version = "0.1.0"
 source = { editable = "packages/homelib-rag" }
 dependencies = [
     { name = "homelib-core" },
+    { name = "httpx" },
     { name = "numpy" },
     { name = "openai" },
     { name = "pgvector" },
@@ -513,6 +514,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "homelib-core", editable = "packages/homelib-core" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "numpy", specifier = "==2.3.2" },
     { name = "openai", specifier = "==3.6.0" },
     { name = "pgvector", specifier = "==0.5.0" },

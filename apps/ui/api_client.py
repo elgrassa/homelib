@@ -298,8 +298,17 @@ class ApiClient:
         data = self._request("GET", "/v1/books")
         return [BookSummary.model_validate(item) for item in data]
 
-    def list_resources(self, *, q: str | None = None) -> dict[str, Any]:
-        path = "/v1/resources" if not q else f"/v1/resources?q={q}"
+    def list_resources(
+        self, *, q: str | None = None, source: str | None = None
+    ) -> dict[str, Any]:
+        from urllib.parse import urlencode
+
+        params: dict[str, str] = {}
+        if q:
+            params["q"] = q
+        if source:
+            params["source"] = source
+        path = "/v1/resources" if not params else f"/v1/resources?{urlencode(params)}"
         return self._request_json("GET", path)
 
     def mentor_intake(
@@ -493,8 +502,10 @@ class InProcessClient:
     def list_books(self) -> list[BookSummary]:
         return self._require_delegate().list_books()
 
-    def list_resources(self, *, q: str | None = None) -> dict[str, Any]:
-        return self._require_delegate().list_resources(q=q)
+    def list_resources(
+        self, *, q: str | None = None, source: str | None = None
+    ) -> dict[str, Any]:
+        return self._require_delegate().list_resources(q=q, source=source)
 
     def mentor_intake(
         self,

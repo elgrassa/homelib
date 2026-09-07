@@ -15,7 +15,7 @@ Lawful catalog sources only ([ADR-008](../adrs/ADR-008-rights-gate.md), [`specs/
 3. Extend grep ban test for new prohibited source names.
 4. Wire into Discover / Forbidden Stacks UI (WP05+).
 
-**Banned permanently:** Kaggle book scrapes, Google Books API, Goodreads graph, Anna's Archive, Sci-Hub, LibGen, course FAQ corpus.
+**Banned permanently for corpus / snapshot ingest:** Kaggle book scrapes, Google Books as redistributed catalog dump, Goodreads graph, Anna's Archive, Sci-Hub, LibGen, course FAQ corpus. **Allowed as live Discover metadata only:** official Google Books volumes API (API key) and Hardcover GraphQL search (Bearer token) — links out, never Ask RAG ingest.
 
 ### New document formats
 

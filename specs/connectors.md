@@ -1,7 +1,9 @@
 # spec: connectors — lawful catalog federation (“Forbidden Stacks”)
 
-**Implemented by:** WP05. **Consumed by:** Discover, Mentor catalog tools.
+**Implemented by:** WP05 + live Discover slice. **Consumed by:** Discover
+(`GET /v1/resources?source=discover`), Shelf UI catalog search.
 **Product:** §5.11. **Not:** Anna’s Archive, Sci-Hub, LibGen (ADR-008).
+Google Books / Hardcover are **discovery metadata only** — never corpus ingest.
 
 ## Purpose
 
@@ -15,6 +17,8 @@ class ConnectorName(StrEnum):
     OPEN_LIBRARY = "open_library"
     STANDARD_EBOOKS = "standard_ebooks"
     GUTENBERG = "gutenberg"
+    GOOGLE_BOOKS = "google_books"
+    HARDCOVER = "hardcover"
 
 class ConnectorHit(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -28,9 +32,16 @@ class ConnectorHit(BaseModel):
     approximate_count_member: bool
 ```
 
-Capstone: live Open Library first (v1 catalog snapshot is the fixture).
-Standard Ebooks and Gutenberg may stay fixture-backed if live smoke is late
-(cut order). One live smoke per enabled provider **outside CI**.
+**Live (default):** Open Library `search.json` + Gutendex (Gutenberg catalog).
+Google Books volumes API when `GOOGLE_BOOKS_API_KEY` is set. Hardcover GraphQL
+search when `HARDCOVER_API_TOKEN` or `HARDCOVER_API_KEY` is set. Standard
+Ebooks stays fixture-backed. **Fixture mode:** `HOMELIB_CONNECTOR_MODE=fixture`
+(CI). One live smoke per keyed provider **outside CI**.
+
+Open Library and Google Books always set `full_text_available=False` even when
+a preview exists — HomeLib does not treat those APIs as a reading corpus.
+Gutenberg may set `full_text_available=True` when Gutendex reports plain text
+and `copyright=false` (lawful source link to gutenberg.org, not local ingest).
 
 ## Data contracts (field-level)
 
@@ -39,14 +50,15 @@ degraded-200). Unique count is **not** the sum of provider counts
 (`test_unique_count_not_provider_sum`). Dedup keeps attributions
 (`test_dedup_keeps_attributions`).
 
-CI: no network. Fixtures under `data/` / test dirs only.
+CI: no network. Fixtures under `packages/homelib-rag/tests/fixtures/connectors/`.
 
 ## Error/degradation behavior
 
-- Provider timeout → that connector omitted, `degraded: true` on the
+- Provider timeout / HTTP failure → that connector omitted, `degraded: true` on the
   Discover payload, others still shown (`test_timeout_degrades_not_fails`).
+- Google Books / Hardcover omitted when API key unset (not an error).
 - Banned host in a connector URL → refuse to fetch; test grep.
-- Paid/proprietary catalogs are out of schema this week (ADR-010).
+- Paid/proprietary catalogs beyond these discovery APIs stay out of schema this week (ADR-010).
 
 ## Named red tests
 
@@ -54,19 +66,26 @@ CI: no network. Fixtures under `data/` / test dirs only.
 - `test_timeout_degrades_not_fails`.
 - `test_unique_count_not_provider_sum`.
 - `test_ambiguous_editions_never_merge`.
+- `test_open_library_live_maps_metadata_only_never_full_text`.
+- `test_gutenberg_live_maps_provider_url_and_full_text_when_plain_text`.
+- `test_google_books_live_maps_infolink_never_claims_full_text`.
+- `test_hardcover_live_maps_slug_url_metadata_only`.
 
 ## Verify
 
 ```
-uv run pytest -k 'connector or dedup_keeps or unique_count_not' -v
+uv run pytest -k 'connector or dedup_keeps or unique_count_not or live_maps' -v
 ```
 
-## Planned (not this capstone): live Open Library connector
+## Live provider notes
 
-Recorded 2026-09-05; the shipped connector federates the **fixture** catalog (`data/catalog.jsonl`, fetched once by `scripts/fetch_catalog.py`). A live connector is the next step and must follow Open Library's API guidelines:
-
-- **Identify:** `User-Agent: HomeLib/<version> (<contact>)` — contact from `HOMELIB_CONTACT` (owner e-mail), never a placeholder. `fetch_catalog.py`'s UA is untouched by this note.
-- **Rate:** ≤1 request/s unidentified, ≤3 request/s identified; one in-flight request; exponential backoff on 429/5xx.
-- **Cache:** responses cached on disk keyed by normalized query for 24 h; the seed DB stays primary so the demo never depends on Open Library being up.
-- **Never bulk-harvest** through the search API — dumps are the bulk path.
-- **Fallback:** any error or timeout → fixture results with a visible "live catalog unavailable" note; never an empty Discover.
+- **Identify:** `User-Agent: HomeLib/<version> (<contact>)` — contact from
+  `HOMELIB_CONTACT` when set; otherwise repo URL. `fetch_catalog.py`'s UA is
+  separate (snapshot ingest).
+- **Open Library:** ≤1 req/s unidentified; never bulk-harvest via search.
+- **Google Books:** official `volumes?q=` with API key. Discovery/infoLink only —
+  still banned for catalog snapshot / corpus redistribution (ADR-002).
+- **Hardcover:** `POST https://api.hardcover.app/v1/graphql` with
+  `authorization: Bearer <token>`; search query only (no mutations, no review
+  ingest into Ask RAG).
+- **Fallback:** fixture mode for CI/offline; live timeouts degrade the payload.
