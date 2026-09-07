@@ -19,12 +19,13 @@ things on top of it:
    justified reading plan from a book catalog.
 3. **Library view** — what's ingested, how it was extracted, and how well.
 
-Compose brings up Postgres (full-text + pgvector), Grafana, the API, and the UI.
+Compose brings up the API, the UI, and (for the v1 Grafana path) Postgres.
+The **running product store is SQLite FTS5 + a float32 embedding matrix**.
 Ask / Mentor / Roadmap use **Groq** (`llama-3.3-70b-versatile`) when `GROQ_API_KEY`
 is set and `LLM_API_KEY` is blank. Ollama is an optional `--profile local-llm`
 fallback, not the reviewer path. When `HOMELIB_SQLITE_PATH` is set (the tip
-product path), asks and feedback also land in SQLite, and the UI's Observatory
-door serves ≥5 charts in-app. Never commit an API key.
+product path), asks and feedback land in SQLite, and the UI's Observatory
+door serves the in-app charts. Never commit an API key.
 
 **Live demo:** _URL to be added after Cloud deploy_
 **Submission commit:** _SHA to be added_
@@ -178,24 +179,25 @@ header-less request stays anonymous.
                       │        section_path + char offsets + provenance
                       │        (PDF page / EPUB spine index + anchor)
                       ▼
-              chunk_book()  ── block-aware, sentence-boundary chunks;
-                      │        canonical_text[start:end] == text, exactly
+              chunk_book()  ── sentence-packed 1200/200; never splits a
+                      │        sentence; canonical_text[start:end] == text
                       ▼
-        dlt pipeline ──────► Postgres
-                               ├── chunks + tsvector (GIN)      lexical
-                               ├── chunk_embeddings vector(384) semantic
-                               ├── catalog (Open Library)       roadmap
-                               └── query_log                    monitoring
+        dlt pipeline ──────► SQLite (tip)          Postgres (v1-fallback)
+                               ├── chunks_fts FTS5     ├── tsvector + GIN
+                               ├── float32 matrix      ├── pgvector(384)
+                               ├── catalog             └── Grafana query_log
+                               └── Observatory query_log
                                         │
               ┌─────────────────────────┼─────────────────────────┐
               ▼                         ▼                         ▼
       lexical / vector           RRF hybrid (k=60)          cross-encoder
-       search arms                                             rerank
+       search arms                   rewrite OFF               rerank
               └─────────────────────────┬─────────────────────────┘
                                         ▼
-                         agent loop (function calling)
-                    search_shelf · search_catalog · build_roadmap · get_block
-                                        │
+                         POST /v1/ask  — single-shot grounded answer
+                         POST /v1/mentor/intake — run_agent (max tools on
+                         that path only: search_shelf · search_catalog ·
+                         get_block). Not LangGraph. Ask never calls it.
                                         ▼
                        answer with block-level citations
 ```
@@ -412,7 +414,7 @@ strict there: `done` means verified by a command whose output is recorded in
 | Criterion | Points | Status | Evidence |
 |---|---:|---|---|
 | Problem description | 2 | done | Stated in user terms above — unsearchable shelf, unplanned reading order |
-| Retrieval flow (KB + LLM) | 2 | done | Postgres FTS + pgvector + grounded, citation-validated answers — [`packages/homelib-rag`](packages/homelib-rag), [`apps/api/main.py`](apps/api/main.py) |
+| Retrieval flow (KB + LLM) | 2 | done | SQLite FTS5 + float32 matrix, `hybrid_rerank`, grounded citation-validated answers (Postgres+pgvector is `v1-fallback`) — [`packages/homelib-rag`](packages/homelib-rag), [`apps/api/main.py`](apps/api/main.py) |
 | Retrieval evaluation | 2 | done | 4 arms × 235 questions, 0 degraded, on both stores (SQLite 2026-09-03 is the gated one) — [`evals/results/retrieval.md`](evals/results/retrieval.md), [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
 | LLM evaluation | 2 | done | 4 prompt arms × 30 questions, judge with bias control; null result recorded — [`evals/results/llm_eval.md`](evals/results/llm_eval.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md) |
 | Interface (UI or API) | 2 | done | Both — FastAPI (19 paths, OpenAPI-pinned) and the Streamlit Crossroads: **seven doors** behind the rotunda, static grid always rendered — [`apps/api/main.py`](apps/api/main.py), [`apps/ui`](apps/ui), [`specs/ui.md`](specs/ui.md) |

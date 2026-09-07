@@ -104,7 +104,7 @@ From [`specs/editions.md`](../../specs/editions.md) and [ADR-006](../adrs/ADR-00
 | Capability | Public showcase (`demo`) | Home / self-hosted (`selfhosted`) | Cloud trial (later) |
 |---|---|---|---|
 | Interface | Streamlit Community Cloud | Streamlit + FastAPI on LAN/localhost | Hosted web app |
-| LLM | App-owner cloud key | LM Studio (Mac) or Ollama (Compose) | Managed + optional BYOK |
+| LLM | App-owner Groq key | Groq in Compose (`GROQ_API_KEY`); Ollama via `--profile local-llm`; LM Studio on the home Mac | Managed + optional BYOK |
 | Database | Resettable SQLite seed | Persistent mounted SQLite | Tenant DB |
 | Identity | Random `demo_session_id` | Single `local_user` | OIDC |
 | Uploads | Disabled | Enabled with rights declaration | Quota storage |
@@ -126,7 +126,8 @@ flowchart TB
     subgraph compose["APP_MODE=selfhosted — docker compose (the reviewer path)"]
         C_UI[ui :8501] -->|HttpClient| C_API[api :8000]
         C_API --> C_DB[(data/homelib.sqlite<br/>just seed-sqlite)]
-        C_API -->|LLM_BASE_URL| C_OLL[ollama qwen2.5:7b-instruct]
+        C_API -->|GROQ_API_KEY, LLM_API_KEY blank| C_GROQ[Groq llama-3.3-70b-versatile]
+        C_API -.->|optional --profile local-llm| C_OLL[ollama qwen2.5:7b-instruct]
         C_ING[ingest one-shots] --> C_PG[(postgres — v1 store, Grafana)]
         C_ING --> C_DB
         C_GRAF[grafana :3001] --> C_PG

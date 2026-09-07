@@ -37,8 +37,10 @@ from apps.ui.view_model import (
     clean_read_url,
     ensure_demo_session,
     format_api_error_message,
+    format_book_choice_label,
     format_citation_label,
     format_degraded_banner,
+    format_playlist_item_line,
     format_scene_hit_label,
     format_shelf_read_markdown,
     has_voted,
@@ -197,12 +199,16 @@ def render_coffee_table_tab(client: Client) -> None:
         return
 
     items = playlist_visible_items(playlist)
+    shelf = resources.get("items") or []
+    title_by_resource_id = {
+        str(resource["id"]): str(resource.get("title") or resource["id"])
+        for resource in shelf
+        if isinstance(resource, dict) and resource.get("id")
+    }
     if items:
         for item in items:
             cols = st.columns([4, 1, 1])
-            cols[0].write(
-                f"`{item.get('ordinal')}` {item.get('resource_id')} · {item.get('status')}"
-            )
+            cols[0].write(format_playlist_item_line(item, title_by_resource_id))
             if cols[1].button(
                 "Accept", key=f"acc_{item['id']}", disabled=item.get("status") != "proposed"
             ):
@@ -220,7 +226,6 @@ def render_coffee_table_tab(client: Client) -> None:
     else:
         st.write("Coffee Table is empty.")
 
-    shelf = resources.get("items") or []
     if shelf:
         choice = st.selectbox(
             "Add from shelf",
@@ -268,7 +273,15 @@ def render_library_tab(client: Client) -> None:
     if not books:
         return
     book_by_id = {b.book_id: b for b in books}
-    book_id = st.selectbox("Book", options=[b.book_id for b in books], key="scene_book")
+    book_id = st.selectbox(
+        "Book",
+        options=[b.book_id for b in books],
+        format_func=lambda bid: next(
+            (format_book_choice_label(book) for book in books if book.book_id == bid),
+            bid,
+        ),
+        key="scene_book",
+    )
     scene_q = st.text_input("Open the scene where…", key="scene_q")
     if st.button("Search scenes", key="scene_go") and scene_q.strip():
         try:
@@ -509,7 +522,7 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
 
 
 def render_roadmap_tab(client: Client) -> None:
-    st.header("Roadmap (v1)")
+    st.header("Roadmap")
     with st.form("roadmap_form"):
         interests_raw = st.text_input("Interests (comma-separated)", key="roadmap_interests")
         level = st.selectbox("Level", LEVELS, key="roadmap_level")

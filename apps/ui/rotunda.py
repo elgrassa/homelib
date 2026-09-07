@@ -42,11 +42,11 @@ _TEMPLATE_PATH = Path(__file__).with_name("rotunda_template.html")
 # new door added to CROSSROADS_DOORS renders before anyone writes its copy.
 DOOR_COPY: Mapping[str, str] = {
     "Ask": "Ask across the shelf and get an answer that cites the passage it came from.",
-    "Mentor": "Tell the mentor what you are trying to learn; it proposes a path you accept.",
+    "Mentor": "Tell the mentor what you want to learn; it proposes a shelf path or refuses.",
     "Roadmap": "Interests, level and goal in — an ordered reading roadmap out.",
     "Coffee Table": "The books you have set aside to read next, in your order.",
-    "Shelf": "What is on the shelf, how it was extracted, and how well.",
-    "Observatory": "Six charts over every question asked here, plus your thumbs.",
+    "Shelf": "What is on the shelf: titles, block and chunk counts, and scene search.",
+    "Observatory": "Charts over every question asked here, plus your thumbs.",
     "Projection": "Open a chapter on the big page and read it end to end.",
 }
 _FALLBACK_COPY = "Step through to open this part of the library."

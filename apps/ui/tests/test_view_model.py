@@ -25,8 +25,10 @@ from apps.ui.view_model import (
     DEFAULT_API_URL,
     block_id_for_citation,
     format_api_error_message,
+    format_book_choice_label,
     format_citation_label,
     format_degraded_banner,
+    format_playlist_item_line,
     get_api_url,
     has_voted,
     library_summary,
@@ -464,6 +466,25 @@ def test_playlist_visible_items_skips_removed() -> None:
         }
     )
     assert [i["id"] for i in visible] == ["a"]
+
+
+def test_playlist_item_line_uses_book_title_not_resource_id() -> None:
+    """The Coffee Table row must name the book a visitor added, not the slug."""
+    item = {"ordinal": 0, "resource_id": "conwell-acres-of-diamonds", "status": "queued"}
+    titled = format_playlist_item_line(
+        item, {"conwell-acres-of-diamonds": "Acres of Diamonds: Our Every-day Opportunities"}
+    )
+    untitled = format_playlist_item_line(item, {})
+    assert "Acres of Diamonds" in titled
+    assert "conwell-acres-of-diamonds" not in titled
+    assert "queued" in titled
+    assert "conwell-acres-of-diamonds" in untitled
+
+
+def test_book_choice_label_is_the_title() -> None:
+    book = _make_book(blocks=1, chunks=2)
+    assert format_book_choice_label(book) == "A Book"
+    assert book.book_id not in format_book_choice_label(book)
 
 
 def test_observatory_chart_titles_preserve_order() -> None:

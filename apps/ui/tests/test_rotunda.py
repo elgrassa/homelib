@@ -147,3 +147,12 @@ def test_rotunda_rejects_unknown_active_and_single_door() -> None:
 def test_every_crossroads_door_has_copy() -> None:
     for door in CROSSROADS_DOORS:
         assert door in DOOR_COPY, f"write a line of intent for the {door} door"
+
+
+def test_observatory_copy_does_not_hardcode_a_chart_count() -> None:
+    """The live Observatory door reports chart count from the API (9 today).
+    Rotunda copy that says 'Six charts' is a LinkedIn-ready overclaim that
+    drifted the first time a chart was added."""
+    copy = DOOR_COPY["Observatory"]
+    assert not any(ch.isdigit() for ch in copy)
+    assert "chart" in copy.lower()

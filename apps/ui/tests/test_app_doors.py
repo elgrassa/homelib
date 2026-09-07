@@ -81,6 +81,18 @@ def test_unknown_door_query_param_does_not_crash_the_crossroads() -> None:
     assert "Open door: Ask" in [c.value for c in at.caption]
 
 
+def test_roadmap_door_heading_is_not_labelled_v1() -> None:
+    """The rotunda and the door heading must agree. 'Roadmap (v1)' leaked an
+    internal store generation onto the public Crossroads."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Roadmap"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    headings = [h.value for h in at.header]
+    assert "Roadmap" in headings
+    assert not any("v1" in str(h).lower() for h in headings)
+
+
 def test_projector_toggle_off_leaves_projector_mode() -> None:
     """`?projection=1` must open projector mode exactly once. Regression for the
     trap where `main()` re-asserted `projector_mode=True` on every rerun,

@@ -19,11 +19,12 @@ flowchart LR
     Ask -->|thumbs| A3[POST /v1/feedback]
     Mentor -->|client.mentor_intake| M1[POST /v1/mentor/intake]
     Roadmap -->|client.build_roadmap| R1[POST /v1/roadmap]
-    CT -->|client.get_playlist / add_playlist_item| C1[GET,POST /v1/playlists/current…]
-    CT -->|client.save_progress| C2[POST /v1/progress]
+    CT -->|client.get_playlist / add_playlist_item| C1[GET,POST /v1/playlists/current]
     Shelf -->|client.list_books| S1[GET /v1/books]
+    Shelf -->|client.scene_search| S2[POST /v1/resources/id/search]
     Obs -->|client.get_observatory| O1[GET /v1/observatory]
-    Proj -->|client.get_block| P1[GET /v1/blocks/id]
+    Proj -->|client.get_book_block| P1[GET /v1/books/id/blocks]
+    Proj -->|client.save_progress| P2[POST /v1/progress]
 
     classDef door fill:#fffaf0,stroke:#8a5b13,color:#241c16;
     class Ask,Mentor,Roadmap,CT,Shelf,Obs,Proj door;

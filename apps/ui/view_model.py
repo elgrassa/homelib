@@ -318,6 +318,20 @@ def playlist_visible_items(playlist: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in items if item.get("status") != "removed"]
 
 
+def format_playlist_item_line(item: Mapping[str, Any], titles: Mapping[str, str]) -> str:
+    """Coffee Table row: ordinal, book title (or resource id), status."""
+    resource_id = str(item.get("resource_id") or "")
+    title = titles.get(resource_id) or resource_id or "—"
+    ordinal = item.get("ordinal")
+    status = item.get("status") or "—"
+    return f"{ordinal} {title} · {status}"
+
+
+def format_book_choice_label(book: BookSummary) -> str:
+    """Selectbox label for a shelf book — title, never the internal id."""
+    return book.title or book.book_id
+
+
 def observatory_chart_titles(payload: dict[str, Any]) -> list[str]:
     """Titles for Observatory charts, in API order."""
     charts = payload.get("charts") or []
