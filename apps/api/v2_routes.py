@@ -23,6 +23,7 @@ from homelib_rag.scene_search import (
 from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api import sqlite_deps
+from apps.api.demo_quota import enforce_demo_llm_quota
 from apps.runtime_settings import read_app_mode
 from apps.store import coffee_table as ct
 from apps.store import observatory as obs
@@ -131,7 +132,11 @@ def _principal(x_demo_session: str | None) -> str:
 
 
 @router.post("/v1/mentor/intake", response_model=MentorIntakeResponse)
-def post_mentor_intake(req: MentorIntakeRequest) -> MentorIntakeResponse:
+def post_mentor_intake(
+    req: MentorIntakeRequest,
+    x_demo_session: str | None = Header(default=None, alias="X-Demo-Session"),
+) -> MentorIntakeResponse:
+    enforce_demo_llm_quota(x_demo_session)
     from apps.api.main import get_deps
 
     deps = get_deps()

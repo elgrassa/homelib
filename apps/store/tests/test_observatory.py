@@ -61,7 +61,11 @@ def test_observatory_cost_chart_uses_cost_when_priced(tmp_path: Path) -> None:
 
 def test_observatory_token_chart_when_nothing_priced(tmp_path: Path) -> None:
     """The pre-C1 behaviour is preserved when every row's cost_usd is the
-    (default) 0 — e.g. a local Ollama run with no `LLM_PRICE_PER_1K_*` set."""
+    (default) 0 — e.g. a local Ollama run with no `LLM_PRICE_PER_1K_*` set.
+
+    Chart 6 breaks the sum into prompt / completion / total so reviewers can
+    see token usage counts without reading query_log.
+    """
     conn = _db(tmp_path)
     _insert_query_log(conn, cost_usd=0.0, tokens_prompt=100, tokens_completion=50)
 
@@ -69,8 +73,12 @@ def test_observatory_token_chart_when_nothing_priced(tmp_path: Path) -> None:
 
     chart = next(c for c in response.charts if c.id == "token_or_cost_estimate")
     assert chart.title == "Token estimate"
-    assert chart.points[0].bucket == "total_tokens"
-    assert chart.points[0].value == 150.0
+    points = {p.bucket: p.value for p in chart.points}
+    assert points == {
+        "prompt_tokens": 100.0,
+        "completion_tokens": 50.0,
+        "total_tokens": 150.0,
+    }
 
 
 def test_observatory_relevance_chart(tmp_path: Path) -> None:

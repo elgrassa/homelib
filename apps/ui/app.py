@@ -13,12 +13,14 @@ from collections.abc import Callable
 from typing import Literal
 
 import streamlit as st
+from pydantic import ValidationError
 
 from apps.ui.api_client import (
     ApiClient,
     ApiClientError,
     ApiUnavailableError,
     AskResponse,
+    Citation,
     InProcessClient,
 )
 from apps.ui.rotunda import build_rotunda_html, door_from_query
@@ -28,6 +30,7 @@ from apps.ui.view_model import (
     DEFAULT_PROJECTION_SOURCE,
     LEVELS,
     apply_streamlit_secrets_to_environ,
+    ask_metric_captions,
     block_id_for_citation,
     build_homelib_client,
     build_official_preview_stage_html,
@@ -79,15 +82,8 @@ def render_ask_tab(client: Client) -> None:
     if banner is not None:
         st.warning(banner)
     st.write(last_ask.answer)
-    if last_ask.cache_hit:
-        # C4b (specs/monitoring.md "Demo answer cache"): only ever True in
-        # APP_MODE=demo — a selfhosted reader never sees this caption.
-        st.caption("served from cache")
-    if last_ask.trace_id:
-        # C5 (specs/monitoring.md "Tracing"): GET /v1/traces/{trace_id} has
-        # this request's span tree; shown as a caption, not a link — the UI
-        # has no trace-viewer page of its own yet.
-        st.caption(f"trace: {last_ask.trace_id}")
+    for line in ask_metric_captions(last_ask):
+        st.caption(line)
 
     feedback_sent: set[str] = st.session_state.setdefault("feedback_sent", set())
     voted = has_voted(feedback_sent, last_ask.request_id)
@@ -131,16 +127,21 @@ def render_mentor_tab(client: Client) -> None:
         goal = st.text_input("Goal", key="mentor_goal")
         interests_raw = st.text_input("Interests (comma-separated)", key="mentor_interests")
         level = st.selectbox("Level", LEVELS, key="mentor_level")
-        submitted = st.form_submit_button("Propose path")
-    if submitted and goal.strip():
-        try:
-            response = client.mentor_intake(
-                goal.strip(), parse_interests(interests_raw), normalize_level(level)
-            )
-        except (ApiClientError, ApiUnavailableError) as exc:
-            st.error(format_api_error_message(exc))
+        submitted = st.form_submit_button("Propose path", key="mentor_propose")
+    st.caption("The mentor searches the shelf; this can take a minute.")
+    if submitted:
+        if not goal.strip():
+            st.error("Enter a goal so the mentor can propose a path.")
         else:
-            st.session_state["last_mentor"] = response
+            with st.spinner("Searching the shelf for a path…"):
+                try:
+                    response = client.mentor_intake(
+                        goal.strip(), parse_interests(interests_raw), normalize_level(level)
+                    )
+                except (ApiClientError, ApiUnavailableError) as exc:
+                    st.error(format_api_error_message(exc))
+                else:
+                    st.session_state["last_mentor"] = response
 
     last = st.session_state.get("last_mentor")
     if last is None:
@@ -153,12 +154,29 @@ def render_mentor_tab(client: Client) -> None:
     if tool_calls:
         rounds_used = last.get("rounds_used", 0)
         st.caption(f"Tools used: {' → '.join(tool_calls)} ({rounds_used} rounds)")
+    area = last.get("proposed_area") if isinstance(last.get("proposed_area"), dict) else None
+    if area and area.get("name"):
+        area_copy = area.get("copy") or area.get("area_copy") or ""
+        st.write(f"**Area:** {area['name']}" + (f" — {area_copy}" if area_copy else ""))
+    wing = last.get("proposed_wing") if isinstance(last.get("proposed_wing"), dict) else None
+    if wing and wing.get("name"):
+        wing_copy = wing.get("copy") or wing.get("wing_copy") or ""
+        st.write(f"**Wing:** {wing['name']}" + (f" — {wing_copy}" if wing_copy else ""))
     st.write(last.get("rationale") or "")
     path = last.get("proposed_path")
-    if path:
+    if isinstance(path, dict) and (path.get("title") or path.get("steps")):
         st.subheader(path.get("title") or "Proposed path")
         for step in path.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
             st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+    for raw in last.get("citations") or []:
+        try:
+            citation = raw if isinstance(raw, Citation) else Citation.model_validate(raw)
+        except ValidationError:
+            continue
+        with st.expander(format_citation_label(citation)):
+            st.write(citation.quote)
 
 
 def render_coffee_table_tab(client: Client) -> None:

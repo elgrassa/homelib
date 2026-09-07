@@ -19,12 +19,12 @@ things on top of it:
    justified reading plan from a book catalog.
 3. **Library view** — what's ingested, how it was extracted, and how well.
 
-Everything runs **fully self-hosted**. Compose still brings up Postgres
-(full-text + pgvector), Grafana, a local LLM, the API, and the UI. When
-`HOMELIB_SQLITE_PATH` is set (the tip product path), asks and feedback also
-land in SQLite, and the UI's Observatory door serves ≥5 charts in-app. A cloud
-API key is an optional override, never a requirement — there is nothing to sign
-up for.
+Compose brings up Postgres (full-text + pgvector), Grafana, the API, and the UI.
+Ask / Mentor / Roadmap use **Groq** (`llama-3.3-70b-versatile`) when `GROQ_API_KEY`
+is set and `LLM_API_KEY` is blank. Ollama is an optional `--profile local-llm`
+fallback, not the reviewer path. When `HOMELIB_SQLITE_PATH` is set (the tip
+product path), asks and feedback also land in SQLite, and the UI's Observatory
+door serves ≥5 charts in-app. Never commit an API key.
 
 **Live demo:** _URL to be added after Cloud deploy_
 **Submission commit:** _SHA to be added_
@@ -68,11 +68,15 @@ are design intent — the rotunda's template came from them — not a pixel matc
 
 ```bash
 cp .env.example .env
+# paste GROQ_API_KEY=gsk_… into .env (https://console.groq.com/keys — never commit)
 docker compose -p homelib --env-file .env -f docker/docker-compose.yml up -d --build
 docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
 docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline
 open http://localhost:8501
 ```
+
+Optional local Ollama instead of Groq: add `--profile local-llm` to `up` and set
+`LLM_API_KEY=ollama` in `.env`.
 
 The two seed lines are not a typo. The first loads Postgres (the v1 store the
 Grafana dashboard reads); the second loads the **SQLite** file the API and the
@@ -205,9 +209,9 @@ One OpenAI-compatible client, three `LLM_*` variables, no provider chain:
 
 | Edition | `LLM_BASE_URL` / `LLM_MODEL` | Where it is set |
 |---|---|---|
-| Compose (`just up`) | Ollama in the stack, `qwen2.5:7b-instruct` | `docker/docker-compose.yml` defaults; `.env` overrides |
-| Local `streamlit run` / tests | any local Ollama or LM Studio endpoint | `.env` |
-| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — one secret, `GROQ_API_KEY`, is enough (with `LLM_API_KEY` blank the client falls back to Groq); the key is never in the tree (`.env.example` shows the shape) |
+| Compose (`just up`) | Groq `llama-3.3-70b-versatile` | `GROQ_API_KEY` in gitignored `.env` (`LLM_API_KEY` blank) |
+| Optional `--profile local-llm` | Ollama `qwen2.5:7b-instruct` | `LLM_API_KEY=ollama` plus the profile |
+| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — `APP_MODE=demo`, `HOMELIB_SQLITE_PATH=data/homelib.sqlite`, `GROQ_API_KEY`. Do not set `LLM_API_KEY`. Cap: **100 LLM calls per visitor per UTC day**. The key is never in the tree |
 
 A missing or unreachable model never fabricates: the answer comes back
 `degraded=true` with the retrieval still shown.

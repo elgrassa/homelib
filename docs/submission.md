@@ -23,10 +23,9 @@ cloud LLM via secrets.
 |---|---|
 | `APP_MODE` | `demo` |
 | `HOMELIB_SQLITE_PATH` | `data/homelib.sqlite` (seeded snapshot path in the repo; inflated once from the committed gzip on cold start) |
-| `GROQ_API_KEY` | One-secret form: with `LLM_API_KEY` blank or absent, the LLM client targets Groq |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Explicit triple; wins over the one-secret form when `LLM_API_KEY` is set |
+| `GROQ_API_KEY` | One-secret form: with `LLM_API_KEY` blank or absent, the LLM client targets Groq. Paste in Streamlit Secrets only — never git. |
 
-No secret values are committed anywhere in this repository. Missing or
+The public demo caps Ask / Mentor / Roadmap at **100 LLM calls per visitor per UTC day**. Missing or
 invalid LLM credentials fail closed: search still works, and an ask returns
 an explicit degraded answer rather than an error or a 500.
 

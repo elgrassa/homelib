@@ -312,10 +312,68 @@ def test_search_vector_without_conn(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
 def test_fts_query_drops_english_stopwords_like_plainto_tsquery() -> None:
     """Questions must not AND-require 'what'/'is' — that zeroed lexical@5 on SQLite."""
-    from homelib_rag.sqlite_index import _fts_query
+    from homelib_rag.sqlite_index import _fts_query, _fts_query_or
 
     assert _fts_query("What is compound interest?") == '"compound" "interest"'
     assert _fts_query("How does compound interest work?") == '"compound" "interest" "work"'
+    assert _fts_query_or("money described") == '"money" OR "described"'
+
+
+def test_search_lexical_or_fallback_when_and_matches_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``money described`` AND-matches nothing if the words never co-occur.
+
+    Without an OR fallback, smart scene search fell through to weak vectors
+    and returned unrelated passages (Shelf "Open the scene" looked broken).
+    """
+    from homelib_rag.sqlite_index import _reset_caches_for_tests, search_lexical
+
+    from apps.store.sqlite import bump_index_revision, connect, migrate, rebuild_chunks_fts
+
+    db_path = tmp_path / "or_fallback.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    _reset_caches_for_tests()
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, authors, rights_status) VALUES (?, ?, ?, ?)",
+        ("book-1", "Book", "[]", "public_domain"),
+    )
+    rows = [
+        ("b0", 0, "Friends raised money to buy a new dog."),
+        ("b1", 1, "She described the garden in careful detail."),
+        ("b2", 2, "Learning to read with raised letters."),
+    ]
+    for block_id, ordinal, text in rows:
+        conn.execute(
+            """
+            INSERT INTO blocks (
+                block_id, book_id, ordinal, section_path, text, char_start, char_end, format
+            ) VALUES (?, 'book-1', ?, '[]', ?, 0, ?, 'txt')
+            """,
+            (block_id, ordinal, text, len(text)),
+        )
+        chunk_id = f"c{ordinal}"
+        conn.execute(
+            """
+            INSERT INTO chunks (
+                chunk_id, book_id, block_ids, section_path, text, char_start, char_end
+            ) VALUES (?, 'book-1', ?, '[]', ?, 0, ?)
+            """,
+            (chunk_id, json.dumps([block_id]), text, len(text)),
+        )
+    rebuild_chunks_fts(conn)
+    bump_index_revision(conn)
+    conn.commit()
+
+    and_hits = search_lexical("money described", 5, book_id="book-1", conn=conn)
+    assert any("money" in h.text.lower() for h in and_hits)
+    # Overlap re-rank: the money passage must outrank "described"-only and
+    # the unrelated "learning to read" filler.
+    assert "money" in and_hits[0].text.lower()
+    conn.close()
+    _reset_caches_for_tests()
 
 
 def test_load_matrix_accepts_float32_blob_embeddings(

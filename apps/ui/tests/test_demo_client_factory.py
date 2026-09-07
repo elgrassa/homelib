@@ -97,3 +97,27 @@ def test_apply_streamlit_secrets_copies_demo_keys_into_environ(
     assert os.environ["LLM_API_KEY"] == "gsk_test_not_real"
     assert "IGNORED" not in DEMO_ENV_KEYS
     assert os.environ.get("IGNORED") is None
+
+
+def test_apply_streamlit_secrets_copies_groq_key_for_cloud_one_secret_form(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Community Cloud: GROQ_API_KEY in Secrets must reach os.environ.
+
+    OpenAIClient only reads process env. If this copy skips GROQ_API_KEY,
+    a Cloud deploy with the one-secret form never targets Groq.
+    """
+    monkeypatch.delenv("APP_MODE", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_MODEL", raising=False)
+    secrets = {
+        "APP_MODE": "demo",
+        "HOMELIB_SQLITE_PATH": "data/homelib.sqlite",
+        "GROQ_API_KEY": "gsk_test_cloud_secret",
+        "GROQ_MODEL": "llama-3.3-70b-versatile",
+    }
+    apply_streamlit_secrets_to_environ(secrets)
+    assert os.environ["GROQ_API_KEY"] == "gsk_test_cloud_secret"
+    assert os.environ["GROQ_MODEL"] == "llama-3.3-70b-versatile"
+    assert os.environ.get("LLM_API_KEY", "") == ""

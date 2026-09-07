@@ -64,3 +64,77 @@ def test_mentor_tab_omits_tool_use_caption_when_no_tools_were_called() -> None:
     assert not at.exception, [e.value for e in at.exception]
     captions = [c.value for c in at.caption]
     assert not any(c.startswith("Tools used:") for c in captions)
+
+
+def test_mentor_propose_path_with_empty_goal_asks_for_a_goal() -> None:
+    """Blank Goal + Propose path must not silently no-op.
+
+    BrokenMentor.har showed the Mentor form still sitting there after a click
+    with no error and no proposal — `if submitted and goal.strip()` dropped
+    the submit on an empty Goal without saying so. A filled Goal against the
+    closed-port API must still surface the unreachable error instead.
+    """
+    empty = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    empty.session_state["door"] = "Mentor"
+    empty.run()
+    empty.button(key="mentor_propose").click().run()
+    assert not empty.exception, [e.value for e in empty.exception]
+    empty_errors = [e.value for e in empty.error]
+    assert empty_errors
+    assert any("goal" in e.lower() for e in empty_errors)
+    assert not any("unreachable" in e.lower() for e in empty_errors)
+
+    filled = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    filled.session_state["door"] = "Mentor"
+    filled.run()
+    filled.text_input(key="mentor_goal").set_value("Land AI engineer job")
+    filled.button(key="mentor_propose").click().run()
+    assert not filled.exception, [e.value for e in filled.exception]
+    filled_errors = [e.value for e in filled.error]
+    assert filled_errors
+    assert any("unreachable" in e.lower() for e in filled_errors)
+    assert not any("goal" in e.lower() for e in filled_errors)
+
+
+def test_mentor_tab_renders_area_wing_path_and_citations() -> None:
+    """A complete intake is the Mentor door's whole product: area, wing,
+    proposed path, and citations that name the book — not rationale alone.
+    The live door looked empty after Propose path because those fields were
+    dropped even when the API returned them."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Mentor"
+    at.session_state["last_mentor"] = _seeded_mentor_response(
+        proposed_area={"name": "Career", "copy": "Ship an AI engineering portfolio."},
+        proposed_wing={"name": "Machine learning", "area_name": "Career", "copy": "Models."},
+        proposed_path={
+            "title": "Path to the job",
+            "kind": "learning",
+            "steps": [{"order": 1, "title": "Read Walden", "why": "attention"}],
+        },
+        citations=[
+            {
+                "chunk_id": "c1",
+                "block_id": "b1",
+                "book_id": "walden",
+                "book_title": "Walden",
+                "section_path": ["Economy"],
+                "page": 3,
+                "quote": "I went to the woods",
+            }
+        ],
+    )
+    at.run()
+
+    assert not at.exception, [e.value for e in at.exception]
+    assert "Path to the job" in [s.value for s in at.subheader]
+    visible = " ".join(
+        str(getattr(block, "value", block))
+        for group in (at.markdown, at.text, at.caption)
+        for block in group
+    )
+    assert "Career" in visible
+    assert "Machine learning" in visible
+    assert "Read Walden" in visible
+    expanders = at.get("expander")
+    labels = [getattr(item, "label", None) or getattr(item, "value", "") for item in expanders]
+    assert any("Walden" in str(label) for label in labels)

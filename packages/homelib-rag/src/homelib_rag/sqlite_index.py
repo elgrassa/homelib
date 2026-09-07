@@ -112,7 +112,7 @@ _FTS_STOPWORDS = frozenset(
 )
 
 
-def _fts_query(q: str) -> str:
+def _fts_content_tokens(q: str) -> list[str]:
     tokens = [
         token
         for token in re.findall(r"\w+", q, flags=re.UNICODE)
@@ -124,7 +124,17 @@ def _fts_query(q: str) -> str:
         tokens = re.findall(r"\w+", q, flags=re.UNICODE)
     if not tokens:
         raise ValueError("q must not be empty")
-    return " ".join(f'"{token}"' for token in tokens)
+    return tokens
+
+
+def _fts_query(q: str) -> str:
+    """FTS5 AND of content tokens (space-separated quoted terms)."""
+    return " ".join(f'"{token}"' for token in _fts_content_tokens(q))
+
+
+def _fts_query_or(q: str) -> str:
+    """FTS5 OR of content tokens — used when AND matches nothing."""
+    return " OR ".join(f'"{token}"' for token in _fts_content_tokens(q))
 
 
 def _decode_embedding(raw: object) -> NDArray[np.float32]:
@@ -189,6 +199,47 @@ def _row_to_hit(
     )
 
 
+def _lexical_rows(
+    db: sqlite3.Connection,
+    fts_q: str,
+    *,
+    book_id: str | None,
+    k: int,
+) -> list[Any]:
+    params: list[Any] = [fts_q]
+    sql = """
+        SELECT c.chunk_id, c.book_id, c.block_ids, c.section_path, c.text,
+               bm25(chunks_fts) AS score
+        FROM chunks_fts
+        JOIN chunks c ON c.chunk_id = chunks_fts.chunk_id
+        WHERE chunks_fts MATCH ?
+    """
+    if book_id is not None:
+        sql += " AND c.book_id = ?"
+        params.append(book_id)
+    sql += " ORDER BY score LIMIT ?"
+    params.append(k)
+    return db.execute(sql, params).fetchall()
+
+
+def _term_overlap(text: str, tokens: list[str]) -> int:
+    lower = text.lower()
+    return sum(1 for token in tokens if token.lower() in lower)
+
+
+def _earliest_matched_token_index(text: str, tokens: list[str]) -> int:
+    """Index of the first query token that appears in ``text`` (or len(tokens)).
+
+    Used only for OR-fallback tie-breaks so ``money described`` prefers the
+    money passage over a strong BM25 hit on the filler word alone.
+    """
+    lower = text.lower()
+    for index, token in enumerate(tokens):
+        if token.lower() in lower:
+            return index
+    return len(tokens)
+
+
 def search_lexical(
     q: str,
     k: int,
@@ -196,26 +247,34 @@ def search_lexical(
     book_id: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[Hit]:
+    """BM25 over FTS5.
+
+    Prefer an AND of content tokens (precise). When that returns nothing and
+    the query has multiple content tokens — e.g. ``money described`` with no
+    chunk holding both words — fall back to OR, then re-rank by how many
+    query terms appear in the passage so a rare filler word ("described")
+    cannot bury the topical term ("money"). Related semantic hits stay the
+    vector arm's job; this only stops lexical from going silent.
+    """
     _validate(q, k)
     owns_conn = conn is None
     db = _connect() if owns_conn else conn
     assert db is not None
     try:
-        fts_q = _fts_query(q)
-        params: list[Any] = [fts_q]
-        sql = """
-            SELECT c.chunk_id, c.book_id, c.block_ids, c.section_path, c.text,
-                   bm25(chunks_fts) AS score
-            FROM chunks_fts
-            JOIN chunks c ON c.chunk_id = chunks_fts.chunk_id
-            WHERE chunks_fts MATCH ?
-        """
-        if book_id is not None:
-            sql += " AND c.book_id = ?"
-            params.append(book_id)
-        sql += " ORDER BY score LIMIT ?"
-        params.append(k)
-        rows = db.execute(sql, params).fetchall()
+        tokens = _fts_content_tokens(q)
+        rows = _lexical_rows(db, _fts_query(q), book_id=book_id, k=k)
+        if not rows and len(tokens) > 1:
+            # Pull a wider OR pool, then prefer multi-term overlap.
+            pool = _lexical_rows(db, _fts_query_or(q), book_id=book_id, k=max(k * len(tokens), k))
+            ranked = sorted(
+                pool,
+                key=lambda row: (
+                    -_term_overlap(str(row["text"]), tokens),
+                    _earliest_matched_token_index(str(row["text"]), tokens),
+                    float(row["score"]),  # bm25: more negative is better
+                ),
+            )
+            rows = ranked[:k]
         return [
             _row_to_hit(db, row, rank=rank, score=-float(row["score"]))
             for rank, row in enumerate(rows, start=1)

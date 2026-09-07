@@ -596,6 +596,57 @@ def test_traces_endpoint_returns_tree(tmp_path: Any, monkeypatch: pytest.MonkeyP
     assert all("duration_ms" in s for s in [root, *root["children"]])
 
 
+def test_ask_flushes_batch_spans_so_selfhosted_traces_include_llm(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Selfhosted uses BatchSpanProcessor; without force_flush after /v1/ask,
+    /v1/traces can miss llm (and its tokens_prompt/completion attrs)."""
+    from apps.api import tracing
+
+    db_path = tmp_path / "batch_traces.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "selfhosted")
+    tracing.reset_tracer_for_tests(None)
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=_ScriptedClient(
+            [_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]
+        ),
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    ask_resp = client.post("/v1/ask", json={"query": "does it jump?"})
+    assert ask_resp.status_code == 200
+    body = ask_resp.json()
+    assert body["tokens"]["prompt"] >= 0
+    assert body["tokens"]["completion"] >= 0
+    trace_id = body["trace_id"]
+    assert trace_id
+
+    trace_resp = client.get(f"/v1/traces/{trace_id}")
+    assert trace_resp.status_code == 200
+    tree = trace_resp.json()["spans"]
+
+    def _walk(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for node in nodes:
+            out.append(node)
+            out.extend(_walk(list(node.get("children") or [])))
+        return out
+
+    by_name = {node["name"]: node for node in _walk(tree)}
+    assert {"homelib.ask", "llm", "cite"} <= set(by_name)
+    assert "tokens_prompt" in by_name["llm"]["attributes"]
+    assert "tokens_completion" in by_name["llm"]["attributes"]
+
+
 def test_traces_without_sqlite_503(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HOMELIB_SQLITE_PATH", raising=False)
     resp = client.get("/v1/traces/does-not-exist")

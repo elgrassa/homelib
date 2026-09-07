@@ -366,6 +366,30 @@ def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
     assert label == "Acres of Diamonds · Russell H. Conwell · — · block 5"
 
 
+def test_ask_metric_captions_include_latency_and_token_breakdown() -> None:
+    from apps.ui.view_model import ask_metric_captions
+
+    ask = _make_ask_response(degraded=False).model_copy(
+        update={
+            "latency_ms": 1234,
+            "tokens": TokenUsage(prompt=90, completion=10),
+            "trace_id": "abc",
+        }
+    )
+    lines = ask_metric_captions(ask)
+    assert lines[0] == "latency: 1234 ms"
+    assert lines[1] == "tokens: 90 prompt + 10 completion = 100"
+    assert "trace: abc" in lines
+    assert "served from cache" not in lines
+
+
+def test_ask_metric_captions_mark_cache_hit() -> None:
+    from apps.ui.view_model import ask_metric_captions
+
+    ask = _make_ask_response(degraded=False).model_copy(update={"cache_hit": True})
+    assert "served from cache" in ask_metric_captions(ask)
+
+
 def test_block_id_for_citation_uses_the_block_id_not_the_chunk_id() -> None:
     """`/v1/blocks/{id}` is keyed on block ids; a chunk_id 404s there.
 

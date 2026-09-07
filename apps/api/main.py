@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 
 import httpx
 import psycopg
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from homelib_core.chunk import chunk_book
 from homelib_core.models import Block, BookDoc, CatalogEntry, Chunk, ExtractionResult
 from homelib_core.normalize import parse_file
@@ -45,6 +45,7 @@ from opentelemetry import trace
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
+from apps.api.demo_quota import enforce_demo_llm_quota
 from apps.api.schemas import (
     AskRequest,
     AskResponse,
@@ -58,7 +59,13 @@ from apps.api.schemas import (
     RoadmapRequest,
     RoadmapResponse,
 )
-from apps.api.tracing import TraceResponse, build_span_tree, get_tracer, read_trace_spans
+from apps.api.tracing import (
+    TraceResponse,
+    build_span_tree,
+    force_flush_traces,
+    get_tracer,
+    read_trace_spans,
+)
 from apps.runtime_settings import AppMode, read_app_mode
 
 if TYPE_CHECKING:
@@ -708,7 +715,11 @@ def get_health(deps: Deps = Depends(get_deps)) -> Health:
 
 
 @app.post("/v1/ask", response_model=AskResponse)
-def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
+def post_ask(
+    req: AskRequest,
+    deps: Deps = Depends(get_deps),
+    x_demo_session: str | None = Header(default=None, alias="X-Demo-Session"),
+) -> AskResponse:
     start = time.monotonic()
     tracer = get_tracer()
     query_hash = _query_sha256_prefix(req.query)
@@ -731,6 +742,7 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
         if cached is not None:
             result = cached
         else:
+            enforce_demo_llm_quota(x_demo_session)
             query_for_retrieval, rewrite_used = _maybe_rewrite(deps, req, tracer)
             hits, arm_used, retrieval_degraded = _retrieve_with_spans(
                 deps, tracer, query_for_retrieval, req.k, resolved_arm
@@ -757,6 +769,10 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
             # retrieve+LLM run could still fill correctly next time.
             if not result.degraded:
                 _maybe_cache_store(req.query, resolved_arm, deps.llm_client.model, result)
+
+    # Selfhosted BatchSpanProcessor otherwise delays llm/cite (and token attrs)
+    # past the AskResponse — Observatory + /v1/traces would look empty mid-flight.
+    force_flush_traces()
 
     cache_hit = cached is not None
     total_latency_ms = int((time.monotonic() - start) * 1000)
@@ -796,7 +812,12 @@ def post_ask(req: AskRequest, deps: Deps = Depends(get_deps)) -> AskResponse:
 
 
 @app.post("/v1/roadmap", response_model=RoadmapResponse)
-def post_roadmap(req: RoadmapRequest, deps: Deps = Depends(get_deps)) -> RoadmapResponse:
+def post_roadmap(
+    req: RoadmapRequest,
+    deps: Deps = Depends(get_deps),
+    x_demo_session: str | None = Header(default=None, alias="X-Demo-Session"),
+) -> RoadmapResponse:
+    enforce_demo_llm_quota(x_demo_session)
     try:
         return roadmap_module.build_roadmap(
             req.interests,

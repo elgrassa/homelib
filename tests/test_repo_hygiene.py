@@ -417,6 +417,25 @@ def test_compose_api_pins_selfhosted_like_ui() -> None:
         assert env["APP_MODE"] == "selfhosted", f"{name}: {env.get('APP_MODE')!r}"
 
 
+def test_compose_api_passes_groq_and_does_not_coerce_blank_llm_key_to_ollama() -> None:
+    """A blank `.env` `LLM_API_KEY=` used to become `ollama` via `:-ollama`,
+    which hid `GROQ_API_KEY`. Groq is the default Ask path; Ollama is a profile.
+    """
+    services = _compose()["services"]
+    assert isinstance(services, dict)
+    api = services["api"]
+    env = api["environment"]
+    assert env["GROQ_API_KEY"] == "${GROQ_API_KEY:-}"
+    assert "llama-3.3-70b-versatile" in str(env["GROQ_MODEL"])
+    assert env["LLM_API_KEY"] == "${LLM_API_KEY:-}"
+    depends = api.get("depends_on") or {}
+    assert "ollama" not in depends
+    ollama = services["ollama"]
+    assert ollama.get("profiles") == ["local-llm"]
+    model_init = services["model-init"]
+    assert model_init.get("profiles") == ["local-llm"]
+
+
 def test_compose_ingest_can_write_sqlite_seed() -> None:
     """Hygiene (string/structure match, not behavioural). The api service reads
     `/data/homelib.sqlite`; the ingest one-shot must be able to write it: the

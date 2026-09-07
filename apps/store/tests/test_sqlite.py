@@ -80,10 +80,11 @@ def test_fresh_migration_then_upgrade(tmp_path: Path) -> None:
 
     migrate(conn, target_version=None)
     versions = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
-    assert versions == {1, 2, 3, 4, 5, 6, 7, 8}
+    assert versions == {1, 2, 3, 4, 5, 6, 7, 8, 9}
     title = conn.execute("SELECT title FROM books WHERE book_id = 'keep-me'").fetchone()
     assert title is not None and title[0] == "Kept Across Upgrade"
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "demo_llm_daily" in tables
     assert "listen_progress" in tables
     assert "areas" in tables
     assert "bookmarks" in tables

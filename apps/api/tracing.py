@@ -48,6 +48,7 @@ __all__ = [
     "TraceResponse",
     "TraceSpanNode",
     "build_span_tree",
+    "force_flush_traces",
     "get_tracer",
     "read_trace_spans",
     "reset_tracer_for_tests",
@@ -137,6 +138,22 @@ def get_tracer() -> trace.Tracer:
             if _provider is None:
                 _provider = _build_provider()
     return _provider.get_tracer(SERVICE_NAME)
+
+
+def force_flush_traces(timeout_millis: int = 5_000) -> bool:
+    """Flush pending BatchSpanProcessor exports so `/v1/traces/{id}` and
+    Observatory's `time_per_stage` see the just-finished ask immediately.
+
+    Selfhosted mode uses `BatchSpanProcessor` (specs/monitoring.md); without
+    an explicit flush, a follow-up `GET /v1/traces/{trace_id}` right after
+    `/v1/ask` can miss `llm`/`cite` (and their token attributes). Demo mode
+    already uses `SimpleSpanProcessor` and is a no-op here. Returns True when
+    flush succeeds or there is no provider yet.
+    """
+    provider = _provider
+    if provider is None:
+        return True
+    return bool(provider.force_flush(timeout_millis))
 
 
 def reset_tracer_for_tests(provider: TracerProvider | None = None) -> None:

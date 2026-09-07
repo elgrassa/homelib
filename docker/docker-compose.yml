@@ -1,10 +1,15 @@
 # homelib — the entire solution in one stack.
 #
-# Reviewer path, start to finish:
-#   cp .env.example .env
-#   docker compose -f docker/docker-compose.yml up -d --build
-#   docker compose -f docker/docker-compose.yml --profile seed run --rm ingest
+# Reviewer path, start to finish (Groq for Ask/Mentor/Roadmap — add
+# GROQ_API_KEY to .env; never commit the key):
+#   cp .env.example .env   # then paste GROQ_API_KEY
+#   docker compose -p homelib --env-file .env -f docker/docker-compose.yml up -d --build
+#   docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest
+#   docker compose -p homelib --env-file .env -f docker/docker-compose.yml --profile seed run --rm ingest python -m apps.ingest.sqlite_pipeline
 #   open http://localhost:8501
+#
+# Optional local Ollama fallback: add `--profile local-llm` and set
+# LLM_API_KEY=ollama (see .env.example). Default up does not wait on Ollama.
 #
 # Every port binds to 127.0.0.1: this stack is a local application, not a
 # service exposed to the network. Each host port is overridable from .env
@@ -38,6 +43,7 @@ services:
 
   ollama:
     image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+    profiles: [local-llm]
     environment:
       # Pinned, because leaving it to the image default is a "works on my
       # machine" trap of the worst kind: it fails SILENTLY. Ollama truncates an
@@ -63,9 +69,11 @@ services:
 
   # One-shot: pulls the chat model so the first /v1/ask never cold-fails on a
   # missing model. Runs to completion and exits; `restart: no` keeps it exited.
+  # Profile local-llm only — Groq is the default Ask path.
   model-init:
     image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
-    entrypoint: ["/bin/sh", "-c", "OLLAMA_HOST=http://ollama:11434 ollama pull ${LLM_MODEL}"]
+    profiles: [local-llm]
+    entrypoint: ["/bin/sh", "-c", "OLLAMA_HOST=http://ollama:11434 ollama pull ${LLM_MODEL:-qwen2.5:7b-instruct}"]
     depends_on:
       ollama: {condition: service_healthy}
     restart: "no"
@@ -76,16 +84,18 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       DATABASE_URL: postgresql://homelib:${POSTGRES_PASSWORD}@postgres:5432/homelib
-      # Point these at any OpenAI-compatible endpoint to swap providers. The
-      # default keeps everything inside this stack — no account, no key.
+      # Groq when GROQ_API_KEY is set and LLM_API_KEY is blank (OpenAIClient
+      # fallback). Do not default LLM_API_KEY to "ollama" — that hid Groq.
       LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-ollama}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
       EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
-      # CPU-only Ollama in this compose stack measures ~7.4 tok/s generation
-      # and ~49 tok/s prefill, so a real /v1/ask costs ~70s minimum — well
-      # past a GPU-host-sized timeout. See homelib_rag.answer._TIMEOUT_SECONDS.
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-300}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-90}
+      LLM_PRICE_PER_1K_PROMPT: ${LLM_PRICE_PER_1K_PROMPT:-0}
+      LLM_PRICE_PER_1K_COMPLETION: ${LLM_PRICE_PER_1K_COMPLETION:-0}
+      HOMELIB_DEMO_LLM_DAILY_LIMIT: ${HOMELIB_DEMO_LLM_DAILY_LIMIT:-100}
       # Pinned like the ui service: .env.example ships APP_MODE=demo for the
       # Community Cloud path, and a demo-mode API mints a fresh anonymous
       # principal per header-less request — the reviewer stack is selfhosted.
@@ -101,7 +111,6 @@ services:
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     depends_on:
       postgres: {condition: service_healthy}
-      ollama: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 10s

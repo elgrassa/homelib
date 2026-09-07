@@ -9,7 +9,8 @@ the same `main()`.
 Edition wiring happens inside `main()`: `APP_MODE=demo` from `st.secrets`
 selects the in-process FastAPI client (`apps/inprocess_bridge.py`) over the
 committed seed SQLite (`data/seed/homelib.sqlite.gz`, inflated once on cold
-start). Nothing here reads secrets or opens a database.
+start). `GROQ_API_KEY` in Secrets is copied into `os.environ` so Ask uses Groq.
+Nothing here reads secrets or opens a database.
 """
 
 from __future__ import annotations

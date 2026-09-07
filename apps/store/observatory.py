@@ -135,18 +135,23 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
             )
         )
     else:
-        tokens = conn.execute(
-            "SELECT COALESCE(SUM(tokens_prompt + tokens_completion), 0) FROM query_log"
+        token_row = conn.execute(
+            "SELECT COALESCE(SUM(tokens_prompt), 0), "
+            "COALESCE(SUM(tokens_completion), 0) FROM query_log"
         ).fetchone()
+        prompt_total = float(token_row[0] if token_row else 0)
+        completion_total = float(token_row[1] if token_row else 0)
         charts.append(
             ObservatoryChart(
                 id="token_or_cost_estimate",
                 title="Token estimate",
                 points=[
+                    ObservatoryPoint(bucket="prompt_tokens", value=prompt_total),
+                    ObservatoryPoint(bucket="completion_tokens", value=completion_total),
                     ObservatoryPoint(
                         bucket="total_tokens",
-                        value=float(tokens[0] if tokens else 0),
-                    )
+                        value=prompt_total + completion_total,
+                    ),
                 ],
             )
         )

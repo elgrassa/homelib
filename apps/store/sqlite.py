@@ -330,6 +330,17 @@ CREATE TABLE answer_cache (
 );
 """
 
+# Shared Streamlit Cloud demo: cap LLM-backed routes per demo principal
+# per UTC day (apps/api/demo_quota.py). Compose selfhosted never writes this.
+_SQL_V9 = """
+CREATE TABLE demo_llm_daily (
+    principal_id TEXT NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    day_utc TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (principal_id, day_utc)
+);
+"""
+
 MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (1, _SQL_V1),
     (2, _SQL_V2),
@@ -339,6 +350,7 @@ MIGRATIONS: Final[tuple[tuple[int, str], ...]] = (
     (6, _SQL_V6),
     (7, _SQL_V7),
     (8, _SQL_V8),
+    (9, _SQL_V9),
 )
 
 

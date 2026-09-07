@@ -51,6 +51,9 @@ DEMO_ENV_KEYS: frozenset[str] = frozenset(
         "LLM_MODEL",
         "LLM_TIMEOUT_SECONDS",
         "LLM_MAX_OUTPUT_TOKENS",
+        "GROQ_API_KEY",
+        "GROQ_MODEL",
+        "HOMELIB_DEMO_LLM_DAILY_LIMIT",
         "EMBED_MODEL",
         "HOMELIB_DEFAULT_ARM",
     }
@@ -197,6 +200,24 @@ def format_citation_label(citation: Citation) -> str:
     section = " / ".join(citation.section_path) if citation.section_path else "—"
     page = str(citation.page) if citation.page is not None else "—"
     return f"{citation.book_title} · {section} · page {page}"
+
+
+def ask_metric_captions(ask: AskResponse) -> list[str]:
+    """Session-scoped Ask monitoring lines (latency, tokens, cache, trace).
+
+    Uses only fields on ``AskResponse`` — never durable ``answer_log`` plaintext.
+    USD cost lives on Observatory / ``query_log.cost_usd`` when
+    ``LLM_PRICE_PER_1K_*`` is set; the Ask door shows token counts always.
+    """
+    lines = [f"latency: {ask.latency_ms} ms"]
+    prompt = ask.tokens.prompt
+    completion = ask.tokens.completion
+    lines.append(f"tokens: {prompt} prompt + {completion} completion = {prompt + completion}")
+    if ask.cache_hit:
+        lines.append("served from cache")
+    if ask.trace_id:
+        lines.append(f"trace: {ask.trace_id}")
+    return lines
 
 
 def format_scene_hit_label(
