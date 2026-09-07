@@ -1,23 +1,26 @@
 # COST-LATENCY.md
 
-Live path timings from **tonight’s Groq** stack (`LLM` via
-`GROQ_API_KEY`, model `llama-3.3-70b-versatile`). Do **not** cite Observatory
-“Latency p50 / p95” bars that read hung `query_log.latency_ms` (hundreds of
-thousands of ms = timeout poison).
+Live path timings from Groq free-tier smoke (**provider:** Groq,
+**model:** `openai/gpt-oss-20b`, **date:** 2026-09-07). Do **not** cite
+Observatory “Latency p50 / p95” bars that read hung `query_log.latency_ms`
+(hundreds of thousands of ms = timeout poison).
 
-## Live Groq table (fill from smoke)
+Observatory USD (when `LLM_PRICE_PER_1K_*` set) is an **estimated list-price
+equivalent**, not Groq billed amount — free-tier bill may remain $0.
 
-| Path | wall ms | prompt tok | completion tok | cost_usd | notes |
+## Live Groq table
+
+| Path | wall ms | prompt tok | completion tok | cost_usd (list eq.) | notes |
 |---|---:|---:|---:|---:|---|
-| Ask (grounded, e.g. Walden) | | | | | |
-| Ask (`what do you have?` / #A1) | | | | | refuse + shelf line |
-| Mentor (#M1 out-of-corpus) | | | | | abstain ≤2 rounds |
-| Mentor (in-corpus goal) | | | | | or timed out / degraded |
+| Ask (Walden) | 16380 | 1595 | 114 | ~0.00015 | grounded; 1+ citation; `degraded=false` |
+| Ask (`what do you have?` / #A1) | — | — | — | — | UI refuse + shelf line (no blank) |
+| Mentor (#M1 out-of-corpus) | ~2–5s | — | — | — | abstain; tools `[]`; ≤2 rounds |
+| Mentor (in-corpus Thoreau goal) | ~2–5s | — | — | — | tools include `search_shelf`; may abstain if shelf miss |
 
-p50 / p95: compute from the Ask sample above only (n small — say so).
+p50 / p95: n=1 Ask sample above — too small to cite as distribution.
 
-Tokens / USD: AskResponse / Observatory `query_log.cost_usd` when
-`LLM_PRICE_PER_1K_*` set; otherwise tokens only.
+List rates used for local evidence (verify at https://groq.com/pricing):
+`LLM_PRICE_PER_1K_PROMPT=0.000075`, `LLM_PRICE_PER_1K_COMPLETION=0.00030`.
 
 ## Local Ollama vs Groq (DACH sentence)
 

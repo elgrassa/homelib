@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import psycopg
 from openai import OpenAI
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from homelib_rag.models import Hit
 
@@ -71,7 +71,7 @@ _DEFAULT_MODEL = "qwen2.5:7b-instruct"
 # the compose/Ollama configuration. Not a provider chain: the choice is made
 # once, at construction, by which key is present.
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-_GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
+_GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b"
 _DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/homelib"
 # Measured on the pure-compose stack (CPU-only Ollama in the Docker VM):
 # prefill ~49 tok/s, generation ~7.4 tok/s uncontended, so a real /v1/ask
@@ -174,7 +174,7 @@ def _resolve_llm_env() -> tuple[str, str, str]:
     1. `LLM_API_KEY` non-empty → the `LLM_*` triple (compose / Ollama, or a
        fully spelled-out provider).
     2. otherwise `GROQ_API_KEY` non-empty → Groq's OpenAI-compatible endpoint
-       with `GROQ_MODEL` (default `openai/gpt-oss-120b`) — the public
+       with `GROQ_MODEL` (default `openai/gpt-oss-20b`) — the public
        demo needs one secret, and a blank `LLM_API_KEY` does not hide it.
     3. otherwise the Ollama placeholder key, so an unreachable LLM degrades
        the answer at call time. The OpenAI SDK refuses `""` at construction,
@@ -358,6 +358,19 @@ class _RawAnswer(BaseModel):
 
     answer: str
     citations: list[_RawCitation] = Field(default_factory=list)
+
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _drop_non_object_citations(cls, value: object) -> object:
+        """Groq occasionally emits bare passage numbers in `citations`.
+
+        Keep only object entries so a single bad element does not fail the
+        whole structured parse (which would zero tokens' usefulness and
+        surface the generic degraded banner).
+        """
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, dict)]
 
 
 # ── Book metadata lookup (test seam) ────────────────────────────────────────

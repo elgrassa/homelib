@@ -239,15 +239,26 @@ def test_answer_degrades_when_book_metadata_lookup_fails(monkeypatch: pytest.Mon
     assert result.citations == []
 
 
-def test_answer_degrades_on_malformed_llm_output() -> None:
-    bad_response = LLMResponse(
-        content="not json at all", usage=LLMUsage(prompt_tokens=1, completion_tokens=1)
+def test_answer_drops_bare_integer_citations_without_full_degrade() -> None:
+    """Groq has returned `citations: [1]` — keep the answer when objects remain."""
+    hits = [_hit(text="I went to the woods because I wished to live deliberately.")]
+    payload = {
+        "answer": "Thoreau went to the woods.",
+        "citations": [
+            1,
+            {"passage": 1, "quote": "I went to the woods"},
+        ],
+    }
+    client = _ScriptedClient(
+        [LLMResponse(content=json.dumps(payload), usage=LLMUsage(prompt_tokens=10, completion_tokens=5))]
     )
-    client = _ScriptedClient([bad_response])
 
-    result = answer("q", [_hit()], client=client, arm_used="hybrid")
+    result = answer("Who wrote Walden?", hits, client=client, arm_used="hybrid_rerank")
 
-    assert result.degraded is True
+    assert result.degraded is False
+    assert result.tokens.prompt == 10
+    assert len(result.citations) == 1
+    assert "woods" in result.citations[0].quote
 
 
 def test_answer_degrades_on_unexpected_exception_from_client() -> None:
@@ -704,7 +715,7 @@ def test_openai_client_falls_back_to_groq_when_llm_api_key_is_empty(
     monkeypatch.delenv("GROQ_MODEL", raising=False)
     client = OpenAIClient()
     assert client.base_url == "https://api.groq.com/openai/v1"
-    assert client.model == "openai/gpt-oss-120b"
+    assert client.model == "openai/gpt-oss-20b"
     assert client._client.api_key == "gsk-test"
 
 

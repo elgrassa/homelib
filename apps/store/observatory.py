@@ -128,7 +128,7 @@ def build_observatory(conn: sqlite3.Connection) -> ObservatoryResponse:
         charts.append(
             ObservatoryChart(
                 id="token_or_cost_estimate",
-                title="Cost estimate (USD)",
+                title="Estimated list-price equivalent",
                 points=[
                     ObservatoryPoint(bucket="total_cost_usd", value=float(total_cost[0])),
                 ],

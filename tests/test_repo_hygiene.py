@@ -426,7 +426,7 @@ def test_compose_api_passes_groq_and_does_not_coerce_blank_llm_key_to_ollama() -
     api = services["api"]
     env = api["environment"]
     assert env["GROQ_API_KEY"] == "${GROQ_API_KEY:-}"
-    assert "openai/gpt-oss-120b" in str(env["GROQ_MODEL"])
+    assert "openai/gpt-oss-20b" in str(env["GROQ_MODEL"])
     assert env["LLM_API_KEY"] == "${LLM_API_KEY:-}"
     depends = api.get("depends_on") or {}
     assert "ollama" not in depends

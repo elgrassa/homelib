@@ -356,7 +356,41 @@ def render_library_tab(client: Client) -> None:
         )
         with st.expander(label, expanded=False):
             st.write(quote)
-            st.caption(f"block `{block.block_id}` · open_anchor resolves via GET /v1/blocks/")
+            st.caption(f"block `{block.block_id}`")
+            passage_key = f"scene_passage_{anchor}"
+            ordinal_key = f"scene_ordinal_{anchor}"
+            if st.button("Open this passage", key=f"open_{passage_key}"):
+                st.session_state[passage_key] = True
+                st.session_state[ordinal_key] = int(block.ordinal)
+            if st.session_state.get(passage_key):
+                read_ordinal = int(st.session_state.get(ordinal_key, block.ordinal))
+                try:
+                    reading = client.get_book_block(block.book_id, ordinal=read_ordinal)
+                except (ApiClientError, ApiUnavailableError) as exc:
+                    st.error(format_api_error_message(exc))
+                    reading = block
+                    read_ordinal = int(block.ordinal)
+                    st.session_state[ordinal_key] = read_ordinal
+                st.text(reading.text)
+                nav_prev, nav_next, nav_proj = st.columns(3)
+                with nav_prev:
+                    if st.button("Previous passage", key=f"prev_{passage_key}") and read_ordinal > 0:
+                        st.session_state[ordinal_key] = read_ordinal - 1
+                        st.rerun()
+                with nav_next:
+                    if st.button("Next passage", key=f"next_{passage_key}"):
+                        st.session_state[ordinal_key] = read_ordinal + 1
+                        st.rerun()
+                with nav_proj:
+                    if st.button("Continue in Projection", key=f"proj_{passage_key}"):
+                        st.session_state["door"] = "Projection"
+                        st.session_state["projection_source"] = "shelf"
+                        st.session_state["projection_source_radio"] = "shelf"
+                        st.session_state[f"proj_ordinal:{block.book_id}"] = read_ordinal
+                        st.session_state["proj_book_id"] = block.book_id
+                        st.rerun()
+            # :8502 companion is absent on Cloud demo — keep the link for
+            # self-hosted / explicit official viewer only.
             if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
                 read_hint = clean_read_url(block.book_id, ordinal=block.ordinal, read_port=port)
                 st.markdown(format_shelf_read_markdown(read_hint, port=port))
@@ -478,10 +512,18 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
         st.write("No books on the shelf.")
         return
     # Never mix Pottermore titles into the shelf picker.
+    pending_book_id = st.session_state.pop("proj_book_id", None)
+    default_index = 0
+    if isinstance(pending_book_id, str) and pending_book_id:
+        for idx, candidate in enumerate(books):
+            if candidate.book_id == pending_book_id:
+                default_index = idx
+                break
     book = st.selectbox(
         "Book",
         options=books,
         format_func=lambda b: b.title,
+        index=default_index,
         key="proj_book",
     )
     # Keyed per book: a global ordinal would carry, say, page 300 of a long

@@ -59,21 +59,17 @@ Four prompt arms, judge scores mostly 1–3/5
 | bad-refusal | Ask `#A1` `"what do you have?"` used to render **blank** (`st.write("")`) — now an explicit refuse + shelf counts |
 | tool-loop | Mentor default was `max_rounds=6` on Ollama → 180s hang / empty JSON. Bound is now **`max_rounds=2`**; empty/unparseable → `_ABSTENTION_RATIONALE`, no invented career path |
 
-## Citation precision (N=5)
+## Citation precision (N=1 live smoke, 2026-09-07, Groq `openai/gpt-oss-20b`)
 
-Fill from tonight’s live Groq Ask (Walden / grounded Q). Triple =
-`chunk_id` ↔ expander label page ↔ `GET /v1/blocks/{block_id}` provenance.
+Triple = `chunk_id` ↔ expander label ↔ `GET /v1/blocks/{block_id}` provenance.
 
-| # | chunk_id | UI page label | block page/ordinal | match? |
+| # | chunk_id | book | block_id | match? |
 |---|---|---|---|---|
-| 1 | _fill on smoke_ | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
-| 5 | | | | |
+| 1 | `76155d018f968e2e` | Walden… | `25a30321b30d03cc` | yes — block text opens |
 
-Mismatch count: _pending smoke_. Key for open-the-page is **`block_id`**
-(`block_id_for_citation`), never `chunk_id` alone.
+Mismatch count: 0 on this smoke. Key for open-the-page is **`block_id`**
+(`block_id_for_citation`), never `chunk_id` alone. Expand N after more Ask smokes.
+
 
 ## Agent (Mentor only)
 

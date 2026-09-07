@@ -12,4 +12,4 @@ Ground-truth `chunk_id`s do not survive re-chunking (a different `target_chars`/
 | 1200/200 | 4121 | 0.027 | 0.027 | 0.986 | 0.912 | 893 | 3073 |
 | 2000/400 | 2586 | 0.027 | 0.027 | 0.973 | 0.924 | 1560 | 3073 |
 
-**Conclusion:** the best config on book-level hit@5 is `1200/200` (0.986 vector, vs `2000/400`'s 0.973 — a 0.014 spread across the three configs); retrieving the top-5 chunks costs ~958 mean tokens against a ~3073-token whole-section baseline, so chunked retrieval is the cheaper context regardless of which config wins.
+**Conclusion:** the best config on book-level hit@5 is `1200/200` (0.986 vector, vs `2000/400`'s 0.973 — a 0.014 spread across the three configs); retrieving the top-5 chunks costs ~893 mean tokens against a ~3073-token whole-section baseline, so chunked retrieval is the cheaper context regardless of which config wins.

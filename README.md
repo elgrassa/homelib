@@ -21,7 +21,7 @@ things on top of it:
 
 Compose brings up the API, the UI, and (for the v1 Grafana path) Postgres.
 The **running product store is SQLite FTS5 + a float32 embedding matrix**.
-Ask / Mentor / Roadmap use **Groq** (`llama-3.3-70b-versatile`) when `GROQ_API_KEY`
+Ask / Mentor / Roadmap use **Groq** (`openai/gpt-oss-20b`) when `GROQ_API_KEY`
 is set and `LLM_API_KEY` is blank. Ollama is an optional `--profile local-llm`
 fallback, not the reviewer path. When `HOMELIB_SQLITE_PATH` is set (the tip
 product path), asks and feedback land in SQLite, and the UI's Observatory
@@ -41,7 +41,9 @@ the demo. Tradeoffs: [`TRADEOFFS.md`](TRADEOFFS.md). Cost/latency:
 in prod” · “AI mentor that plans a career” · “production vector DB” · “eval in
 CI fails the build” (gate code exists; not in `just ci` yet).
 
-Happy path: Ask “Who wrote Walden?” → citation → Show full source block.
+Happy path: Shelf → search a phrase → **Open this passage** → next/previous or
+**Continue in Projection**. Ask “Who wrote Walden?” → citation → Show full
+source block (Groq structured-output smoke required).
 Known miss: Ask “what do you have?” (#A1) → refuse + shelf counts; Mentor
 “Land AI engineer job” (#M1) → abstain, no invented path.
 
@@ -134,7 +136,10 @@ viewer for publisher previews; it is off by default and is never used by the
 public demo.
 
 **Reviewer notes.** Monitoring is the in-app **Observatory** door
-(`GET /v1/observatory`, six charts + thumbs feedback) — that is the v2 surface
+(`GET /v1/observatory`, nine chart definitions + thumbs feedback; panels
+populate when corresponding telemetry exists) — that is the tip monitoring
+surface on SQLite. Judged relevance stays empty until an operator runs
+`scripts/judge_recent.py` (off by default; requires answer logging).
 and the one `just drill` asserts on ([ADR-005](docs/adrs/ADR-005-observatory-replaces-grafana.md)).
 
 - With `HOMELIB_SQLITE_PATH` set (the compose default and the tip path) every
@@ -181,67 +186,79 @@ header-less request stays anonymous.
 
 ---
 
-## Architecture
+## System Architecture
 
-```
-     EPUB / PDF / scanned PDF / TXT / MD / DjVu
-                      │
-              parse_file()  ── per-format handlers, each returning an
-                      │        ExtractionResult (native_text | ocr_fallback
-                      │        | mixed) with a sha256 of what it extracted
-                      ▼
-                  BookDoc  ── ordered Blocks; every Block carries
-                      │        section_path + char offsets + provenance
-                      │        (PDF page / EPUB spine index + anchor)
-                      ▼
-              chunk_book()  ── sentence-packed 1200/200; never splits a
-                      │        sentence; canonical_text[start:end] == text
-                      ▼
-        dlt pipeline ──────► SQLite (tip)          Postgres (v1-fallback)
-                               ├── chunks_fts FTS5     ├── tsvector + GIN
-                               ├── float32 matrix      ├── pgvector(384)
-                               ├── catalog             └── Grafana query_log
-                               └── Observatory query_log
-                                        │
-              ┌─────────────────────────┼─────────────────────────┐
-              ▼                         ▼                         ▼
-      lexical / vector           RRF hybrid (k=60)          cross-encoder
-       search arms                   rewrite OFF               rerank
-              └─────────────────────────┬─────────────────────────┘
-                                        ▼
-                         POST /v1/ask  — single-shot grounded answer
-                         POST /v1/mentor/intake — run_agent (max tools on
-                         that path only: search_shelf · search_catalog ·
-                         get_block). Not LangGraph. Ask never calls it.
-                                        ▼
-                       answer with block-level citations
+```mermaid
+flowchart TD
+    Reader([Reader]) --> Streamlit[Streamlit Crossroads]
+    Streamlit --> FastAPI[FastAPI]
+    FastAPI --> Shelf[Shelf search]
+    Shelf --> Index[SQLite FTS5 plus float32]
+    Index --> Passage[Cited passage open_anchor]
+    Passage --> Reading[In-UI passage plus Projection]
+    FastAPI --> Ask[Ask fixed RAG]
+    Ask --> RetrAsk[Hybrid retrieve RRF k60 rerank]
+    RetrAsk --> GroqAsk[Groq openai gpt-oss-20b]
+    GroqAsk --> Cite[Citation validation]
+    FastAPI --> Mentor[Mentor run_agent max 2]
+    Mentor --> Tools[search_shelf catalog get_block]
+    Tools --> GroqMen[Groq]
+    FastAPI --> Roadmap[Roadmap LLM catalog path]
+    Roadmap --> CatSnap[OL catalog snapshot]
+    CatSnap --> GroqRoad[Groq]
+    FastAPI --> Feedback["POST /v1/feedback"]
+    Feedback --> QLog[(SQLite query_log)]
+    Ask --> QLog
+    Ask --> Spans[(OTel spans)]
+    QLog --> Obs[Observatory 9 chart defs]
+    Spans --> Obs
+    Corpus[Ingested corpus text] --> DLT[dlt]
+    DLT --> Blocks[BookDoc blocks]
+    Blocks --> Chunks[Chunks 1200/200]
+    Chunks --> SQLite[(SQLite tip)]
+    Meta[OL catalog snapshot] --> CatTable[(catalog table)]
+    CatTable --> SQLite
+    DLT -.-> PG[(Postgres pgvector fallback)]
 ```
 
-The **UI never touches the database.** It talks only through the public API, so
-the API stays the single contract — and the Swagger page is the documentation.
+The reader picks a Crossroads door; there is no shared query router. **Ask** is
+single-shot hybrid retrieve → rerank → Groq → citation validation (or explicit
+degrade). **Mentor** alone runs `run_agent` (max 2 rounds) with shelf/catalog/block
+tools. **Roadmap** is an LLM-assisted catalog path. Shelf, Coffee Table, and
+Projection browse/read without calling Groq.
+
+Ingest builds readable text into BookDoc blocks and MiniLM embeddings in **SQLite**
+(demo tip). Open Library metadata is a **separate catalog snapshot** loaded into
+the catalog table — it does not pass through format parsing or chunking. The seed
+corpus demonstrated today is **18 public-domain TXT books**; other formats
+(EPUB/PDF/OCR/DjVu) are implemented and tested but not in that seed. Postgres +
+pgvector remains the self-hosted fallback. Ask writes latency/tokens/cost and
+OTel spans; feedback is `POST /v1/feedback` → SQLite. Observatory exposes nine
+chart definitions that fill when telemetry exists; the online judge is
+**operator-run** (`scripts/judge_recent.py`), off by default.
 
 ### Which LLM answers
 
 One OpenAI-compatible client, three `LLM_*` variables, no provider chain:
 
-| Edition | `LLM_BASE_URL` / `LLM_MODEL` | Where it is set |
+| Edition | Model | Where it is set |
 |---|---|---|
-| Compose (`just up`) | Groq `llama-3.3-70b-versatile` | `GROQ_API_KEY` in gitignored `.env` (`LLM_API_KEY` blank) |
+| Compose (`just up`) | Groq `openai/gpt-oss-20b` | `GROQ_API_KEY` in gitignored `.env` (`LLM_API_KEY` blank) |
 | Optional `--profile local-llm` | Ollama `qwen2.5:7b-instruct` | `LLM_API_KEY=ollama` plus the profile |
-| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `llama-3.3-70b-versatile` | **owner's** Streamlit Secrets only — `APP_MODE=demo`, `HOMELIB_SQLITE_PATH=data/homelib.sqlite`, `GROQ_API_KEY`. Do not set `LLM_API_KEY`. Cap: **100 LLM calls per visitor per UTC day**. The key is never in the tree |
+| Public demo (Streamlit Community Cloud, owner-deployed) | Groq free tier, `openai/gpt-oss-20b` | **owner's** Streamlit Secrets — `APP_MODE=demo`, `HOMELIB_SQLITE_PATH=data/homelib.sqlite`, `GROQ_API_KEY`. Cap: **100 LLM calls per visitor per UTC day** |
 
 A missing or unreachable model never fabricates: the answer comes back
-`degraded=true` with the retrieval still shown.
+`degraded=true` with the retrieval still shown. Structured-output smoke on Groq
+must pass before claiming Ask citations operational on a given deploy.
 
-One real ask, SQLite-only edition (`DATABASE_URL` unset, `APP_MODE=demo`,
-local Ollama `qwen2.5:7b-instruct`, 2026-09-05, `scripts/sqlite_only_smoke.sh`):
+One real ask on Groq `openai/gpt-oss-20b` (2026-09-07, compose SQLite tip):
 
 ```text
-POST /v1/ask {"query": "Who wrote Walden?", "k": 3}
-→ degraded: false · arm_used: hybrid_rerank · latency_ms: 35857
+POST /v1/ask {"query": "Who wrote Walden?", "k": 5}
+→ degraded: false · arm_used: hybrid_rerank · latency_ms: ~16380
+→ tokens: 1595 prompt + 114 completion
 → answer: Henry David Thoreau
-→ citation 1: "Walden, and On The Duty Of Civil Disobedience", block 25a30321b30d03cc
-GET /v1/blocks/25a30321b30d03cc → 200 (the citation opens)
+→ citation opens GET /v1/blocks/25a30321b30d03cc → 200
 ```
 
 ## Evaluation results
@@ -249,8 +266,9 @@ GET /v1/blocks/25a30321b30d03cc → 200 (the citation opens)
 **Retrieval on the tip store — SQLite FTS5 + float32 matrix (measured
 2026-09-03).** 4 arms × 235 ground-truth questions, k=5, **0 degraded across
 all 940 arm-runs**. This is the store the product reads when
-`HOMELIB_SQLITE_PATH` is set, and the one `just ci` gates against
-([`evals/eval-baseline.json`](evals/eval-baseline.json), margin 0.01).
+`HOMELIB_SQLITE_PATH` is set. Floors live in
+[`evals/eval-baseline.json`](evals/eval-baseline.json) (margin 0.01); compare
+with `just eval-gate` (not wired into `just ci`).
 
 | arm | hit-rate@5 | MRR@5 | mean latency |
 |---|---:|---:|---:|

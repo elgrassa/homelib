@@ -53,7 +53,7 @@ def test_observatory_cost_chart_uses_cost_when_priced(tmp_path: Path) -> None:
     response = build_observatory(conn)
 
     chart = next(c for c in response.charts if c.id == "token_or_cost_estimate")
-    assert chart.title == "Cost estimate (USD)"
+    assert chart.title == "Estimated list-price equivalent"
     assert len(chart.points) == 1
     assert chart.points[0].bucket == "total_cost_usd"
     assert chart.points[0].value == 0.0123 + 0.0456

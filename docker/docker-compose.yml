@@ -90,7 +90,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
       EMBED_MODEL: ${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-90}
       LLM_PRICE_PER_1K_PROMPT: ${LLM_PRICE_PER_1K_PROMPT:-0}
