@@ -71,14 +71,70 @@ _ABSTENTION_RATIONALE = (
 # tractors, Taylor pig-iron) look "on goal" for modern SWE goals (#M1).
 _GOAL_STOPWORDS = frozenset(
     {
-        "a", "an", "the", "and", "or", "to", "of", "for", "in", "on", "at", "by",
-        "is", "are", "be", "as", "it", "its", "my", "me", "i", "we", "you", "your",
-        "with", "from", "into", "about", "how", "what", "when", "where", "why",
-        "this", "that", "these", "those",
-        "land", "get", "got", "find", "make", "become", "learn", "study", "start",
-        "help", "want", "need", "build", "create",
-        "job", "jobs", "career", "careers", "work", "path", "paths", "goal",
-        "goals", "role", "roles", "plan", "plans",
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "to",
+        "of",
+        "for",
+        "in",
+        "on",
+        "at",
+        "by",
+        "is",
+        "are",
+        "be",
+        "as",
+        "it",
+        "its",
+        "my",
+        "me",
+        "i",
+        "we",
+        "you",
+        "your",
+        "with",
+        "from",
+        "into",
+        "about",
+        "how",
+        "what",
+        "when",
+        "where",
+        "why",
+        "this",
+        "that",
+        "these",
+        "those",
+        "land",
+        "get",
+        "got",
+        "find",
+        "make",
+        "become",
+        "learn",
+        "study",
+        "start",
+        "help",
+        "want",
+        "need",
+        "build",
+        "create",
+        "job",
+        "jobs",
+        "career",
+        "careers",
+        "work",
+        "path",
+        "paths",
+        "goal",
+        "goals",
+        "role",
+        "roles",
+        "plan",
+        "plans",
     }
 )
 
@@ -477,25 +533,19 @@ def mentor_intake(
     rounds_used = agent_result.rounds_used
 
     if agent_result.degraded or not (agent_result.final_message or "").strip():
-        return _abstention_response(
-            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     # Search tools ran but returned only off-topic summaries → abstain.
     search_on_goal = _search_tool_results_on_goal(goal, interests, agent_result.tool_calls)
     if search_on_goal is False:
-        return _abstention_response(
-            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     try:
         payload = json.loads(agent_result.final_message or "{}")
         parsed = _LLMIntakeOutput.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("mentor intake parse failed: %s", exc)
-        return _abstention_response(
-            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     has_proposal = (
         parsed.proposed_path is not None
@@ -506,13 +556,9 @@ def mentor_intake(
     # empty tool_calls (LIVE #M1 signature tool_calls=[], rounds_used=1) →
     # force abstention rather than invent a labour-market path.
     if has_proposal and not _proposal_aligns_with_goal(goal, interests, parsed):
-        return _abstention_response(
-            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
     if parsed.proposed_path is not None and not tool_calls:
-        return _abstention_response(
-            notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     try:
         citations = _passage_citations(parsed.citations, hits) if hits else []
