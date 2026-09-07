@@ -293,9 +293,7 @@ def render_library_tab(client: Client) -> None:
             st.write(quote)
             st.caption(f"block `{block.block_id}` · open_anchor resolves via GET /v1/blocks/")
             if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
-                read_hint = clean_read_url(
-                    block.book_id, ordinal=block.ordinal, read_port=port
-                )
+                read_hint = clean_read_url(block.book_id, ordinal=block.ordinal, read_port=port)
                 st.markdown(
                     f"Open at the same host**{read_hint}** "
                     f"(clean article / Listen to Page — port {port})."

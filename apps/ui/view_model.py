@@ -214,7 +214,6 @@ def format_scene_hit_label(
     return f"{book_title} · {author} · {section} · {place}"
 
 
-
 def parse_interests(raw: str) -> list[str]:
     """Split a free-text, comma-separated interests field into a clean list."""
     return [item.strip() for item in raw.split(",") if item.strip()]

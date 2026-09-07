@@ -339,7 +339,6 @@ def test_format_citation_label_handles_missing_page_and_section() -> None:
     assert format_citation_label(citation) == "Walden · — · page —"
 
 
-
 def test_format_scene_hit_label_includes_book_author_section_and_page() -> None:
     from apps.ui.view_model import format_scene_hit_label
 
