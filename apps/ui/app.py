@@ -36,6 +36,7 @@ from apps.ui.view_model import (
     format_api_error_message,
     format_citation_label,
     format_degraded_banner,
+    format_scene_hit_label,
     has_voted,
     library_summary,
     load_official_preview_books,
@@ -240,6 +241,7 @@ def render_library_tab(client: Client) -> None:
     st.subheader("Scene search")
     if not books:
         return
+    book_by_id = {b.book_id: b for b in books}
     book_id = st.selectbox("Book", options=[b.book_id for b in books], key="scene_book")
     scene_q = st.text_input("Open the scene where…", key="scene_q")
     if st.button("Search scenes", key="scene_go") and scene_q.strip():
@@ -248,8 +250,56 @@ def render_library_tab(client: Client) -> None:
         except (ApiClientError, ApiUnavailableError) as exc:
             st.error(format_api_error_message(exc))
         else:
-            for hit in result.get("hits") or []:
-                st.write(f"**{hit.get('open_anchor')}** — {hit.get('quote', '')[:200]}")
+            st.session_state["last_scene"] = {
+                "book_id": book_id,
+                "hits": list(result.get("hits") or []),
+                "mode_used": result.get("mode_used"),
+            }
+
+    last_scene = st.session_state.get("last_scene")
+    if not isinstance(last_scene, dict):
+        return
+    hits = last_scene.get("hits") or []
+    if not hits:
+        st.write("No scenes matched.")
+        return
+    mode_used = last_scene.get("mode_used")
+    if mode_used:
+        st.caption(f"Retrieval mode: {mode_used} (related passages OK — not exact-phrase only)")
+    selected = book_by_id.get(str(last_scene.get("book_id") or ""))
+    port = read_port()
+    for hit in hits:
+        if not isinstance(hit, dict):
+            continue
+        anchor = str(hit.get("open_anchor") or hit.get("block_id") or "")
+        quote = str(hit.get("quote") or "")[:200]
+        if not anchor:
+            st.write(quote)
+            continue
+        try:
+            block = client.get_block(anchor)
+        except (ApiClientError, ApiUnavailableError) as exc:
+            st.error(format_api_error_message(exc))
+            st.write(f"`{anchor}` — {quote}")
+            continue
+        label = format_scene_hit_label(
+            book_title=selected.title if selected is not None else block.book_id,
+            authors=list(selected.authors) if selected is not None else [],
+            section_path=list(block.section_path),
+            page=block.provenance.page,
+            ordinal=block.ordinal,
+        )
+        with st.expander(label, expanded=False):
+            st.write(quote)
+            st.caption(f"block `{block.block_id}` · open_anchor resolves via GET /v1/blocks/")
+            if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
+                read_hint = clean_read_url(
+                    block.book_id, ordinal=block.ordinal, read_port=port
+                )
+                st.markdown(
+                    f"Open at the same host**{read_hint}** "
+                    f"(clean article / Listen to Page — port {port})."
+                )
 
 
 def render_observatory_tab(client: Client) -> None:

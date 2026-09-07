@@ -339,6 +339,34 @@ def test_format_citation_label_handles_missing_page_and_section() -> None:
     assert format_citation_label(citation) == "Walden · — · page —"
 
 
+
+def test_format_scene_hit_label_includes_book_author_section_and_page() -> None:
+    from apps.ui.view_model import format_scene_hit_label
+
+    label = format_scene_hit_label(
+        book_title="Acres of Diamonds",
+        authors=["Russell H. Conwell"],
+        section_path=["Chapter I"],
+        page=12,
+        ordinal=3,
+    )
+    assert label == "Acres of Diamonds · Russell H. Conwell · Chapter I · page 12"
+
+
+def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
+    """Gutenberg txt blocks have no Provenance.page — show block ordinal instead."""
+    from apps.ui.view_model import format_scene_hit_label
+
+    label = format_scene_hit_label(
+        book_title="Acres of Diamonds",
+        authors=["Russell H. Conwell"],
+        section_path=[],
+        page=None,
+        ordinal=4,
+    )
+    assert label == "Acres of Diamonds · Russell H. Conwell · — · block 5"
+
+
 def test_block_id_for_citation_uses_the_block_id_not_the_chunk_id() -> None:
     """`/v1/blocks/{id}` is keyed on block ids; a chunk_id 404s there.
 

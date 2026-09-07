@@ -199,6 +199,22 @@ def format_citation_label(citation: Citation) -> str:
     return f"{citation.book_title} · {section} · page {page}"
 
 
+def format_scene_hit_label(
+    *,
+    book_title: str,
+    authors: list[str],
+    section_path: list[str],
+    page: int | None,
+    ordinal: int,
+) -> str:
+    """Shelf scene-search line: book · author · section · page (or block N for txt)."""
+    author = ", ".join(authors) if authors else "—"
+    section = " / ".join(section_path) if section_path else "—"
+    place = f"page {page}" if page is not None else f"block {ordinal + 1}"
+    return f"{book_title} · {author} · {section} · {place}"
+
+
+
 def parse_interests(raw: str) -> list[str]:
     """Split a free-text, comma-separated interests field into a clean list."""
     return [item.strip() for item in raw.split(",") if item.strip()]
