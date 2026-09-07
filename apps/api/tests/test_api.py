@@ -283,7 +283,10 @@ def test_ask_arm_none_uses_default_arm() -> None:
         captured["arm"] = arm
         return ([], arm, False)
 
-    deps = _make_deps(retrieve=_retrieve, llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -299,7 +302,10 @@ def test_ask_explicit_arm_is_honored() -> None:
         captured["arm"] = arm
         return ([], arm, False)
 
-    deps = _make_deps(retrieve=_retrieve, llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q", "arm": "lexical"})
@@ -330,7 +336,10 @@ def test_ask_no_rewrite_when_disabled() -> None:
         captured["called"] = True
         return "should not be used " + query
 
-    deps = _make_deps(rewrite_query=_rewrite, llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        rewrite_query=_rewrite,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q", "rewrite": False})
@@ -349,7 +358,10 @@ def test_ask_rewrite_defaults_to_false_when_omitted() -> None:
         captured["called"] = True
         return "should not be used " + query
 
-    deps = _make_deps(rewrite_query=_rewrite, llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        rewrite_query=_rewrite,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -543,7 +555,9 @@ def test_answer_log_off_by_default(tmp_path: Any, monkeypatch: pytest.MonkeyPatc
     conn.close()
     monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
     monkeypatch.delenv("HOMELIB_LOG_ANSWERS", raising=False)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "does it jump?"})
@@ -564,7 +578,9 @@ def test_answer_log_written_when_enabled(tmp_path: Any, monkeypatch: pytest.Monk
     conn.close()
     monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
     monkeypatch.setenv("HOMELIB_LOG_ANSWERS", "1")
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "does it jump?"})
@@ -658,7 +674,9 @@ def test_spans_never_carry_raw_question_by_default(monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("HOMELIB_TRACE_QUESTIONS", raising=False)
     provider, exporter = _in_memory_tracer_provider()
     tracing.reset_tracer_for_tests(provider)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
@@ -675,7 +693,9 @@ def test_spans_carry_question_when_opted_in(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("HOMELIB_TRACE_QUESTIONS", "1")
     provider, exporter = _in_memory_tracer_provider()
     tracing.reset_tracer_for_tests(provider)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
@@ -1385,9 +1405,7 @@ def test_health_returns_while_ask_llm_is_still_running(
         )
 
     monkeypatch.setattr(answer_module, "answer", _blocking_answer)
-    monkeypatch.setattr(
-        main.shelf_meta_module, "is_shelf_meta_intent", lambda query: False
-    )
+    monkeypatch.setattr(main.shelf_meta_module, "is_shelf_meta_intent", lambda query: False)
     deps = _make_deps(
         retrieve=lambda q, k, arm: ([_hit()], arm, False),
         llm_reachable=lambda: True,
