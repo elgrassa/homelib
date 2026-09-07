@@ -45,7 +45,7 @@ CI fails the build” (gate code exists; not in `just ci` yet).
 
 1. **Find-and-Read** (no LLM quota): Shelf → search a phrase → **Open this passage** → next/previous or **Continue in Projection**.
 2. **Ask** (needs Groq structured-output smoke): “Who wrote Walden?” → citation → Show full source block.
-3. Known miss: Ask “what do you have?” (#A1) → refuse + shelf counts; Mentor “Land AI engineer job” (#M1) → abstain, no invented path.
+3. Known misses (unit-tested; live LLM can still misbehave): Ask “what do you have?” (#A1) — UI refuse+counts only when the answer body is empty; a degraded non-empty reply still shows as-is. Mentor “Land AI engineer job” (#M1) — abstains when shelf+catalog are empty; with live shelf hits, Groq may still invent a path (do not claim live abstention until re-checked).
 
 A screenshot of the Crossroads rotunda (the entry to the Ask door) lives in
 [`docs/screenshots/crossroads-rotunda-seven-doors.png`](docs/screenshots/crossroads-rotunda-seven-doors.png)

@@ -23,7 +23,7 @@ Source: `README.md` ("Data", "Architecture", "Which LLM answers" sections); `spe
 | Ground-truth questions | derived | 235 `question -> chunk_id` pairs for retrieval eval | Generated, not scraped | `evals/ground_truth.py` (LLM-generated from the committed corpus) | `evals/ground_truth.jsonl` | `evals/retrieval_eval.py` |
 | SQLite seed | derived | Books/blocks/chunks/embeddings/catalog, pre-built | Same rights as source rows | `just seed-gz` (gzips a migrated+seeded `homelib.sqlite`) | `data/seed/homelib.sqlite.gz` (28.7 MB / ~27.4 MiB) | Streamlit demo, cold-clone drill |
 | Corpus snapshot | derived | Parsed `BookDoc`s, one per book | Same rights as source rows | `apps/ingest/build_snapshot.py` | `data/corpus_snapshot.jsonl.gz` (6.0 MB) | `apps/ingest/pipeline.py`, `apps/ingest/sqlite_pipeline.py`, `evals/ground_truth.py` |
-| Eval history | derived | Append-only run history + baseline margins | n/a | `evals/gate.py` | `evals/eval-baseline.json`, `evals/history.jsonl` | CI regression gate (`just ci`) |
+| Eval history | derived | Append-only run history + baseline margins | n/a | `evals/gate.py` | `evals/eval-baseline.json`, `evals/history.jsonl` | `just eval-gate` (recipe exists; **not** wired into `just ci` yet) |
 
 Source: `specs/corpus.md`; `specs/connectors.md`; `docs/adrs/ADR-002-catalog-source.md`; `apps/ui/fixtures/pottermore_uk_hp_preview.json`; `packages/homelib-rag/src/homelib_rag/{index.py,sqlite_index.py,rerank.py,answer.py}`; `README.md` ("Which LLM answers"); `evals/eval-baseline.json`.
 
