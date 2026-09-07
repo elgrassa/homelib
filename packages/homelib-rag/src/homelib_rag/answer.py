@@ -80,6 +80,11 @@ _DEFAULT_DATABASE_URL = "postgresql://homelib:homelib_local_dev@localhost:5432/h
 # stack every ask timed out on prefill alone, degrading 100% of answers.
 # Env-tunable so a GPU host can still tighten it.
 _TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "300"))
+# gpt-oss on Groq spends completion budget on reasoning before the JSON
+# document; 400 regularly hits `json_validate_failed` / "max completion
+# tokens reached before generating a valid document" on inventory asks.
+# Env-tunable (see `.env.example` `LLM_MAX_OUTPUT_TOKENS`).
+_ANSWER_MAX_TOKENS = int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "1200"))
 
 # A passage list this long is not "a few relevant chunks" anymore; cap the
 # prompt rather than let an unusually large `hits` list blow the context
@@ -498,11 +503,42 @@ def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
             )
 
 
+_GENERIC_DEGRADED_ANSWER = (
+    "I couldn't produce a verified answer right now. Please try again in a moment."
+)
+_RATE_LIMITED_DEGRADED_ANSWER = (
+    "The answer service is rate-limited right now. Please try again in a moment."
+)
+
+
+def _is_json_validate_failure(reason: object) -> bool:
+    """Groq JSON mode sometimes 400s with `json_validate_failed` and an empty
+    `failed_generation` — common on inventory/refuse questions where the model
+    emits nothing the schema validator will accept."""
+    text = str(reason).lower()
+    return "json_validate_failed" in text or "max completion tokens reached" in text
+
+
+def _is_rate_limit_failure(reason: object) -> bool:
+    text = str(reason).lower()
+    return "429" in text or "rate_limit" in text or "rate limit" in text
+
+
 def _degraded_response(arm_used: str, reason: str) -> AskResponse:
     logger.warning("answer() returning a degraded response: %s", reason)
+    # Empty answer on Groq JSON-validate / truncated-JSON failure so the Ask UI
+    # refuse+#A1 path (`format_ask_answer_body`) can show shelf counts instead
+    # of a generic "try again" that hides the inventory miss. Rate limits get
+    # a clearer line.
+    if _is_json_validate_failure(reason):
+        answer_text = ""
+    elif _is_rate_limit_failure(reason):
+        answer_text = _RATE_LIMITED_DEGRADED_ANSWER
+    else:
+        answer_text = _GENERIC_DEGRADED_ANSWER
     return AskResponse(
         request_id=str(uuid.uuid4()),
-        answer=("I couldn't produce a verified answer right now. Please try again in a moment."),
+        answer=answer_text,
         citations=[],
         arm_used=arm_used,
         degraded=True,
@@ -537,19 +573,52 @@ def answer(
         ChatMessage(role="user", content=_build_context_prompt(question, hits, book_meta)),
     ]
 
+    retried_without_json_format = False
     try:
-        response = client.chat(messages, response_format={"type": "json_object"})
+        response = client.chat(
+            messages,
+            response_format={"type": "json_object"},
+            max_tokens=_ANSWER_MAX_TOKENS,
+        )
     except LLMUnreachableError as exc:
-        return _degraded_response(arm_used, f"LLM unreachable: {exc}")
+        if _is_json_validate_failure(exc):
+            # Prompt already demands JSON; retry without Groq's schema gate.
+            logger.warning(
+                "answer(): JSON validate failed (%s); retrying without response_format",
+                exc,
+            )
+            retried_without_json_format = True
+            try:
+                response = client.chat(messages, max_tokens=_ANSWER_MAX_TOKENS)
+            except LLMUnreachableError as retry_exc:
+                return _degraded_response(arm_used, f"LLM unreachable: {retry_exc}")
+            except Exception as retry_exc:
+                logger.exception("answer(): unexpected error on JSON-validate retry")
+                return _degraded_response(arm_used, f"unexpected LLM error: {retry_exc}")
+        else:
+            return _degraded_response(arm_used, f"LLM unreachable: {exc}")
     except Exception as exc:  # belt-and-braces: never let an LLM call 500 this request
         logger.exception("answer(): unexpected error calling the LLM")
         return _degraded_response(arm_used, f"unexpected LLM error: {exc}")
 
-    raw_content = response.content or ""
+    raw_content = (response.content or "").strip()
+    if raw_content.startswith("```"):
+        # Retry-without-format path sometimes wraps JSON in a fence.
+        lines = raw_content.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        raw_content = "\n".join(lines).strip()
     try:
         parsed = _RawAnswer.model_validate_json(raw_content)
     except ValidationError as exc:
-        return _degraded_response(arm_used, f"malformed LLM output: {exc}")
+        # After a JSON-mode truncate/validate failure the free-form retry often
+        # still isn't `_RawAnswer`-shaped; empty body keeps #A1 refuse+shelf.
+        reason = f"malformed LLM output: {exc}"
+        if retried_without_json_format:
+            reason = f"json_validate_failed after retry; {reason}"
+        return _degraded_response(arm_used, reason)
 
     # Only the passages actually shown to the model are citable. Slicing the
     # same way `_build_context_prompt` does keeps the two in step.
