@@ -41,6 +41,7 @@ from apps.ui.view_model import (
     format_book_choice_label,
     format_citation_label,
     format_degraded_banner,
+    format_discover_link_markdown,
     format_playlist_item_line,
     format_scene_hit_label,
     format_shelf_read_markdown,
@@ -81,6 +82,8 @@ def render_ask_tab(client: Client) -> None:
                     st.error(format_api_error_message(exc))
                 else:
                     st.session_state["last_ask"] = response
+                    st.session_state["last_ask_query"] = query.strip()
+                    st.session_state.pop("last_ask_catalog", None)
 
     last_ask: AskResponse | None = st.session_state.get("last_ask")
     if last_ask is None:
@@ -90,12 +93,15 @@ def render_ask_tab(client: Client) -> None:
     if banner is not None:
         st.warning(banner)
     summary = None
-    if not (last_ask.answer or "").strip():
+    empty_answer = not (last_ask.answer or "").strip()
+    if empty_answer:
         try:
             summary = library_summary(client.list_books())
         except (ApiClientError, ApiUnavailableError):
             summary = None
     st.write(format_ask_answer_body(last_ask.answer, summary))
+    if empty_answer:
+        _render_ask_catalog_links(client)
     for line in ask_metric_captions(last_ask):
         st.caption(line)
 
@@ -110,6 +116,26 @@ def render_ask_tab(client: Client) -> None:
             _cast_vote(client, last_ask.request_id, "down")
 
     _render_citation_expanders(client, last_ask.citations)
+
+
+def _render_ask_catalog_links(client: Client) -> None:
+    """Shelf-miss → Discover: lawful catalog URLs beside refuse + shelf counts."""
+    catalog = st.session_state.get("last_ask_catalog")
+    query = str(st.session_state.get("last_ask_query") or "").strip()
+    if not isinstance(catalog, dict) and query:
+        try:
+            catalog = client.list_resources(q=query, source="discover")
+        except (ApiClientError, ApiUnavailableError):
+            catalog = None
+        else:
+            st.session_state["last_ask_catalog"] = catalog
+    if not isinstance(catalog, dict):
+        return
+    if catalog.get("degraded"):
+        st.caption("Some catalog providers timed out; showing partial links.")
+    md = format_discover_link_markdown(catalog.get("items") or [])
+    if md:
+        st.markdown(md)
 
 
 def _render_citation_expanders(client: Client, citations: list[Citation]) -> None:
@@ -176,6 +202,8 @@ def render_mentor_tab(client: Client) -> None:
                 st.error(format_api_error_message(exc))
             else:
                 st.session_state["last_mentor"] = response
+                st.session_state["last_mentor_goal"] = str(pending["goal"])
+                st.session_state.pop("last_mentor_catalog", None)
 
     last = st.session_state.get("last_mentor")
     if last is None:
@@ -198,12 +226,15 @@ def render_mentor_tab(client: Client) -> None:
         st.write(f"**Wing:** {wing['name']}" + (f" — {wing_copy}" if wing_copy else ""))
     st.write(last.get("rationale") or "")
     path = last.get("proposed_path")
-    if isinstance(path, dict) and (path.get("title") or path.get("steps")):
+    has_path = isinstance(path, dict) and (path.get("title") or path.get("steps"))
+    if has_path:
         st.subheader(path.get("title") or "Proposed path")
         for step in path.get("steps") or []:
             if not isinstance(step, dict):
                 continue
             st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+    elif last.get("degraded"):
+        _render_mentor_catalog_links(client)
     parsed_citations: list[Citation] = []
     for raw in last.get("citations") or []:
         try:
@@ -213,6 +244,24 @@ def render_mentor_tab(client: Client) -> None:
         except ValidationError:
             continue
     _render_citation_expanders(client, parsed_citations)
+
+
+def _render_mentor_catalog_links(client: Client) -> None:
+    """Abstention → Discover: lawful catalog URLs when Mentor cannot propose."""
+    catalog = st.session_state.get("last_mentor_catalog")
+    goal = str(st.session_state.get("last_mentor_goal") or "").strip()
+    if not isinstance(catalog, dict) and goal:
+        try:
+            catalog = client.list_resources(q=goal, source="discover")
+        except (ApiClientError, ApiUnavailableError):
+            catalog = None
+        else:
+            st.session_state["last_mentor_catalog"] = catalog
+    if not isinstance(catalog, dict):
+        return
+    md = format_discover_link_markdown(catalog.get("items") or [])
+    if md:
+        st.markdown(md)
 
 
 def render_coffee_table_tab(client: Client) -> None:

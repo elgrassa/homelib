@@ -190,6 +190,43 @@ def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -
     return "\n\n".join(lines)
 
 
+def format_discover_link_markdown(
+    items: list[Mapping[str, Any]] | None,
+    *,
+    limit: int = 5,
+) -> str:
+    """Lawful catalog links for Ask refuse / Mentor abstain (ADR-008).
+
+    Renders metadata + provider URLs only — never claims remote full text as
+    local corpus. Empty/missing items → empty string (caller skips render).
+    """
+    if not items:
+        return ""
+    lines = [
+        "Lawful catalog sources (open the link; HomeLib does not ingest "
+        "these into the Ask reading shelf):"
+    ]
+    shown = 0
+    for raw in items:
+        if shown >= limit:
+            break
+        if not isinstance(raw, Mapping):
+            continue
+        url = str(raw.get("provider_url") or "").strip()
+        if not url:
+            continue
+        title = str(raw.get("title") or "").strip() or "Untitled"
+        authors = raw.get("authors") or []
+        author_bit = ""
+        if isinstance(authors, list) and authors:
+            author_bit = " — " + ", ".join(str(a) for a in authors if a)
+        lines.append(f"- **{title}**{author_bit} · [Open lawful source]({url})")
+        shown += 1
+    if shown == 0:
+        return ""
+    return "\n".join(lines)
+
+
 def format_library_summary_line(summary: LibrarySummary) -> str:
     """One-line Shelf / Ask inventory readout."""
     return (

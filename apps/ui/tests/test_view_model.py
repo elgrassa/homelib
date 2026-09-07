@@ -30,6 +30,7 @@ from apps.ui.view_model import (
     format_book_choice_label,
     format_citation_label,
     format_degraded_banner,
+    format_discover_link_markdown,
     format_playlist_item_line,
     get_api_url,
     has_voted,
@@ -214,6 +215,26 @@ def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:
     assert "do not answer" in body.lower()
     assert "18 books" in body
     assert format_ask_answer_body("Henry David Thoreau", None) == "Henry David Thoreau"
+
+
+def test_discover_link_markdown_renders_open_lawful_source() -> None:
+    """Ask refuse / Mentor abstain must surface provider URLs, not blank."""
+    md = format_discover_link_markdown(
+        [
+            {
+                "title": "Meditations",
+                "authors": ["Marcus Aurelius"],
+                "provider_url": "https://openlibrary.org/works/OL100W",
+            },
+            {"title": "No URL", "authors": [], "provider_url": ""},
+        ]
+    )
+    assert "Open lawful source" in md
+    assert "Meditations" in md
+    assert "https://openlibrary.org/works/OL100W" in md
+    assert "No URL" not in md
+    assert format_discover_link_markdown([]) == ""
+    assert format_discover_link_markdown(None) == ""
 
 
 # --------------------------------------------------------------------------
