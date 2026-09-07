@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -40,7 +41,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import psycopg
 from openai import OpenAI
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from homelib_rag.models import Hit
 
@@ -59,6 +60,7 @@ __all__ = [
     "OpenAICompatibleClient",
     "TokenUsage",
     "answer",
+    "is_passage_abstention",
 ]
 
 logger = logging.getLogger(__name__)
@@ -364,6 +366,49 @@ class _RawAnswer(BaseModel):
     answer: str
     citations: list[_RawCitation] = Field(default_factory=list)
 
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _reject_bare_citation_markers(cls, value: object) -> object:
+        """Groq sometimes emits `citations: [1]` (passage ordinals only).
+
+        Those are not `_RawCitation` objects. Reject the whole payload rather
+        than coercing to `[]` and silently trusting an uncited answer.
+        """
+        if not isinstance(value, list):
+            return value
+        for item in value:
+            if isinstance(item, (int, float, str)):
+                raise ValueError(
+                    "bare citation markers are not allowed; "
+                    "each citation must be an object with passage and quote"
+                )
+        return value
+
+
+# Honest passage-path refuses (empty citations + decline wording). Anything
+# else with empty citations is an uncited claim and must not be trusted.
+_PASSAGE_ABSTENTION = re.compile(
+    r"("
+    r"passages? do not answer|"
+    r"none of the (provided )?passages|"
+    r"provided passages do not|"
+    r"don'?t have (enough )?information|"
+    r"do not have (enough )?information|"
+    r"cannot (answer|determine|find)|"
+    r"not (enough|sufficient) (information|context|evidence)|"
+    r"no (relevant |matching )?(passage|information|evidence)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def is_passage_abstention(answer: str) -> bool:
+    """True when ``answer`` is an honest refuse, not a grounded claim."""
+    text_value = answer.strip()
+    if not text_value:
+        return True
+    return _PASSAGE_ABSTENTION.search(text_value) is not None
+
 
 # ── Book metadata lookup (test seam) ────────────────────────────────────────
 
@@ -524,13 +569,17 @@ def _is_rate_limit_failure(reason: object) -> bool:
     return "429" in text or "rate_limit" in text or "rate limit" in text
 
 
+def _is_uncited_failure(reason: object) -> bool:
+    return "uncited" in str(reason).lower()
+
+
 def _degraded_response(arm_used: str, reason: str) -> AskResponse:
     logger.warning("answer() returning a degraded response: %s", reason)
-    # Empty answer on Groq JSON-validate / truncated-JSON failure so the Ask UI
-    # refuse+#A1 path (`format_ask_answer_body`) can show shelf counts instead
-    # of a generic "try again" that hides the inventory miss. Rate limits get
-    # a clearer line.
-    if _is_json_validate_failure(reason):
+    # Empty answer on Groq JSON-validate / truncated-JSON failure / uncited
+    # claims so the Ask UI refuse+#A1 path (`format_ask_answer_body`) can show
+    # shelf counts instead of a generic "try again" that hides the miss. Rate
+    # limits get a clearer line.
+    if _is_json_validate_failure(reason) or _is_uncited_failure(reason):
         answer_text = ""
     elif _is_rate_limit_failure(reason):
         answer_text = _RATE_LIMITED_DEGRADED_ANSWER
@@ -619,6 +668,16 @@ def answer(
         if retried_without_json_format:
             reason = f"json_validate_failed after retry; {reason}"
         return _degraded_response(arm_used, reason)
+
+    # Empty citations are only honest for an abstention. A non-empty claim
+    # with `citations: []` (or after bare markers like `[1]` failed open) must
+    # not be trusted as a grounded answer.
+    if parsed.answer.strip() and not parsed.citations:
+        if not is_passage_abstention(parsed.answer):
+            return _degraded_response(
+                arm_used,
+                "uncited factual answer rejected; empty citations with a claim",
+            )
 
     # Only the passages actually shown to the model are citable. Slicing the
     # same way `_build_context_prompt` does keeps the two in step.

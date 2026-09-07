@@ -45,6 +45,7 @@ from apps.ui.view_model import (
     has_voted,
     library_summary,
     load_official_preview_books,
+    needs_ask_shelf_fallback,
     normalize_door,
     normalize_level,
     normalize_official_language,
@@ -88,7 +89,7 @@ def render_ask_tab(client: Client) -> None:
     if banner is not None:
         st.warning(banner)
     summary = None
-    if not (last_ask.answer or "").strip():
+    if needs_ask_shelf_fallback(last_ask.answer):
         try:
             summary = library_summary(client.list_books())
         except (ApiClientError, ApiUnavailableError):

@@ -171,21 +171,52 @@ def format_degraded_banner(response: AskResponse) -> str | None:
     return f"Answered with a degraded backend: {response.arm_used}"
 
 
-def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -> str:
-    """Never-blank Ask body. Empty LLM answers (inventory questions) get an
-    explicit refuse line plus optional shelf counts — ``st.write("")`` is
-    invisible and looks like a dead door."""
+def needs_ask_shelf_fallback(answer: str) -> bool:
+    """True when Ask should fetch shelf counts / next-step help.
+
+    Empty bodies and non-empty passage abstentions both hide useful next
+    actions unless the UI appends inventory context.
+    """
     text = answer.strip()
-    if text:
+    if not text:
+        return True
+    lowered = text.lower()
+    markers = (
+        "passages do not answer",
+        "none of the provided passages",
+        "none of the passages",
+        "don't have information",
+        "do not have information",
+        "cannot answer",
+        "not enough information",
+        "no relevant passage",
+    )
+    return any(m in lowered for m in markers)
+
+
+def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -> str:
+    """Never-blank Ask body. Empty LLM answers and passage abstentions get an
+    explicit refuse line plus optional shelf counts — ``st.write("")`` is
+    invisible and looks like a dead door; a lone abstention hides next steps.
+    """
+    text = answer.strip()
+    if text and not needs_ask_shelf_fallback(text):
         return text
-    lines = [
-        "The shelf passages do not answer that. Try a question about a book "
-        "on the shelf (for example: Who wrote Walden?)."
-    ]
+    lines: list[str] = []
+    if text:
+        lines.append(text)
+    else:
+        lines.append(
+            "The shelf passages do not answer that. Try a question about a book "
+            "on the shelf (for example: Who wrote Walden?)."
+        )
     if summary is not None and summary.book_count > 0:
         lines.append(
             f"This shelf currently has {summary.book_count} books · "
             f"{summary.total_blocks} blocks · {summary.total_chunks} chunks."
+        )
+        lines.append(
+            "Ask what is on the shelf, or a question about a title listed there."
         )
     return "\n\n".join(lines)
 

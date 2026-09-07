@@ -174,9 +174,10 @@ def test_agent_dispatches_tools_with_scripted_llm_alias() -> None:
     """Sanity: this module's own scripted-client pattern (used across the
     agent-tools/answer/roadmap test suites) never touches the network."""
     hits = [_hit()]
-    client = _ScriptedClient([_llm_json("ok", [])])
+    client = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
     result = answer("q", hits, client=client, arm_used="hybrid")
     assert result.answer == "ok"
+    assert result.degraded is False
 
 
 # ── Author-attribution hardening (the Ford/Roosevelt finding) ──────────────
@@ -190,7 +191,7 @@ def test_context_includes_authors_not_just_title(monkeypatch: pytest.MonkeyPatch
         lambda book_ids: {"b1": ("My Life and Work", ["Henry Ford"])},
     )
     hits = [_hit(book_id="b1")]
-    client = _ScriptedClient([_llm_json("ok", [])])
+    client = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
 
     answer("who wrote this?", hits, client=client, arm_used="hybrid")
 
@@ -238,7 +239,7 @@ def test_answer_degrades_when_book_metadata_lookup_fails(monkeypatch: pytest.Mon
         raise ConnectionError("db down")
 
     monkeypatch.setattr("homelib_rag.answer._book_metadata", _raise)
-    client = _ScriptedClient([_llm_json("ok", [])])
+    client = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
 
     result = answer("q", [_hit()], client=client, arm_used="hybrid")
 
@@ -728,7 +729,7 @@ def test_context_prompt_never_shows_a_chunk_id() -> None:
     out is cheaper than out-instructing it.
     """
     hits = [_hit(chunk_id="b4e8f2cb74bee0e8")]
-    client = _ScriptedClient([_llm_json("ok", [])])
+    client = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
 
     answer("q", hits, client=client, arm_used="hybrid")
 
@@ -805,3 +806,49 @@ def test_openai_client_prefers_a_set_llm_api_key_over_groq(monkeypatch: pytest.M
     assert client.base_url == "http://ollama:11434/v1"
     assert client.model == "qwen2.5:7b-instruct"
     assert client._client.api_key == "ollama"
+
+
+def test_factual_answer_with_empty_citations_is_not_trusted() -> None:
+    """Ungrounded claim + empty citations must degrade — never silent accept."""
+    hits = [_hit()]
+    client = _ScriptedClient([_llm_json("A factual claim", [])])
+
+    result = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert result.degraded is True
+    assert result.citations == []
+    assert result.answer != "A factual claim"
+    assert result.answer == ""
+
+
+def test_bare_integer_citations_do_not_become_trusted_uncited_answers() -> None:
+    """Groq `citations: [1]` must not coerce to [] and trust the claim."""
+    hits = [_hit()]
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                content='{"answer": "A factual claim", "citations": [1]}',
+                usage=LLMUsage(prompt_tokens=10, completion_tokens=5),
+            )
+        ]
+    )
+
+    result = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert result.degraded is True
+    assert result.citations == []
+    assert result.answer != "A factual claim"
+
+
+def test_honest_passage_abstention_with_empty_citations_stays_trusted() -> None:
+    """Legitimate refuse wording may keep citations=[] without degrading."""
+    hits = [_hit()]
+    client = _ScriptedClient(
+        [_llm_json("None of the provided passages answer this question.", [])]
+    )
+
+    result = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert result.degraded is False
+    assert result.citations == []
+    assert "passages" in result.answer.lower()

@@ -85,3 +85,23 @@ def test_ask_empty_degraded_answer_renders_refuse_and_degraded_banner() -> None:
     visible = " ".join(str(getattr(block, "value", block)) for block in at.markdown)
     visible += " ".join(str(getattr(block, "value", block)) for block in at.text)
     assert "do not answer" in visible.lower() or "passages do not answer" in visible.lower()
+
+
+def test_ask_nonempty_abstention_renders_abstention_text() -> None:
+    """Non-empty abstention must remain visible (not wiped to a blank door)."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Ask"
+    at.session_state["last_ask"] = AskResponse(
+        request_id="req-abstain",
+        answer="None of the provided passages answer this question.",
+        citations=[],
+        arm_used="hybrid_rerank",
+        degraded=False,
+        latency_ms=12,
+        tokens=TokenUsage(prompt=1, completion=0),
+    )
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    visible = " ".join(str(getattr(block, "value", block)) for block in at.markdown)
+    visible += " ".join(str(getattr(block, "value", block)) for block in at.text)
+    assert "none of the provided passages" in visible.lower()

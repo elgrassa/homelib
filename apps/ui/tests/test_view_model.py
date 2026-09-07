@@ -27,6 +27,7 @@ from apps.ui.view_model import (
     block_id_for_citation,
     format_api_error_message,
     format_ask_answer_body,
+    needs_ask_shelf_fallback,
     format_citation_label,
     format_degraded_banner,
     get_api_url,
@@ -211,7 +212,21 @@ def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:
     )
     assert "do not answer" in body.lower()
     assert "18 books" in body
+    assert "what is on the shelf" in body.lower()
     assert format_ask_answer_body("Henry David Thoreau", None) == "Henry David Thoreau"
+
+
+def test_ask_answer_body_appends_shelf_help_for_nonempty_abstention() -> None:
+    """Non-empty passage abstentions must still show shelf counts / next action."""
+    abstention = "None of the provided passages answer this question."
+    assert needs_ask_shelf_fallback(abstention) is True
+    body = format_ask_answer_body(
+        abstention, LibrarySummary(book_count=18, total_blocks=729, total_chunks=9168)
+    )
+    assert abstention in body
+    assert "18 books" in body
+    assert "what is on the shelf" in body.lower()
+    assert needs_ask_shelf_fallback("Henry David Thoreau") is False
 
 
 # --------------------------------------------------------------------------
