@@ -83,3 +83,40 @@ def test_sqlite_get_book_block_ignores_other_books_same_ordinal(sqlite_env: Path
 
     assert block.book_id == "book-b"
     assert block.text == "B at ordinal zero."
+
+
+def test_open_store_migrates_each_path_only_once(
+    sqlite_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: migrate-on-every-open held SQLite locks under Ask and made
+    `/health` wait for the whole LLM call (client timeouts / UI hang)."""
+    calls: list[Path] = []
+    real_migrate = migrate
+
+    def _counting_migrate(conn: object, target_version: int | None = None) -> None:
+        calls.append(sqlite_env)
+        real_migrate(conn, target_version)  # type: ignore[arg-type]
+
+    sqlite_deps.reset_migration_cache_for_tests()
+    monkeypatch.setattr(sqlite_deps, "migrate", _counting_migrate)
+
+    with sqlite_deps.open_store() as conn:
+        conn.execute("SELECT 1")
+    with sqlite_deps.open_store() as conn:
+        conn.execute("SELECT 1")
+    with sqlite_deps.open_store() as conn:
+        conn.execute("SELECT 1")
+
+    assert len(calls) == 1
+
+
+def test_sqlite_health_snapshot_returns_reachable_and_counts(sqlite_env: Path) -> None:
+    _seed_book_blocks(sqlite_env, "book-a", ["page"])
+    sqlite_deps.reset_migration_cache_for_tests()
+
+    ok, books, chunks = sqlite_deps.sqlite_health_snapshot()
+
+    assert ok is True
+    assert books == 1
+    assert chunks == 0
+

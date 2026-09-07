@@ -10,7 +10,10 @@ still stubbing out the network-reachability check — see that test's comment.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
+import threading
+import time
 from dataclasses import replace
 from typing import Any
 
@@ -1322,6 +1325,7 @@ def test_default_retrieve_marks_degraded_when_search_falls_back(
 
 @respx.mock
 def test_default_llm_reachable_true_when_models_endpoint_responds() -> None:
+    main._reset_llm_reachable_cache_for_tests()
     respx.get("http://localhost:11434/v1/models").mock(
         return_value=httpx.Response(200, json={"data": []})
     )
@@ -1330,7 +1334,87 @@ def test_default_llm_reachable_true_when_models_endpoint_responds() -> None:
 
 
 def test_default_llm_reachable_false_on_connection_error() -> None:
+    main._reset_llm_reachable_cache_for_tests()
     assert main._default_llm_reachable("http://127.0.0.1:1") is False
+
+
+@respx.mock
+def test_default_llm_reachable_caches_probe_so_health_stays_cheap() -> None:
+    """Regression: uncached Groq `/models` probes made solo `/health` 1.2–1.9s
+    and timed out during Ask; a short TTL cache keeps liveness under 2s."""
+    main._reset_llm_reachable_cache_for_tests()
+    route = respx.get("http://llm.test/v1/models").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
+
+    assert main._default_llm_reachable("http://llm.test/v1") is True
+    assert main._default_llm_reachable("http://llm.test/v1") is True
+    assert route.call_count == 1
+
+
+def test_health_returns_while_ask_llm_is_still_running(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`/health` must not wait for an in-flight Ask's LLM call — that was the
+    compose hang (UI spinner + curling /health both timing out)."""
+    from homelib_rag.answer import AskResponse, TokenUsage
+
+    from apps.inprocess_bridge import SyncASGITransport
+
+    release = threading.Event()
+    entered = threading.Event()
+
+    def _blocking_answer(
+        query: str,
+        hits: Any,
+        *,
+        client: Any = None,
+        arm_used: str = "hybrid",
+    ) -> AskResponse:
+        del query, hits, client
+        entered.set()
+        release.wait(timeout=5.0)
+        return AskResponse(
+            request_id="blocked-ask",
+            answer="ok",
+            citations=[],
+            arm_used=arm_used,
+            degraded=False,
+            latency_ms=0,
+            tokens=TokenUsage(prompt=1, completion=1),
+        )
+
+    monkeypatch.setattr(answer_module, "answer", _blocking_answer)
+    monkeypatch.setattr(
+        main.shelf_meta_module, "is_shelf_meta_intent", lambda query: False
+    )
+    deps = _make_deps(
+        retrieve=lambda q, k, arm: ([_hit()], arm, False),
+        llm_reachable=lambda: True,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+    transport = SyncASGITransport(app)
+    ask_http = httpx.Client(transport=transport, base_url="http://test")
+    health_http = httpx.Client(transport=transport, base_url="http://test")
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            ask_future = pool.submit(
+                lambda: ask_http.post("/v1/ask", json={"query": "Who wrote Walden?"})
+            )
+            assert entered.wait(timeout=2.0)
+            t0 = time.monotonic()
+            health = health_http.get("/health", timeout=2.0)
+            health_s = time.monotonic() - t0
+            release.set()
+            ask = ask_future.result(timeout=5)
+    finally:
+        ask_http.close()
+        health_http.close()
+        app.dependency_overrides.pop(get_deps, None)
+
+    assert health.status_code == 200
+    assert health_s < 2.0
+    assert ask.status_code == 200
 
 
 def test_default_db_reachable_true_when_select_one_succeeds(

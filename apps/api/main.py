@@ -360,12 +360,44 @@ def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, boo
     return hits, mode_used, degraded
 
 
-def _default_llm_reachable(base_url: str, timeout: float = 2.0) -> bool:
+# `/health` must stay snappy during a long `/v1/ask` (Groq/Ollama can sit near
+# LLM_TIMEOUT_SECONDS). A fresh provider `/models` probe every healthcheck was
+# measured at 1.2–1.9s alone on compose and stacked behind Ask into client
+# timeouts — cache briefly and keep the probe short.
+_LLM_REACHABLE_TTL_SECONDS = 30.0
+_LLM_REACHABLE_PROBE_TIMEOUT_SECONDS = 0.5
+_llm_reachable_cache: tuple[str, float, bool] | None = None
+_llm_reachable_lock = threading.Lock()
+
+
+def _reset_llm_reachable_cache_for_tests() -> None:
+    global _llm_reachable_cache
+    with _llm_reachable_lock:
+        _llm_reachable_cache = None
+
+
+def _default_llm_reachable(
+    base_url: str,
+    timeout: float = _LLM_REACHABLE_PROBE_TIMEOUT_SECONDS,
+) -> bool:
+    global _llm_reachable_cache
+    now = time.monotonic()
+    with _llm_reachable_lock:
+        cached = _llm_reachable_cache
+        if (
+            cached is not None
+            and cached[0] == base_url
+            and now - cached[1] < _LLM_REACHABLE_TTL_SECONDS
+        ):
+            return cached[2]
     try:
         httpx.get(f"{base_url.rstrip('/')}/models", timeout=timeout)
+        ok = True
     except Exception:
-        return False
-    return True
+        ok = False
+    with _llm_reachable_lock:
+        _llm_reachable_cache = (base_url, time.monotonic(), ok)
+    return ok
 
 
 def _default_db_reachable() -> bool:
@@ -698,9 +730,19 @@ def get_deps() -> Deps:
 
 @app.get("/health", response_model=Health)
 def get_health(deps: Deps = Depends(get_deps)) -> Health:
-    db_ok = deps.db_reachable()
+    # Prefer a single SQLite snapshot when wired — avoids double open_store()
+    # (reachable + counts) stacking locks under an in-flight Ask.
+    from apps.api import sqlite_deps
+
+    if (
+        sqlite_deps.sqlite_path() is not None
+        and deps.db_reachable is sqlite_deps.sqlite_db_reachable
+    ):
+        db_ok, books, chunks = sqlite_deps.sqlite_health_snapshot()
+    else:
+        db_ok = deps.db_reachable()
+        books, chunks = deps.counts() if db_ok else (0, 0)
     llm_ok = deps.llm_reachable()
-    books, chunks = deps.counts() if db_ok else (0, 0)
     # An empty store is reachable, migrated and useless: SQLite creates the
     # file on first connect, so a cold clone that never ran the seed would
     # otherwise report "ok" with 0 books. HTTP stays 200 (the compose
