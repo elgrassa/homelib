@@ -208,7 +208,9 @@ def test_healthy_response_has_no_banner() -> None:
 
 def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:
     """Inventory questions often get answer=\"\" — that must not render blank."""
-    body = format_ask_answer_body("", LibrarySummary(book_count=18, total_blocks=729, total_chunks=9168))
+    body = format_ask_answer_body(
+        "", LibrarySummary(book_count=18, total_blocks=729, total_chunks=9168)
+    )
     assert "do not answer" in body.lower()
     assert "18 books" in body
     assert format_ask_answer_body("Henry David Thoreau", None) == "Henry David Thoreau"
