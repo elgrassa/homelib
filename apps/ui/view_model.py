@@ -171,6 +171,25 @@ def format_degraded_banner(response: AskResponse) -> str | None:
     return f"Answered with a degraded backend: {response.arm_used}"
 
 
+def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -> str:
+    """Never-blank Ask body. Empty LLM answers (inventory questions) get an
+    explicit refuse line plus optional shelf counts — ``st.write("")`` is
+    invisible and looks like a dead door."""
+    text = answer.strip()
+    if text:
+        return text
+    lines = [
+        "The shelf passages do not answer that. Try a question about a book "
+        "on the shelf (for example: Who wrote Walden?)."
+    ]
+    if summary is not None and summary.book_count > 0:
+        lines.append(
+            f"This shelf currently has {summary.book_count} books · "
+            f"{summary.total_blocks} blocks · {summary.total_chunks} chunks."
+        )
+    return "\n\n".join(lines)
+
+
 def has_voted(feedback_sent: set[str], request_id: str) -> bool:
     """Whether ``request_id`` has already had feedback submitted for it."""
     return request_id in feedback_sent

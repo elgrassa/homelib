@@ -48,7 +48,14 @@ class _ScriptedClient:
         response_format: Any = None,
         max_tokens: int = 400,
     ) -> LLMResponse:
-        self.calls.append({"messages": list(messages), "tools": tools, "format": response_format})
+        self.calls.append(
+            {
+                "messages": list(messages),
+                "tools": tools,
+                "format": response_format,
+                "max_tokens": max_tokens,
+            }
+        )
         result = self._responses.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -274,6 +281,84 @@ def test_degraded_response_has_zero_tokens_and_empty_citations() -> None:
     assert result.tokens.prompt == 0
     assert result.tokens.completion == 0
     assert result.arm_used == "hybrid"
+    assert "try again" in result.answer.lower()
+
+
+def test_answer_retries_without_json_format_after_json_validate_failed() -> None:
+    """Groq `json_validate_failed` must not stick on the first attempt when a
+    plain chat retry can still produce valid JSON (inventory / refuse cases)."""
+    hits = [_hit(text="by Henry David Thoreau")]
+    client = _ScriptedClient(
+        [
+            LLMUnreachableError(
+                "Error code: 400 - {'error': {'message': \"Failed to validate JSON.\", "
+                "'code': 'json_validate_failed', 'failed_generation': ''}}"
+            ),
+            _llm_json("Henry David Thoreau", [{"passage": 1, "quote": "by Henry David Thoreau"}]),
+        ]
+    )
+
+    result = answer("Who wrote Walden?", hits, client=client, arm_used="hybrid_rerank")
+
+    assert result.degraded is False
+    assert result.answer == "Henry David Thoreau"
+    assert len(client.calls) == 2
+    assert client.calls[0]["format"] == {"type": "json_object"}
+    assert client.calls[1]["format"] is None
+    assert client.calls[0]["max_tokens"] == 1200
+    assert client.calls[1]["max_tokens"] == 1200
+
+
+def test_answer_json_validate_failed_twice_returns_empty_degraded_for_ui_refuse() -> None:
+    """Persistent Groq JSON-validate failure → degraded with empty answer so
+    Ask #A1 (`format_ask_answer_body`) can render refuse + shelf counts."""
+    err = LLMUnreachableError(
+        "Error code: 400 - {'error': {'code': 'json_validate_failed', 'failed_generation': ''}}"
+    )
+    client = _ScriptedClient([err, err])
+
+    result = answer("what do you have?", [_hit()], client=client, arm_used="hybrid_rerank")
+
+    assert result.degraded is True
+    assert result.answer == ""
+    assert result.citations == []
+    assert result.tokens.prompt == 0
+    assert len(client.calls) == 2
+
+
+def test_answer_malformed_after_json_retry_returns_empty_degraded() -> None:
+    """Retry without response_format that still isn't `_RawAnswer` JSON must
+    empty-degrade (not the generic try-again filler) for #A1."""
+    client = _ScriptedClient(
+        [
+            LLMUnreachableError(
+                "Error code: 400 - {'error': {'code': 'json_validate_failed', "
+                "'failed_generation': 'max completion tokens reached before "
+                "generating a valid document'}}"
+            ),
+            LLMResponse(
+                content="not json at all",
+                usage=LLMUsage(prompt_tokens=10, completion_tokens=5),
+            ),
+        ]
+    )
+
+    result = answer("what do you have?", [_hit()], client=client, arm_used="hybrid_rerank")
+
+    assert result.degraded is True
+    assert result.answer == ""
+
+
+def test_answer_rate_limit_surfaces_clearer_degraded_message() -> None:
+    client = _ScriptedClient(
+        [LLMUnreachableError("Error code: 429 - {'error': {'code': 'rate_limit_exceeded'}}")]
+    )
+
+    result = answer("q", [_hit()], client=client, arm_used="hybrid")
+
+    assert result.degraded is True
+    assert "rate-limited" in result.answer.lower()
+    assert result.citations == []
 
 
 # ── _validate_citations unit tests ──────────────────────────────────────────

@@ -37,6 +37,7 @@ from apps.ui.view_model import (
     clean_read_url,
     ensure_demo_session,
     format_api_error_message,
+    format_ask_answer_body,
     format_citation_label,
     format_degraded_banner,
     format_scene_hit_label,
@@ -67,13 +68,17 @@ def render_ask_tab(client: Client) -> None:
     st.header("Ask")
     query = st.text_input("Ask your library a question", key="ask_query")
     k = st.slider("Number of results", min_value=1, max_value=10, value=5, key="ask_k")
-    if st.button("Ask", key="ask_submit") and query.strip():
-        try:
-            response = client.ask(query, k=k)
-        except (ApiClientError, ApiUnavailableError) as exc:
-            st.error(format_api_error_message(exc))
+    if st.button("Ask", key="ask_submit"):
+        if not query.strip():
+            st.error("Enter a question so Ask can search the shelf.")
         else:
-            st.session_state["last_ask"] = response
+            with st.spinner("Searching the shelf…"):
+                try:
+                    response = client.ask(query.strip(), k=k)
+                except (ApiClientError, ApiUnavailableError) as exc:
+                    st.error(format_api_error_message(exc))
+                else:
+                    st.session_state["last_ask"] = response
 
     last_ask: AskResponse | None = st.session_state.get("last_ask")
     if last_ask is None:
@@ -82,7 +87,13 @@ def render_ask_tab(client: Client) -> None:
     banner = format_degraded_banner(last_ask)
     if banner is not None:
         st.warning(banner)
-    st.write(last_ask.answer)
+    summary = None
+    if not (last_ask.answer or "").strip():
+        try:
+            summary = library_summary(client.list_books())
+        except (ApiClientError, ApiUnavailableError):
+            summary = None
+    st.write(format_ask_answer_body(last_ask.answer, summary))
     for line in ask_metric_captions(last_ask):
         st.caption(line)
 
