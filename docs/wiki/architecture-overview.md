@@ -9,64 +9,54 @@ See [`specs/product.md`](../../specs/product.md) for the full product narrative.
 ## High-level system diagram
 
 ```mermaid
-flowchart TB
-    subgraph clients["Clients"]
-        UI["Streamlit UI<br/>(apps/ui)"]
-        API_docs["Swagger / OpenAPI"]
-    end
-
-    subgraph app["Application layer"]
-        API["FastAPI<br/>(apps/api)"]
-        Client["HomelibClient<br/>InProcess | Http"]
-        Svc["Service layer<br/>(WP06+)"]
-    end
-
-    subgraph rag["Retrieval & generation"]
-        Index["index.py<br/>lexical + vector"]
-        Hybrid["hybrid.py<br/>RRF fusion"]
-        Rerank["rerank.py"]
-        Rewrite["rewrite.py"]
-        Answer["answer.py / agent.py"]
-    end
-
-    subgraph ingest["Ingestion"]
-        Parse["homelib-core<br/>parse_file()"]
-        Chunk["chunk_book()"]
-        DLT["dlt pipeline<br/>(apps/ingest)"]
-    end
-
-    subgraph store["Storage (edition-dependent)"]
-        PG[("Postgres<br/>v1 fallback")]
-        SQL[("SQLite + FTS5<br/>v2 target")]
-        Matrix["NumPy embedding<br/>matrix cache"]
-    end
-
-    subgraph llm["LLM providers"]
-        Ollama["Ollama / LM Studio"]
-        Cloud["Managed cloud<br/>(demo)"]
-    end
-
-    UI --> Client
-    Client --> API
-    Client --> Svc
-    API --> Svc
-    Svc --> Index
-    Index --> Hybrid
-    Hybrid --> Rerank
-    Rewrite --> Hybrid
-    Svc --> Answer
-    Answer --> llm
-
-    Parse --> Chunk --> DLT
-    DLT --> PG
-    DLT --> SQL
-    DLT --> Matrix
-    Index --> PG
-    Index --> SQL
-    Index --> Matrix
+flowchart TD
+    Reader([Reader]) --> Streamlit[Streamlit Crossroads]
+    Streamlit --> FastAPI[FastAPI]
+    FastAPI --> Shelf[Shelf search]
+    Shelf --> Index[SQLite FTS5 plus float32]
+    Index --> Passage[Cited passage open_anchor]
+    Passage --> Reading[In-UI passage plus Projection]
+    FastAPI --> Ask[Ask fixed RAG]
+    Ask --> RetrAsk[Hybrid retrieve RRF k60 rerank]
+    RetrAsk --> GroqAsk[Groq openai gpt-oss-20b]
+    GroqAsk --> Cite[Citation validation]
+    FastAPI --> Mentor[Mentor run_agent max 2]
+    Mentor --> Tools[search_shelf catalog get_block]
+    Tools --> GroqMen[Groq]
+    FastAPI --> Roadmap[Roadmap LLM catalog path]
+    Roadmap --> CatSnap[OL catalog snapshot]
+    CatSnap --> GroqRoad[Groq]
+    FastAPI --> Feedback["POST /v1/feedback"]
+    Feedback --> QLog[(SQLite query_log)]
+    Ask --> QLog
+    Ask --> Spans[(OTel spans)]
+    QLog --> Obs[Observatory 9 chart defs]
+    Spans --> Obs
+    Corpus[Ingested corpus text] --> DLT[dlt]
+    DLT --> Blocks[BookDoc blocks]
+    Blocks --> Chunks[Chunks 1200/200]
+    Chunks --> SQLite[(SQLite tip)]
+    Meta[OL catalog snapshot] --> CatTable[(catalog table)]
+    CatTable --> SQLite
+    DLT -.-> PG[(Postgres pgvector fallback)]
 ```
 
-**Boundary rule:** the UI never touches the database. All access goes through `HomelibClient` ([`specs/client.md`](../../specs/client.md)).
+The reader picks a Crossroads door; there is no shared query router. **Ask** is
+single-shot hybrid retrieve → rerank → Groq (`openai/gpt-oss-20b`) → citation
+validation (or explicit degrade). **Mentor** alone runs `run_agent` (max 2 rounds)
+with shelf/catalog/block tools. **Roadmap** is an LLM-assisted catalog path.
+Shelf, Coffee Table, and Projection browse/read without calling Groq. The UI
+never touches the database — all access goes through `HomelibClient`
+([`specs/client.md`](../../specs/client.md)).
+
+Ingest builds readable text into BookDoc blocks and MiniLM embeddings in
+**SQLite** (demo tip). Open Library metadata is a **separate catalog snapshot**
+loaded into the catalog table — it does not pass through format parsing or
+chunking, and it is not full-text reading. Ask writes latency/tokens/cost and
+OTel spans; feedback is `POST /v1/feedback` → SQLite. Observatory exposes nine
+chart definitions that fill when telemetry exists; the online judge is
+**operator-run** (`scripts/judge_recent.py`), off by default. Postgres + pgvector
+remains the self-hosted fallback.
 
 ---
 
@@ -126,7 +116,7 @@ flowchart TB
     subgraph compose["APP_MODE=selfhosted — docker compose (the reviewer path)"]
         C_UI[ui :8501] -->|HttpClient| C_API[api :8000]
         C_API --> C_DB[(data/homelib.sqlite<br/>just seed-sqlite)]
-        C_API -->|GROQ_API_KEY, LLM_API_KEY blank| C_GROQ[Groq llama-3.3-70b-versatile]
+        C_API -->|GROQ_API_KEY, LLM_API_KEY blank| C_GROQ[Groq openai/gpt-oss-20b]
         C_API -.->|optional --profile local-llm| C_OLL[ollama qwen2.5:7b-instruct]
         C_ING[ingest one-shots] --> C_PG[(postgres — v1 store, Grafana)]
         C_ING --> C_DB
