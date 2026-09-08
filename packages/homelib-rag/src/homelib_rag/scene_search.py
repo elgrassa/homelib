@@ -269,6 +269,17 @@ def _fuse_hits(lexical_hits: list[Hit], vector_hits: list[Hit], k: int) -> tuple
     return _fuse(lexical_hits, vector_hits, k), "smart"
 
 
+def _promote_verbatim_phrase(query: str, hits: list[Hit]) -> list[Hit]:
+    """Keep exact body matches ahead of semantic/reranker approximations."""
+    needle = " ".join(query.split()).casefold()
+    if not needle:
+        return hits
+    return sorted(
+        hits,
+        key=lambda hit: needle not in " ".join(hit.text.split()).casefold(),
+    )
+
+
 def _smart_hits(
     conn: sqlite3.Connection,
     query: str,
@@ -313,6 +324,7 @@ def _smart_hits(
     reranked = rerank(search_q, scoped)
     if reranked is not None:
         scoped = reranked
+    scoped = _promote_verbatim_phrase(search_q, scoped)
     scenes = _hits_to_scene(conn, scoped[:k], resource_id=resource_id, chapter_id=chapter_id)
     return scenes, mode_used, degraded
 

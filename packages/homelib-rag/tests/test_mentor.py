@@ -226,6 +226,41 @@ def test_path_schema_fail_closed() -> None:
         )
 
 
+def test_build_path_rejects_empty_steps_and_accepts_grounded_steps() -> None:
+    catalog = lambda _goal, _subjects: [_catalog_entry("/works/OL1W")]
+    with pytest.raises(RoadmapParseError, match="at least one step"):
+        build_path(
+            "Empty path",
+            "reading",
+            [],
+            catalog=catalog,
+            interests=["philosophy"],
+            goal="learn",
+        )
+
+    response = build_path(
+        "Grounded path",
+        "reading",
+        [
+            RoadmapStep(
+                order=0,
+                ol_key="/works/OL1W",
+                book_id=None,
+                title="Meditations",
+                authors=["Marcus Aurelius"],
+                why="Foundation",
+                prerequisites=[],
+                est_effort="light",
+            )
+        ],
+        catalog=catalog,
+        interests=["philosophy"],
+        goal="learn",
+    )
+    assert response.title == "Grounded path"
+    assert response.steps[0].ol_key == "/works/OL1W"
+
+
 def test_citations_resolve() -> None:
     client = _ScriptedClient(_tool_then_intake(_intake_json()))
     response = mentor_intake(
@@ -304,6 +339,25 @@ def test_mentor_accepts_grounded_in_context_path_without_optional_tool_call() ->
     assert response.rounds_used == 1
 
 
+def test_mentor_accepts_grounded_area_and_wing_without_path() -> None:
+    client = _ScriptedClient([_intake_json(proposed_path=None)])
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+
+    assert response.degraded is False
+    assert response.proposed_area is not None
+    assert response.proposed_area.name == "Stoicism"
+    assert response.proposed_wing is not None
+    assert response.proposed_path is None
+
+
 def test_mentor_intake_degrades_when_llm_down() -> None:
     """The LLM endpoint is unreachable before `run_agent` gets to invoke a
     tool: the response is still returned degraded, exactly as it was before
@@ -322,6 +376,47 @@ def test_mentor_intake_degrades_when_llm_down() -> None:
     assert response.tool_calls == []
     assert response.rounds_used == 0
     assert response.rationale == "The mentor service is temporarily unavailable."
+
+
+def test_mentor_invalid_structured_output_abstains() -> None:
+    """Malformed final JSON must never become an apparently healthy proposal."""
+    client = _ScriptedClient(
+        [LLMResponse(content="{not json", usage=LLMUsage(prompt_tokens=1, completion_tokens=1))]
+    )
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.citations == []
+
+
+def test_mentor_invalid_citation_keeps_proposal_but_marks_it_degraded() -> None:
+    """A useful path cannot make a fabricated passage quote look verified."""
+    client = _ScriptedClient(
+        [_intake_json(citations=[{"passage": 1, "quote": "Invented source text."}])]
+    )
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+
+    assert response.degraded is True
+    assert response.proposed_path is not None
+    assert response.proposed_path.title == "Start with Stoicism"
+    assert response.citations == []
 
 
 def test_abstention_on_no_evidence() -> None:

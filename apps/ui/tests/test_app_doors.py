@@ -58,6 +58,21 @@ def test_clicking_a_door_button_opens_that_door() -> None:
     assert f"Facing: {target}" in rotunda.body
 
 
+def test_switching_doors_does_not_render_the_previous_door_body() -> None:
+    """LIVE: Projection briefly kept Observatory/Ask controls until another rerun."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Ask"
+    at.run()
+    assert "Ask your library a question" in [widget.label for widget in at.text_input]
+
+    at.button(key="door_Projection").click().run()
+
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["door"] == "Projection"
+    assert "Projection" in [header.value for header in at.header]
+    assert "Ask your library a question" not in [widget.label for widget in at.text_input]
+
+
 def test_door_query_param_opens_that_door_and_is_consumed() -> None:
     """The rotunda's Enter reloads the page on `?door=X`; the app must open X
     and drop the param so a later grid click is not overridden on rerun."""

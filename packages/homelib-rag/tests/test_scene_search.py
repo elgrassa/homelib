@@ -291,6 +291,25 @@ def test_smart_mode_returns_fused_hits(scene_db: sqlite3.Connection) -> None:
     assert response.mode_used in {"smart", "keyword", "semantic"}
 
 
+def test_smart_mode_keeps_verbatim_phrase_ahead_of_reranker_noise(
+    scene_db: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LIVE: Walden's exact sentence ranked fourth after cross-encoder rerank."""
+    exact_phrase = "the lantern flickered in the corridor"
+
+    def _reverse_rerank(_query: str, hits: list[object]) -> list[object]:
+        return list(reversed(hits))
+
+    monkeypatch.setattr(scene_search_module, "rerank", _reverse_rerank)
+
+    response = scene_search(scene_db, "book-a", exact_phrase, SceneMode.SMART, k=3)
+
+    assert response.hits
+    assert response.hits[0].block_id == "a-ch1-b0"
+    assert exact_phrase in response.hits[0].quote.lower()
+
+
 def test_resource_not_found(scene_db: sqlite3.Connection) -> None:
     with pytest.raises(scene_search_module.ResourceNotFoundError):
         scene_search(scene_db, "missing-book", "lantern", SceneMode.KEYWORD, k=3)
