@@ -118,7 +118,6 @@ _SYSTEM_PROMPT = (
     "and no other text."
 )
 
-
 # ── Shared OpenAI-compatible client seam ────────────────────────────────────
 
 
@@ -520,6 +519,51 @@ def _resolve_quote(raw_citation: _RawCitation, context_hits: list[Hit]) -> Hit |
     return None
 
 
+def _resolve_author_header_quote(
+    raw_citation: _RawCitation,
+    answer_text: str,
+    context_hits: list[Hit],
+    book_meta: dict[str, tuple[str, list[str]]],
+) -> tuple[Hit, str] | None:
+    """Recover only when a quoted author header is also verbatim passage text.
+
+    Some OpenAI-compatible models quote ``authors=['Name']`` from the prompt
+    metadata. Metadata alone is not citable. If that exact stored author also
+    appears in the answer and in a shown passage body, return the body-backed
+    author substring; otherwise keep failing closed.
+    """
+    raw_quote = _collapse_whitespace(raw_citation.quote)
+    answer_folded = _collapse_whitespace(answer_text).casefold()
+    if not raw_quote.startswith("authors="):
+        return None
+
+    hinted_index = raw_citation.passage - 1
+    if not 0 <= hinted_index < len(context_hits):
+        return None
+    hinted_book_id = context_hits[hinted_index].book_id
+
+    for hit in context_hits:
+        if hit.book_id != hinted_book_id:
+            continue
+        _title, authors = book_meta.get(hit.book_id, ("", []))
+        passage = _collapse_whitespace(hit.text)
+        for author in authors:
+            author_text = _collapse_whitespace(author)
+            if (
+                author_text
+                and author_text.casefold() in raw_quote.casefold()
+                and author_text.casefold() in answer_folded
+                and author_text in passage
+            ):
+                logger.info(
+                    "citation quoted an author metadata header; rebinding %r "
+                    "to the same verbatim author in passage text",
+                    author_text,
+                )
+                return hit, author_text
+    return None
+
+
 def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
     """Raise `CitationValidationError` unless every citation is genuine.
 
@@ -604,6 +648,7 @@ def answer(
     `AskResponse`," matching specs/answer.md's degradation rule.
     """
     start = time.monotonic()
+
     try:
         book_meta = _book_metadata([hit.book_id for hit in hits])
     except Exception as exc:  # DB unreachable, etc. — never let this 500 the request
@@ -660,6 +705,7 @@ def answer(
         reason = f"malformed LLM output: {exc}"
         if retried_without_json_format:
             reason = f"json_validate_failed after retry; {reason}"
+
         return _degraded_response(arm_used, reason)
 
     if not parsed.answer.strip():
@@ -677,6 +723,17 @@ def answer(
     citations: list[Citation] = []
     for raw_citation in parsed.citations:
         source = _resolve_quote(raw_citation, context_hits)
+        citation_quote = raw_citation.quote
+        if source is None:
+            recovered = _resolve_author_header_quote(
+                raw_citation,
+                parsed.answer,
+                context_hits,
+                book_meta,
+            )
+            if recovered is not None:
+                source, citation_quote = recovered
+
         if source is None:
             return _degraded_response(
                 arm_used,
@@ -692,7 +749,7 @@ def answer(
                 book_title=title,
                 section_path=source.section_path,
                 page=source.page,
-                quote=raw_citation.quote,
+                quote=citation_quote,
             )
         )
 

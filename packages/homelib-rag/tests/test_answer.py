@@ -635,6 +635,57 @@ def test_a_quote_from_a_different_passage_is_reattributed_not_discarded() -> Non
     assert [c.chunk_id for c in response.citations] == ["c2"]
 
 
+def test_author_metadata_header_quote_rebinds_to_verbatim_author_in_passage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LIVE: Groq quoted the prompt header; trust only the same author in body text."""
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata",
+        lambda book_ids: {
+            book_id: ("Walden" if book_id == "b1" else "Another Book", ["Henry David Thoreau"])
+            for book_id in book_ids
+        },
+    )
+    hits = [_hit(text="Walden, by Henry David Thoreau", book_id="b1")]
+    hits[0].block_ids = ["blk-walden"]
+    client = _ScriptedClient(
+        [
+            _llm_json(
+                "Henry David Thoreau",
+                [{"passage": 1, "quote": "authors=['Henry David Thoreau']"}],
+            )
+        ]
+    )
+
+    response = answer("Who wrote Walden?", hits, client=client, arm_used="hybrid_rerank")
+
+    assert response.degraded is False
+    assert len(response.citations) == 1
+    assert response.citations[0].quote == "Henry David Thoreau"
+    assert response.citations[0].block_id == "blk-walden"
+    assert response.citations[0].quote in hits[0].text
+
+    metadata_only_hits = [
+        _hit(text="Walden discusses civil disobedience.", book_id="b1"),
+        _hit(text="An essay by Henry David Thoreau.", book_id="b2"),
+    ]
+    metadata_only = answer(
+        "Who wrote Walden?",
+        metadata_only_hits,
+        client=_ScriptedClient(
+            [
+                _llm_json(
+                    "Henry David Thoreau",
+                    [{"passage": 1, "quote": "authors=['Henry David Thoreau']"}],
+                )
+            ]
+        ),
+        arm_used="hybrid_rerank",
+    )
+    assert metadata_only.degraded is True
+    assert metadata_only.citations == []
+
+
 def test_a_quote_found_in_no_passage_at_all_still_degrades() -> None:
     """Reattribution must not become "accept anything".
 
