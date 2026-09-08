@@ -45,8 +45,31 @@ step "mypy --strict"     uv run mypy
 # Skipped rather than failed when gitleaks is absent, because a contributor
 # without it should be told, not blocked. CI hard-errors on a missing binary,
 # so the guarantee is not lost — only deferred.
+#
+# Scan only the commits this push actually sends. A full-history `gitleaks git`
+# over this repo can hang for tens of minutes on large binary blobs in early
+# history (corpus snapshots); CI still runs the full scan with a job budget.
 if command -v gitleaks >/dev/null 2>&1; then
-    step "gitleaks"      gitleaks git --config .gitleaks.toml --redact --no-banner .
+    gitleaks_ok=1
+    while read -r local_ref local_sha remote_ref remote_sha; do
+        [[ -z "${local_sha:-}" || "$local_sha" =~ ^0+$ ]] && continue
+        if [[ -z "${remote_sha:-}" || "$remote_sha" =~ ^0+$ ]]; then
+            range_opts="--max-count=64"
+        else
+            range_opts="$remote_sha..$local_sha"
+        fi
+        if ! gitleaks git --config .gitleaks.toml --redact --no-banner \
+                --log-opts="$range_opts" . >/tmp/homelib-prepush.log 2>&1; then
+            printf '  ✗ gitleaks (%s)\n' "$local_ref"
+            sed 's/^/      /' /tmp/homelib-prepush.log | tail -25
+            gitleaks_ok=0
+        fi
+    done
+    if [[ "$gitleaks_ok" -eq 1 ]]; then
+        printf '  ✓ gitleaks (push range)\n'
+    else
+        fail=1
+    fi
 else
     printf '  ⚠ gitleaks not installed — history not scanned here (CI still enforces it)\n'
 fi
