@@ -316,8 +316,6 @@ def test_discover_empty_query_browses_and_q_filters(sqlite_env: Path) -> None:
         assert browsed["items"]
         title = browsed["items"][0]["title"]
         needle = title.split()[0]
-        filtered = client.get(
-            "/v1/resources", params={"source": "discover", "q": needle}
-        ).json()
+        filtered = client.get("/v1/resources", params={"source": "discover", "q": needle}).json()
         assert filtered["items"]
         assert all(needle.lower() in item["title"].lower() for item in filtered["items"])

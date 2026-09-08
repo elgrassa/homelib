@@ -559,8 +559,10 @@ def browse_catalog(
     matched: list[CatalogEntry] = []
     for row in rows:
         entry_subjects = _json_list_or_empty(row[3])
-        if needle and needle not in str(row[1]).lower() and not any(
-            needle in s.lower() for s in entry_subjects
+        if (
+            needle
+            and needle not in str(row[1]).lower()
+            and not any(needle in s.lower() for s in entry_subjects)
         ):
             continue
         matched.append(

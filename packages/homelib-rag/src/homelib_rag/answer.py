@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import threading
 import time
 import uuid
@@ -60,7 +59,6 @@ __all__ = [
     "OpenAICompatibleClient",
     "TokenUsage",
     "answer",
-    "is_passage_abstention",
 ]
 
 logger = logging.getLogger(__name__)

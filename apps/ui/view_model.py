@@ -263,6 +263,7 @@ def format_ask_answer_body(answer: str, summary: LibrarySummary | None = None) -
         lines.append("Ask what is on the shelf, or a question about a title listed there.")
     return "\n\n".join(lines)
 
+
 def has_voted(feedback_sent: set[str], request_id: str) -> bool:
     """Whether ``request_id`` has already had feedback submitted for it."""
     return request_id in feedback_sent
