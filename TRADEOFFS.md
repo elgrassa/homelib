@@ -49,3 +49,11 @@ Postgres+pgvector remains compose for Grafana / `v1-fallback`. Do not claim
 
 `run_agent` exists for course M1 and runs **only** on Mentor intake with
 `max_rounds=2`. Ask is single-shot RAG. **No LangGraph in prod.**
+
+## Dual corpus — shelf full-text vs catalog metadata
+
+**Shipped surface:** Ask passages + inventory/romance use the **18** ingested
+full-text shelf books. Mentor/Roadmap/`GET /v1/resources?source=discover`
+default to the committed **Open Library catalog snapshot**
+(`data/catalog.jsonl` → `catalog` table, ~3061 works, metadata only). Live
+connector federation stays opt-in (`HOMELIB_CONNECTOR_MODE=live`, issue #46).

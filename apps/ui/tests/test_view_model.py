@@ -35,6 +35,7 @@ from apps.ui.view_model import (
     get_api_url,
     has_voted,
     library_summary,
+    needs_ask_shelf_fallback,
     normalize_door,
     normalize_level,
     observatory_chart_titles,

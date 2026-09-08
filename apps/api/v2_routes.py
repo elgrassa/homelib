@@ -195,20 +195,56 @@ def post_scene_search(resource_id: str, req: SceneSearchRequest) -> SceneSearchR
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def _open_library_url(ol_key: str) -> str:
+    key = ol_key if ol_key.startswith("/") else f"/{ol_key}"
+    return f"https://openlibrary.org{key}"
+
+
+def _discover_from_catalog(q: str | None, *, limit: int = 50, offset: int = 0) -> ResourceList:
+    """Demo default: committed Open Library catalog snapshot (offline)."""
+    from homelib_rag.sqlite_index import browse_catalog, catalog_row_count
+
+    with sqlite_deps.open_store() as conn:
+        total = catalog_row_count(conn=conn)
+        entries, match_count = browse_catalog(q, limit=limit, offset=offset, conn=conn)
+
+    items = [
+        ResourceSummary(
+            id=entry.ol_key,
+            book_id=None,
+            title=entry.title,
+            authors=list(entry.authors),
+            source="discover",
+            rights_status="metadata_only",
+            can_index_text=False,
+            full_text_available=False,
+            provider_url=_open_library_url(entry.ol_key),
+        )
+        for entry in entries
+    ]
+    return ResourceList(
+        items=items,
+        unique_count=match_count if (q or "").strip() else total,
+        approximate_provider_counts={"open_library_snapshot": total},
+        degraded=False,
+    )
+
+
 def _discover_resources(q: str | None) -> ResourceList:
-    """Federate lawful catalog connectors; empty query returns no hits."""
+    """Discover: snapshot by default; live federation when HOMELIB_CONNECTOR_MODE=live."""
     import hashlib
+    import os
+
+    mode = os.environ.get("HOMELIB_CONNECTOR_MODE", "snapshot").strip().lower()
+    if mode not in {"live", "federate"}:
+        return _discover_from_catalog(q)
 
     from homelib_rag.connectors import build_discover_connectors, federate_connectors
 
     needle = (q or "").strip()
     if not needle:
-        return ResourceList(
-            items=[],
-            unique_count=0,
-            approximate_provider_counts={},
-            degraded=False,
-        )
+        # Live connectors need a query; fall back to snapshot browse for empty q.
+        return _discover_from_catalog(q)
 
     result = federate_connectors(build_discover_connectors(), needle)
     items: list[ResourceSummary] = []

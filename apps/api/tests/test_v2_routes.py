@@ -294,3 +294,30 @@ def test_discover_resources_degrades_when_one_connector_times_out(
         assert body["degraded"] is True
         assert body["unique_count"] >= 1
         assert body["items"][0]["title"] == "The Republic"
+
+
+def test_discover_returns_seeded_catalog_not_empty(sqlite_env: Path) -> None:
+    """Discover default is the committed Open Library snapshot."""
+    with TestClient(app) as client:
+        shelf = client.get("/v1/resources").json()
+        discover = client.get("/v1/resources", params={"source": "discover"}).json()
+        assert shelf["items"]
+        assert discover["items"], "seeded catalog must surface on Discover"
+        assert discover["approximate_provider_counts"].get("open_library_snapshot", 0) >= 1
+        for item in discover["items"]:
+            assert item["source"] == "discover"
+            assert item["full_text_available"] is False
+            assert item["provider_url"]
+
+
+def test_discover_empty_query_browses_and_q_filters(sqlite_env: Path) -> None:
+    with TestClient(app) as client:
+        browsed = client.get("/v1/resources", params={"source": "discover"}).json()
+        assert browsed["items"]
+        title = browsed["items"][0]["title"]
+        needle = title.split()[0]
+        filtered = client.get(
+            "/v1/resources", params={"source": "discover", "q": needle}
+        ).json()
+        assert filtered["items"]
+        assert all(needle.lower() in item["title"].lower() for item in filtered["items"])

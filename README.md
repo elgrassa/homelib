@@ -1,4 +1,4 @@
-# homelib
+# homelib https://homelib.streamlit.app/
 
 **Your bookshelf is unsearchable, and your reading order is unplanned.**
 
@@ -464,7 +464,7 @@ strict there: `done` means verified by a command whose output is recorded in
 | Containerization | 2 | done | 7 services in one compose file, digest-pinned, healthchecked — [`docker/docker-compose.yml`](docker/docker-compose.yml) |
 | Reproducibility | 2 | done | Pins, snapshot, digests; **`just drill` PASSED on the train tip `ee0f318`** (2026-09-05 22:01, ~68 min at host load 200–440: cold clone from `.env.example`, `--build` Postgres seed 18 books, `--build` SQLite seed 18/729/9168/9168, `/health` ok 18/9168, ask attempt 1 timed out at 300 s, **attempt 2 grounded `hybrid_rerank` with a resolving citation**, Observatory then 6 charts / 5 populated — tip now **9 chart defs**, `queries_over_time` 1 point). Earlier: PASSED on `v2` @ `d6f9946` (2026-09-04); the 2026-09-05 re-run on `ae83d51` passed clone/seeds/health and failed the ask step under host load (3/5 timeouts) — recorded, not hidden — [`docs/evidence.md`](docs/evidence.md), [`scripts/cold_clone_drill.sh`](scripts/cold_clone_drill.sh) |
 | Best practices — hybrid (1) + rerank (1) + rewrite (1) | 3 | done | All three implemented **and** measured. Rewrite's evaluation rejected it on evidence — under the course's own "if implemented and evaluated" rule, the measurement is the point earned, not a passing score — [ADR-001](docs/adrs/ADR-001-retrieval-arm.md) |
-| Cloud deployment (bonus) | 2 | not done | No public URL from this tree. The Cloud files (root `streamlit_app.py`, committed seed, Python 3.13 in Advanced settings, Groq secrets) are drafted and held until the drill re-run passes; the Streamlit Community Cloud app is created after this snapshot merges — [`docs/submission.md`](docs/submission.md) |
+| Cloud deployment (bonus) | 2 | done | https://homelib.streamlit.app/ — [`docs/submission.md`](docs/submission.md) |
 | Extras (bonus) | 1 | partial | Mentor agent with abstention, eval regression gate with an append-only history, Coffee Table state machine, the rotunda — the reviewer's call |
 
 Floor without any bonus, on the statuses above: **21/21** done, with row 9

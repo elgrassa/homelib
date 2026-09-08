@@ -20,7 +20,15 @@ from homelib_rag.models import Hit
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-__all__ = ["book_metadata", "search_catalog", "search_lexical", "search_vector", "sqlite_path"]
+__all__ = [
+    "book_metadata",
+    "browse_catalog",
+    "catalog_row_count",
+    "search_catalog",
+    "search_lexical",
+    "search_vector",
+    "sqlite_path",
+]
 
 _DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 _EMBED_DIM = 384
@@ -410,6 +418,7 @@ def search_vector(
 # predicate as `search_lexical`/`search_vector` (ADR-004).
 
 _MAX_CATALOG_RESULTS = 20
+_MAX_DISCOVER_BROWSE = 100
 
 
 def _json_list_or_empty(raw: object) -> list[str]:
@@ -501,3 +510,68 @@ def search_catalog(
         if len(out) >= _MAX_CATALOG_RESULTS:
             break
     return out
+
+
+def catalog_row_count(*, conn: sqlite3.Connection | None = None) -> int:
+    """Total rows in the seeded Open Library catalog snapshot."""
+    owns_conn = conn is None
+    db = _connect() if owns_conn else conn
+    assert db is not None
+    try:
+        row = db.execute("SELECT COUNT(*) FROM catalog").fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        if owns_conn:
+            db.close()
+
+
+def browse_catalog(
+    query: str | None = None,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    conn: sqlite3.Connection | None = None,
+) -> tuple[list[CatalogEntry], int]:
+    """Discover browse over the committed catalog table (empty query = title order).
+
+    Unlike `search_catalog`, empty/whitespace `query` is allowed. Returns
+    ``(page, match_count)``.
+    """
+    capped = max(1, min(int(limit), _MAX_DISCOVER_BROWSE))
+    start = max(0, int(offset))
+    owns_conn = conn is None
+    db = _connect() if owns_conn else conn
+    assert db is not None
+    needle = (query or "").strip().lower()
+    try:
+        rows = db.execute(
+            """
+            SELECT ol_key, title, authors, subjects, first_publish_year,
+                   description, provenance_note
+            FROM catalog
+            ORDER BY title COLLATE NOCASE
+            """
+        ).fetchall()
+    finally:
+        if owns_conn:
+            db.close()
+
+    matched: list[CatalogEntry] = []
+    for row in rows:
+        entry_subjects = _json_list_or_empty(row[3])
+        if needle and needle not in str(row[1]).lower() and not any(
+            needle in s.lower() for s in entry_subjects
+        ):
+            continue
+        matched.append(
+            CatalogEntry(
+                ol_key=str(row[0]),
+                title=str(row[1]),
+                authors=_json_list_or_empty(row[2]),
+                subjects=entry_subjects,
+                first_publish_year=row[4],
+                description=row[5],
+                provenance_note=str(row[6] or ""),
+            )
+        )
+    return matched[start : start + capped], len(matched)

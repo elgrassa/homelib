@@ -48,6 +48,7 @@ from apps.ui.view_model import (
     has_voted,
     library_summary,
     load_official_preview_books,
+    needs_ask_shelf_fallback,
     normalize_door,
     normalize_level,
     normalize_official_language,
@@ -173,7 +174,10 @@ def render_mentor_tab(client: Client) -> None:
         interests_raw = st.text_input("Interests (comma-separated)", key="mentor_interests")
         level = st.selectbox("Level", LEVELS, key="mentor_level")
         submitted = st.form_submit_button("Propose path", key="mentor_propose")
-    st.caption("The mentor searches the shelf; this can take a minute.")
+    st.caption(
+        "Mentor tools search the full-text shelf and the Open Library catalog "
+        "snapshot (metadata). Full text is only on the shelf."
+    )
 
     # Two-phase submit: clear the previous error banner on this rerun, then call
     # the API on the next run so "Enter a goal…" cannot sit next to the spinner.
@@ -328,8 +332,12 @@ def render_library_tab(client: Client) -> None:
 
     summary = library_summary(books)
     st.write(
-        f"{summary.book_count} books · {summary.total_blocks} blocks · "
+        f"{summary.book_count} full-text books · {summary.total_blocks} blocks · "
         f"{summary.total_chunks} chunks"
+    )
+    st.caption(
+        "Full-text Ask corpus is this shelf. Open Library catalog snapshot "
+        "(~3061 metadata works from data/catalog.jsonl) is under Discover below."
     )
     st.table(
         [
@@ -343,16 +351,27 @@ def render_library_tab(client: Client) -> None:
             for book in books
         ]
     )
+    for book in books:
+        open_cols = st.columns([4, 1])
+        open_cols[0].caption(book.title)
+        if open_cols[1].button("Open in Projection", key=f"shelf_open_{book.book_id}"):
+            st.session_state["door"] = "Projection"
+            st.session_state["projection_source"] = "shelf"
+            st.session_state["projection_source_radio"] = "shelf"
+            st.session_state[f"proj_ordinal:{book.book_id}"] = 0
+            st.session_state["proj_book_id"] = book.book_id
+            st.rerun()
 
-    st.subheader("Discover (lawful catalogs)")
+    st.subheader("Discover (Open Library catalog snapshot)")
     st.caption(
-        "Open Library, Project Gutenberg, and optional Google Books / Hardcover — "
-        "metadata and open-source links only; not the Ask reading corpus."
+        "Committed data/catalog.jsonl snapshot (metadata only — not Ask full text). "
+        "Live federation is optional via HOMELIB_CONNECTOR_MODE=live (see issue #46)."
     )
-    discover_q = st.text_input("Search catalogs", key="discover_q")
-    if st.button("Search catalogs", key="discover_go") and discover_q.strip():
+    discover_q = st.text_input("Filter catalog", key="discover_q")
+    if st.button("Show catalog", key="discover_go"):
         try:
-            discovered = client.list_resources(q=discover_q.strip(), source="discover")
+            needle = discover_q.strip() if discover_q else None
+            discovered = client.list_resources(q=needle, source="discover")
         except (ApiClientError, ApiUnavailableError) as exc:
             st.error(format_api_error_message(exc))
         else:
@@ -362,9 +381,11 @@ def render_library_tab(client: Client) -> None:
         if last_discover.get("degraded"):
             st.warning("One or more catalog providers timed out; showing partial results.")
         counts = last_discover.get("approximate_provider_counts") or {}
-        if counts:
-            approx = ", ".join(f"~{name}: {n}" for name, n in counts.items())
-            st.caption(f"{last_discover.get('unique_count', 0)} unique works · {approx}")
+        snap = counts.get("open_library_snapshot")
+        st.caption(
+            f"{last_discover.get('unique_count', 0)} matching · "
+            f"snapshot size {snap if snap is not None else '—'}"
+        )
         for hit in last_discover.get("items") or []:
             if not isinstance(hit, dict):
                 continue
@@ -373,15 +394,10 @@ def render_library_tab(client: Client) -> None:
             line = f"**{title}** — {authors}" if authors else f"**{title}**"
             url = hit.get("provider_url")
             if url:
-                st.markdown(f"{line} · [Open lawful source]({url})")
+                st.markdown(f"{line} · [Open Library]({url})")
             else:
                 st.markdown(line)
-            rights = hit.get("rights_status") or "metadata_only"
-            if hit.get("full_text_available"):
-                ft = "provider has full text"
-            else:
-                ft = "metadata / preview link only"
-            st.caption(f"{rights} · {ft}")
+            st.caption("metadata only · not full text on this shelf")
 
     st.subheader("Scene search")
     if not books:
@@ -693,6 +709,10 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
 
 def render_roadmap_tab(client: Client) -> None:
     st.header("Roadmap")
+    st.caption(
+        "Roadmap steps can cite the Open Library catalog snapshot plus shelf hits; "
+        "full text remains the ingested shelf only."
+    )
     with st.form("roadmap_form"):
         interests_raw = st.text_input("Interests (comma-separated)", key="roadmap_interests")
         level = st.selectbox("Level", LEVELS, key="roadmap_level")

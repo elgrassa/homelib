@@ -10,7 +10,10 @@ still stubbing out the network-reachability check — see that test's comment.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
+import threading
+import time
 from dataclasses import replace
 from typing import Any
 
@@ -280,7 +283,10 @@ def test_ask_arm_none_uses_default_arm() -> None:
         captured["arm"] = arm
         return ([], arm, False)
 
-    deps = _make_deps(retrieve=_retrieve, llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -296,7 +302,10 @@ def test_ask_explicit_arm_is_honored() -> None:
         captured["arm"] = arm
         return ([], arm, False)
 
-    deps = _make_deps(retrieve=_retrieve, llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q", "arm": "lexical"})
@@ -309,7 +318,7 @@ def test_ask_rewrite_flag_reflected_in_query_log() -> None:
     logged: list[QueryLogRow] = []
     deps = _make_deps(
         rewrite_query=lambda query: "rewritten " + query,
-        llm_client=_ScriptedClient([_llm_json("ok", [])]),
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
         log_query=logged.append,
     )
     app.dependency_overrides[get_deps] = lambda: deps
@@ -327,7 +336,10 @@ def test_ask_no_rewrite_when_disabled() -> None:
         captured["called"] = True
         return "should not be used " + query
 
-    deps = _make_deps(rewrite_query=_rewrite, llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        rewrite_query=_rewrite,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q", "rewrite": False})
@@ -346,7 +358,10 @@ def test_ask_rewrite_defaults_to_false_when_omitted() -> None:
         captured["called"] = True
         return "should not be used " + query
 
-    deps = _make_deps(rewrite_query=_rewrite, llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        rewrite_query=_rewrite,
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -360,6 +375,187 @@ def test_ask_validation_rejects_unknown_field() -> None:
     assert resp.status_code == 422
 
 
+def test_ask_walden_still_uses_passage_citation_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Passage content Q must still retrieve + cite; shelf-meta must not short-circuit."""
+    retrieve_calls: list[str] = []
+    hit = Hit(
+        chunk_id="c-walden",
+        book_id="b-walden",
+        score=1.0,
+        rank=1,
+        text="by Henry David Thoreau",
+        section_path=["Economy"],
+        page=1,
+        block_ids=["blk-1"],
+    )
+
+    def _retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, bool]:
+        retrieve_calls.append(query)
+        return ([hit], arm, False)
+
+    monkeypatch.setattr(
+        answer_module,
+        "_book_metadata",
+        lambda book_ids: {bid: ("Walden", ["Henry David Thoreau"]) for bid in book_ids},
+    )
+    llm = _ScriptedClient(
+        [_llm_json("Henry David Thoreau", [{"passage": 1, "quote": "by Henry David Thoreau"}])]
+    )
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=llm,
+        list_books=lambda: [
+            BookSummary(
+                book_id="b-walden",
+                title="Walden",
+                authors=["Henry David Thoreau"],
+                blocks=1,
+                chunks=1,
+                format="txt",
+            )
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "Who wrote Walden?"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert retrieve_calls == ["Who wrote Walden?"]
+    assert body["answer"] == "Henry David Thoreau"
+    assert body["arm_used"] != "shelf_meta"
+    assert len(body["citations"]) == 1
+    assert body["citations"][0]["quote"] == "by Henry David Thoreau"
+
+
+def test_ask_what_do_you_have_uses_shelf_metadata_not_passage_abstain() -> None:
+    """Inventory Ask must list books via list_books — never empty passage refuse."""
+    retrieve_calls: list[str] = []
+
+    def _retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, bool]:
+        retrieve_calls.append(query)
+        return ([], arm, False)
+
+    deps = _make_deps(
+        retrieve=_retrieve,
+        llm_client=_ScriptedClient([]),  # must not be called
+        list_books=lambda: [
+            BookSummary(
+                book_id="b1",
+                title="Walden, and On The Duty Of Civil Disobedience",
+                authors=["Henry David Thoreau"],
+                blocks=10,
+                chunks=20,
+                format="txt",
+            ),
+            BookSummary(
+                book_id="b2",
+                title="Meditations",
+                authors=["Marcus Aurelius"],
+                blocks=5,
+                chunks=8,
+                format="txt",
+            ),
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "what do you have"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert retrieve_calls == []
+    assert body["arm_used"] == "shelf_meta"
+    assert body["degraded"] is False
+    assert body["citations"] == []
+    assert "Walden" in body["answer"]
+    assert "Meditations" in body["answer"]
+    assert body["answer"].strip() != ""
+
+
+def test_demo_poisoned_hybrid_cache_does_not_block_shelf_meta(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P0 Cloud bug: inventory Q cached as passage refuse under arm=hybrid must
+    not win over shelf_meta after the Ask contract lands."""
+    from homelib_rag.answer import AskResponse as RagAskResponse
+    from homelib_rag.answer import TokenUsage
+
+    from apps.store import answer_cache
+
+    db_path = tmp_path / "poison_cache.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    poisoned = RagAskResponse(
+        request_id="poison",
+        answer="I don't have an answer.",
+        citations=[],
+        arm_used="hybrid",
+        degraded=False,
+        latency_ms=1,
+        tokens=TokenUsage(prompt=1987, completion=40),
+    )
+    key = answer_cache.cache_key("what do you have", arm="hybrid", model="fake-model")
+    answer_cache.store(conn, key, poisoned)
+    conn.close()
+
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "demo")
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([], arm, False),
+        llm_client=_ScriptedClient([]),
+        list_books=lambda: [
+            BookSummary(
+                book_id="b1",
+                title="Walden",
+                authors=["Henry David Thoreau"],
+                blocks=1,
+                chunks=1,
+                format="txt",
+            ),
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
+
+    resp = client.post("/v1/ask", json={"query": "what do you have"}, headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["arm_used"] == "shelf_meta"
+    assert body["cache_hit"] is False
+    assert "Walden" in body["answer"]
+    assert "I don't have an answer" not in body["answer"]
+
+
+def test_ask_romance_from_available_lists_shelf_instead_of_empty_abstain() -> None:
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: (_ for _ in ()).throw(AssertionError("no retrieve")),
+        llm_client=_ScriptedClient([]),
+        list_books=lambda: [
+            BookSummary(
+                book_id="b1",
+                title="The Prince",
+                authors=["Niccolò Machiavelli"],
+                blocks=3,
+                chunks=4,
+                format="txt",
+            )
+        ],
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+
+    resp = client.post("/v1/ask", json={"query": "which available romance book should I read?"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["arm_used"] == "shelf_meta"
+    assert "romance" in body["answer"].lower()
+    assert "The Prince" in body["answer"]
+    assert body["citations"] == []
+
+
 # ── C1: cost in $ (specs/monitoring.md) ─────────────────────────────────
 
 
@@ -369,7 +565,7 @@ def test_cost_usd_zero_under_local_default(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.delenv("LLM_PRICE_PER_1K_PROMPT", raising=False)
     monkeypatch.delenv("LLM_PRICE_PER_1K_COMPLETION", raising=False)
     logged: list[QueryLogRow] = []
-    fake_llm = _ScriptedClient([_llm_json("ok", [])])
+    fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
     app.dependency_overrides[get_deps] = lambda: deps
 
@@ -387,7 +583,7 @@ def test_cost_usd_computed_from_prices(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PRICE_PER_1K_PROMPT", "2.0")
     monkeypatch.setenv("LLM_PRICE_PER_1K_COMPLETION", "4.0")
     logged: list[QueryLogRow] = []
-    fake_llm = _ScriptedClient([_llm_json("ok", [])])
+    fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
     app.dependency_overrides[get_deps] = lambda: deps
 
@@ -413,7 +609,9 @@ def test_answer_log_off_by_default(tmp_path: Any, monkeypatch: pytest.MonkeyPatc
     conn.close()
     monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
     monkeypatch.delenv("HOMELIB_LOG_ANSWERS", raising=False)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "does it jump?"})
@@ -434,7 +632,9 @@ def test_answer_log_written_when_enabled(tmp_path: Any, monkeypatch: pytest.Monk
     conn.close()
     monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
     monkeypatch.setenv("HOMELIB_LOG_ANSWERS", "1")
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("It jumps.", [])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "does it jump?"})
@@ -511,7 +711,7 @@ def test_ask_omits_optional_stage_spans_when_not_used() -> None:
     tracing.reset_tracer_for_tests(provider)
     deps = _make_deps(
         retrieve=lambda query, k, arm: ([], "lexical", False),
-        llm_client=_ScriptedClient([_llm_json("ok", [])]),
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])]),
     )
     app.dependency_overrides[get_deps] = lambda: deps
 
@@ -528,7 +728,9 @@ def test_spans_never_carry_raw_question_by_default(monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("HOMELIB_TRACE_QUESTIONS", raising=False)
     provider, exporter = _in_memory_tracer_provider()
     tracing.reset_tracer_for_tests(provider)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
@@ -545,7 +747,9 @@ def test_spans_carry_question_when_opted_in(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("HOMELIB_TRACE_QUESTIONS", "1")
     provider, exporter = _in_memory_tracer_provider()
     tracing.reset_tracer_for_tests(provider)
-    deps = _make_deps(llm_client=_ScriptedClient([_llm_json("ok", [])]))
+    deps = _make_deps(
+        llm_client=_ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "a very unique raw question xyz123"})
@@ -1195,6 +1399,7 @@ def test_default_retrieve_marks_degraded_when_search_falls_back(
 
 @respx.mock
 def test_default_llm_reachable_true_when_models_endpoint_responds() -> None:
+    main._reset_llm_reachable_cache_for_tests()
     respx.get("http://localhost:11434/v1/models").mock(
         return_value=httpx.Response(200, json={"data": []})
     )
@@ -1203,7 +1408,85 @@ def test_default_llm_reachable_true_when_models_endpoint_responds() -> None:
 
 
 def test_default_llm_reachable_false_on_connection_error() -> None:
+    main._reset_llm_reachable_cache_for_tests()
     assert main._default_llm_reachable("http://127.0.0.1:1") is False
+
+
+@respx.mock
+def test_default_llm_reachable_caches_probe_so_health_stays_cheap() -> None:
+    """Regression: uncached Groq `/models` probes made solo `/health` 1.2-1.9s
+    and timed out during Ask; a short TTL cache keeps liveness under 2s."""
+    main._reset_llm_reachable_cache_for_tests()
+    route = respx.get("http://llm.test/v1/models").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
+
+    assert main._default_llm_reachable("http://llm.test/v1") is True
+    assert main._default_llm_reachable("http://llm.test/v1") is True
+    assert route.call_count == 1
+
+
+def test_health_returns_while_ask_llm_is_still_running(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`/health` must not wait for an in-flight Ask's LLM call — that was the
+    compose hang (UI spinner + curling /health both timing out)."""
+    from homelib_rag.answer import AskResponse, TokenUsage
+
+    from apps.inprocess_bridge import SyncASGITransport
+
+    release = threading.Event()
+    entered = threading.Event()
+
+    def _blocking_answer(
+        query: str,
+        hits: Any,
+        *,
+        client: Any = None,
+        arm_used: str = "hybrid",
+    ) -> AskResponse:
+        del query, hits, client
+        entered.set()
+        release.wait(timeout=5.0)
+        return AskResponse(
+            request_id="blocked-ask",
+            answer="ok",
+            citations=[],
+            arm_used=arm_used,
+            degraded=False,
+            latency_ms=0,
+            tokens=TokenUsage(prompt=1, completion=1),
+        )
+
+    monkeypatch.setattr(answer_module, "answer", _blocking_answer)
+    monkeypatch.setattr(main.shelf_meta_module, "is_shelf_meta_intent", lambda query: False)
+    deps = _make_deps(
+        retrieve=lambda q, k, arm: ([_hit()], arm, False),
+        llm_reachable=lambda: True,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+    transport = SyncASGITransport(app)
+    ask_http = httpx.Client(transport=transport, base_url="http://test")
+    health_http = httpx.Client(transport=transport, base_url="http://test")
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            ask_future = pool.submit(
+                lambda: ask_http.post("/v1/ask", json={"query": "Who wrote Walden?"})
+            )
+            assert entered.wait(timeout=2.0)
+            t0 = time.monotonic()
+            health = health_http.get("/health", timeout=2.0)
+            health_s = time.monotonic() - t0
+            release.set()
+            ask = ask_future.result(timeout=5)
+    finally:
+        ask_http.close()
+        health_http.close()
+        app.dependency_overrides.pop(get_deps, None)
+
+    assert health.status_code == 200
+    assert health_s < 2.0
+    assert ask.status_code == 200
 
 
 def test_default_db_reachable_true_when_select_one_succeeds(

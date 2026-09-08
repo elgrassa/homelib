@@ -80,8 +80,8 @@ uv run pytest -k 'connector or dedup_keeps or unique_count_not or live_maps' -v
 ## Live provider notes
 
 - **Identify:** `User-Agent: HomeLib/<version> (<contact>)` — contact from
-  `HOMELIB_CONTACT` when set; otherwise repo URL. `fetch_catalog.py`'s UA is
-  separate (snapshot ingest).
+  `HOMELIB_CONTACT` when set; otherwise repo URL. `apps/ingest/fetch_catalog.py`'s UA is
+  separate (snapshot ingest of `data/catalog.jsonl`).
 - **Open Library:** ≤1 req/s unidentified; never bulk-harvest via search.
 - **Google Books:** official `volumes?q=` with API key. Discovery/infoLink only —
   still banned for catalog snapshot / corpus redistribution (ADR-002).

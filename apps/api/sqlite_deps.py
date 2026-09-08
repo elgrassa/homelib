@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +17,12 @@ from apps.store.sqlite import connect, migrate, row_counts
 
 __all__ = [
     "open_store",
+    "reset_migration_cache_for_tests",
     "sqlite_counts",
     "sqlite_db_reachable",
     "sqlite_get_block",
     "sqlite_get_book_block",
+    "sqlite_health_snapshot",
     "sqlite_list_books",
     "sqlite_log_answer",
     "sqlite_log_query",
@@ -27,10 +30,22 @@ __all__ = [
     "sqlite_record_feedback",
 ]
 
+# Migrate once per resolved path per process. Running migrate() on every
+# open_store() took BEGIN locks that stacked under /v1/ask and made /health
+# wait for the whole Ask (compose single-worker + WAL busy_timeout).
+_migrated_paths: set[str] = set()
+_migrate_lock = threading.Lock()
+
 
 def sqlite_path() -> Path | None:
     raw = os.environ.get("HOMELIB_SQLITE_PATH", "").strip()
     return Path(raw) if raw else None
+
+
+def reset_migration_cache_for_tests() -> None:
+    """Clear the process migrate-once cache (unit tests only)."""
+    with _migrate_lock:
+        _migrated_paths.clear()
 
 
 def open_store() -> sqlite3.Connection:
@@ -38,26 +53,34 @@ def open_store() -> sqlite3.Connection:
     if path is None:
         raise RuntimeError("HOMELIB_SQLITE_PATH is not set")
     conn = connect(path)
-    migrate(conn)
+    key = str(path.resolve())
+    if key not in _migrated_paths:
+        with _migrate_lock:
+            if key not in _migrated_paths:
+                migrate(conn)
+                _migrated_paths.add(key)
     return conn
 
 
 def sqlite_db_reachable() -> bool:
-    try:
-        with open_store() as conn:
-            conn.execute("SELECT 1")
-    except Exception:
-        return False
-    return True
+    ok, _books, _chunks = sqlite_health_snapshot()
+    return ok
 
 
 def sqlite_counts() -> tuple[int, int]:
+    _ok, books, chunks = sqlite_health_snapshot()
+    return books, chunks
+
+
+def sqlite_health_snapshot() -> tuple[bool, int, int]:
+    """One connection for `/health`: reachable + book/chunk counts."""
     try:
         with open_store() as conn:
+            conn.execute("SELECT 1")
             counts = row_counts(conn)
     except Exception:
-        return (0, 0)
-    return (int(counts.get("books", 0)), int(counts.get("chunks", 0)))
+        return (False, 0, 0)
+    return (True, int(counts.get("books", 0)), int(counts.get("chunks", 0)))
 
 
 def sqlite_list_books() -> list[BookSummary]:
