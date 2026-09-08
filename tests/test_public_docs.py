@@ -94,3 +94,20 @@ def test_no_tracked_doc_links_to_handoffs() -> None:
                 offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
 
     assert not offenders, "tracked docs still link to docs/handoffs/:\n" + "\n".join(offenders)
+
+
+def test_submission_docs_name_the_live_demo_without_old_cloud_placeholders() -> None:
+    """The final review found mutually contradictory pending/live Cloud claims."""
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    checklist = (REPO_ROOT / "CHECKLIST.md").read_text(encoding="utf-8")
+    live_url = "https://homelib.streamlit.app/"
+
+    assert live_url in readme
+    assert live_url in checklist
+    for stale_claim in (
+        "URL to be added after Cloud deploy",
+        "Public demo URL: none yet",
+        "Cloud deploy is pending",
+    ):
+        assert stale_claim not in readme
+        assert stale_claim not in checklist

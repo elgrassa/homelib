@@ -297,8 +297,12 @@ def test_discover_resources_degrades_when_one_connector_times_out(
         assert body["items"][0]["title"] == "The Republic"
 
 
-def test_discover_returns_seeded_catalog_not_empty(sqlite_env: Path) -> None:
+def test_discover_returns_seeded_catalog_not_empty(
+    sqlite_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Discover default is the committed Open Library snapshot."""
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "snapshot")
     with TestClient(app) as client:
         shelf = client.get("/v1/resources").json()
         discover = client.get("/v1/resources", params={"source": "discover"}).json()
@@ -311,7 +315,11 @@ def test_discover_returns_seeded_catalog_not_empty(sqlite_env: Path) -> None:
             assert item["provider_url"]
 
 
-def test_discover_empty_query_browses_and_q_filters(sqlite_env: Path) -> None:
+def test_discover_empty_query_browses_and_q_filters(
+    sqlite_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "snapshot")
     with TestClient(app) as client:
         browsed = client.get("/v1/resources", params={"source": "discover"}).json()
         assert browsed["items"]

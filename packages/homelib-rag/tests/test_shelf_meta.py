@@ -31,6 +31,7 @@ def test_inventory_and_romance_available_are_shelf_meta_intent() -> None:
     """Corpus-drawn inventory / genre-among-available asks route to shelf meta."""
     assert is_shelf_meta_intent("what do you have") is True
     assert is_shelf_meta_intent("which available romance book should I read?") is True
+    assert is_shelf_meta_intent("what is the best science-fiction book to read in 2026?") is True
     assert is_shelf_meta_intent("what from available books is more interesting") is True
 
 
