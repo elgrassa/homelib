@@ -22,6 +22,7 @@ from homelib_rag.answer import (
     LLMUnreachableError,
     LLMUsage,
     OpenAIClient,
+    TokenUsage,
     _book_metadata,
     _degraded_response,
     _validate_citations,
@@ -290,14 +291,30 @@ def test_answer_handles_empty_hits() -> None:
     assert result.citations == []
 
 
-def test_degraded_response_has_zero_tokens_and_empty_citations() -> None:
-    result = _degraded_response("hybrid", "some reason")
+def test_degraded_response_preserves_latency_and_tokens_when_provided() -> None:
+    result = _degraded_response(
+        "hybrid",
+        "citation quote 'x' does not appear in any of the passages provided",
+        latency_ms=1234,
+        tokens=TokenUsage(prompt=100, completion=40),
+    )
     assert result.degraded is True
+    assert result.degraded_reason == "citation_mismatch"
     assert result.citations == []
-    assert result.tokens.prompt == 0
-    assert result.tokens.completion == 0
+    assert result.latency_ms == 1234
+    assert result.tokens.prompt == 100
+    assert result.tokens.completion == 40
     assert result.arm_used == "hybrid"
     assert "try again" in result.answer.lower()
+
+
+def test_degraded_response_defaults_zero_usage_without_llm_call() -> None:
+    result = _degraded_response("hybrid", "LLM unreachable: boom")
+    assert result.degraded is True
+    assert result.degraded_reason == "llm_unreachable"
+    assert result.latency_ms == 0
+    assert result.tokens.prompt == 0
+    assert result.tokens.completion == 0
 
 
 def test_answer_retries_without_json_format_after_json_validate_failed() -> None:

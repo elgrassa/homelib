@@ -25,6 +25,7 @@ from homelib_rag.answer import (
     CitationValidationError,
     LLMUnreachableError,
     OpenAICompatibleClient,
+    _book_metadata,
     _validate_citations,
 )
 from homelib_rag.models import Hit
@@ -297,7 +298,8 @@ def _has_on_goal_evidence(
     """
     tokens = _goal_content_tokens(goal, interests)
     if not tokens:
-        return bool(hits or candidates)
+        # Stopword-only goals ("get a job") must not treat any shelf hit as on-goal.
+        return False
     return _blob_has_goal_tokens(_evidence_blob(hits, candidates), tokens)
 
 
@@ -370,6 +372,7 @@ def _abstention_response(
 
 
 def _passage_citations(raw: list[_RawPassageCitation], hits: list[Hit]) -> list[Citation]:
+    book_meta = _book_metadata([hit.book_id for hit in hits])
     citations: list[Citation] = []
     for item in raw:
         if item.passage < 1 or item.passage > len(hits):
@@ -378,12 +381,13 @@ def _passage_citations(raw: list[_RawPassageCitation], hits: list[Hit]) -> list[
             )
         hit = hits[item.passage - 1]
         block_id = hit.block_ids[0] if hit.block_ids else hit.chunk_id
+        title, _authors = book_meta.get(hit.book_id, (hit.book_id, []))
         citations.append(
             Citation(
                 chunk_id=hit.chunk_id,
                 block_id=block_id,
                 book_id=hit.book_id,
-                book_title=hit.book_id,
+                book_title=title,
                 section_path=list(hit.section_path),
                 page=hit.page,
                 quote=item.quote,
@@ -561,18 +565,7 @@ def mentor_intake(
     try:
         citations = _passage_citations(parsed.citations, hits) if hits else []
     except CitationValidationError:
-        return MentorIntakeResponse(
-            request_id=str(uuid.uuid4()),
-            proposed_area=parsed.proposed_area,
-            proposed_wing=parsed.proposed_wing,
-            proposed_path=parsed.proposed_path,
-            rationale=parsed.rationale,
-            citations=[],
-            degraded=True,
-            high_stakes_notice=notice,
-            tool_calls=tool_calls,
-            rounds_used=rounds_used,
-        )
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     return MentorIntakeResponse(
         request_id=str(uuid.uuid4()),

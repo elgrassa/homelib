@@ -156,3 +156,11 @@ def test_observatory_copy_does_not_hardcode_a_chart_count() -> None:
     copy = DOOR_COPY["Observatory"]
     assert not any(ch.isdigit() for ch in copy)
     assert "chart" in copy.lower()
+
+
+def test_collapsed_rotunda_hides_enter_for_open_door() -> None:
+    doc = build_rotunda_html(CROSSROADS_DOORS, "Ask", collapsed=True)
+    assert "hl-collapsed" in doc
+    assert 'data-door="Ask" hidden' in doc or 'data-door="Ask"' in doc
+    # Active Enter must stay hidden while collapsed (door body is already open).
+    assert 'class="hl-enter-link" href="?door=Ask" data-door="Ask" hidden>' in doc

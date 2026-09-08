@@ -81,12 +81,15 @@ def build_rotunda_html(
     active: str,
     *,
     reduced_motion: bool = False,
+    collapsed: bool = False,
 ) -> str:
     """Return the rotunda fragment that `app.py` renders with `st.html`.
 
     `active` must be one of `doors`; it is the door facing the viewer on load.
     `reduced_motion=True` disables the rotation transition from the Python
     side (the CSS media query does the same for users who asked their OS).
+    `collapsed=True` shrinks the room to a navigation band and hides the
+    duplicate Enter card once a door's content is already on screen.
     The markup lives in `rotunda_template.html` next to this module — CSS and
     JS are not Python, and a 100-column linter should not shape a gradient.
     """
@@ -98,14 +101,18 @@ def build_rotunda_html(
     active_index = list(doors).index(active)
     # The static Enter links: one per door, rendered server-side so the
     # navigation exists even before the script runs (and is testable as text).
+    # When collapsed, omit Enter for the already-open door (primary action is
+    # inside that door's body).
     enter_links = "\n".join(
         f'<a class="hl-enter-link" href="?door={html.escape(d, quote=True)}" '
         f'data-door="{html.escape(d, quote=True)}"'
-        f"{' hidden' if i != active_index else ''}>Enter {html.escape(d)}</a>"
+        f"{' hidden' if collapsed or i != active_index else ''}>Enter {html.escape(d)}</a>"
         for i, d in enumerate(doors)
     )
+    motion = " hl-reduced" if reduced_motion else ""
+    collapse = " hl-collapsed" if collapsed else ""
     replacements = {
-        "__MOTION_CLASS__": " hl-reduced" if reduced_motion else "",
+        "__MOTION_CLASS__": f"{motion}{collapse}",
         "__ACTIVE_ESCAPED__": html.escape(active),
         "__ACTIVE_COPY_ESCAPED__": html.escape(DOOR_COPY.get(active, _FALLBACK_COPY)),
         "__ENTER_LINKS__": enter_links,

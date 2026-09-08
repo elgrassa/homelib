@@ -20,6 +20,17 @@
     /* Reserve height so Ask widgets below do not jump (CLS). */
     min-height: 460px;
   }
+  #hl-rotunda.hl-collapsed {
+    min-height: 0;
+    margin-top: 1.25rem;
+    padding-bottom: 4.5rem; /* Streamlit status badges sit bottom-right on Cloud */
+  }
+  #hl-rotunda.hl-collapsed .hl-room {
+    height: 160px;
+  }
+  #hl-rotunda.hl-collapsed .hl-result {
+    display: none;
+  }
   #hl-rotunda * { box-sizing: border-box; }
   #hl-rotunda .hl-room {
     position: relative; height: 380px; max-width: 920px; margin: 0 auto; overflow: hidden;
@@ -272,7 +283,10 @@ __ENTER_LINKS__
     compass.textContent = 'Facing: ' + doors[active];
     title.textContent = doors[active];
     copyEl.textContent = copy[doors[active]] || '';
-    links.forEach((a, i) => { a.hidden = i !== active; });
+    links.forEach((a, i) => {
+      // Collapsed band: door content is already on screen — never re-show Enter.
+      a.hidden = root.classList.contains('hl-collapsed') || i !== active;
+    });
   }
 
   root.querySelector('#hl-turn').addEventListener('click', () => face_door(active + 1));

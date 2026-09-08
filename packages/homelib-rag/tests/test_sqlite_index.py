@@ -434,3 +434,35 @@ def test_load_matrix_accepts_float32_blob_embeddings(
     assert lexical
     assert lexical[0].chunk_id == "c-blob"
     conn.close()
+
+
+def test_browse_catalog_matches_author_needle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from homelib_rag.sqlite_index import browse_catalog
+
+    db_path = tmp_path / "catalog.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        """
+        INSERT INTO catalog (
+            ol_key, title, authors, subjects, first_publish_year, description, provenance_note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "OL1W",
+            "Meditations",
+            json.dumps(["Marcus Aurelius"]),
+            json.dumps(["Stoicism"]),
+            1800,
+            None,
+            "test",
+        ),
+    )
+    conn.commit()
+    page, total = browse_catalog("aurelius", limit=10, conn=conn)
+    assert total == 1
+    assert page[0].title == "Meditations"
+    conn.close()

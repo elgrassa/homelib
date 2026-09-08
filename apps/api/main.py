@@ -203,6 +203,11 @@ def _retrieve_with_spans(
         retrieve_span.set_attribute("hits", len(hits))
         retrieve_span.set_attribute("degraded", degraded)
         retrieve_span.set_attribute("arm_used", arm_used)
+        # Demo/debug: log ranked chunk ids + scores so Cloud logs can compare
+        # against FTS ground truth without shell access to the seed DB.
+        if hits and read_app_mode() is AppMode.DEMO:
+            ranked = [f"{hit.chunk_id}:{hit.score:.4f}" for hit in hits[: min(k, len(hits))]]
+            logger.info("ask retrieve ranked chunk_ids=%s arm=%s", ranked, arm_used)
     return hits, arm_used, degraded
 
 

@@ -563,6 +563,7 @@ def browse_catalog(
             needle
             and needle not in str(row[1]).lower()
             and not any(needle in s.lower() for s in entry_subjects)
+            and not any(needle in a.lower() for a in _json_list_or_empty(row[2]))
         ):
             continue
         matched.append(

@@ -322,6 +322,9 @@ class AskResponse(BaseModel):
     degraded: bool
     latency_ms: int
     tokens: TokenUsage
+    # Short machine code for the degrade branch (e.g. citation_mismatch).
+    # Optional so older clients / OpenAPI required-field pins stay valid.
+    degraded_reason: str | None = None
     # C5 (specs/monitoring.md "Tracing"): the OpenTelemetry trace covering
     # this request, set by apps/api/main.py's post_ask via model_copy —
     # answer() itself has no tracer and never sets this. Optional (not
@@ -612,7 +615,31 @@ def _is_uncited_failure(reason: object) -> bool:
     return "uncited" in str(reason).lower()
 
 
-def _degraded_response(arm_used: str, reason: str) -> AskResponse:
+def _degraded_reason_code(reason: str) -> str:
+    """Stable short code for UI / Observatory — not the verbose log line."""
+    text = reason.lower()
+    if "citation" in text or "quote" in text or "verbatim" in text:
+        return "citation_mismatch"
+    if _is_uncited_failure(reason):
+        return "uncited_claim"
+    if _is_json_validate_failure(reason) or "malformed" in text:
+        return "malformed_llm_output"
+    if _is_rate_limit_failure(reason):
+        return "rate_limited"
+    if "unreachable" in text or "llm" in text:
+        return "llm_unreachable"
+    if "metadata" in text:
+        return "metadata_unavailable"
+    return "degraded"
+
+
+def _degraded_response(
+    arm_used: str,
+    reason: str,
+    *,
+    latency_ms: int = 0,
+    tokens: TokenUsage | None = None,
+) -> AskResponse:
     logger.warning("answer() returning a degraded response: %s", reason)
     # Empty answer on malformed JSON and uncited claims lets the Ask UI show
     # its grounded refusal and shelf next steps. Rate limits get a clearer line.
@@ -622,14 +649,16 @@ def _degraded_response(arm_used: str, reason: str) -> AskResponse:
         answer_text = _RATE_LIMITED_DEGRADED_ANSWER
     else:
         answer_text = _GENERIC_DEGRADED_ANSWER
+    usage = tokens if tokens is not None else TokenUsage(prompt=0, completion=0)
     return AskResponse(
         request_id=str(uuid.uuid4()),
         answer=answer_text,
         citations=[],
         arm_used=arm_used,
         degraded=True,
-        latency_ms=0,
-        tokens=TokenUsage(prompt=0, completion=0),
+        degraded_reason=_degraded_reason_code(reason),
+        latency_ms=max(0, int(latency_ms)),
+        tokens=usage,
     )
 
 
@@ -649,11 +678,19 @@ def answer(
     """
     start = time.monotonic()
 
+    def _fail(reason: str, tokens: TokenUsage | None = None) -> AskResponse:
+        return _degraded_response(
+            arm_used,
+            reason,
+            latency_ms=int((time.monotonic() - start) * 1000),
+            tokens=tokens,
+        )
+
     try:
         book_meta = _book_metadata([hit.book_id for hit in hits])
     except Exception as exc:  # DB unreachable, etc. — never let this 500 the request
         logger.warning("answer(): failed to load book metadata: %s", exc)
-        return _degraded_response(arm_used, f"failed to load book metadata: {exc}")
+        return _fail(f"failed to load book metadata: {exc}")
 
     messages = [
         ChatMessage(role="system", content=_SYSTEM_PROMPT),
@@ -678,16 +715,20 @@ def answer(
             try:
                 response = client.chat(messages, max_tokens=_ANSWER_MAX_TOKENS)
             except LLMUnreachableError as retry_exc:
-                return _degraded_response(arm_used, f"LLM unreachable: {retry_exc}")
+                return _fail(f"LLM unreachable: {retry_exc}")
             except Exception as retry_exc:
                 logger.exception("answer(): unexpected error on JSON-validate retry")
-                return _degraded_response(arm_used, f"unexpected LLM error: {retry_exc}")
+                return _fail(f"unexpected LLM error: {retry_exc}")
         else:
-            return _degraded_response(arm_used, f"LLM unreachable: {exc}")
+            return _fail(f"LLM unreachable: {exc}")
     except Exception as exc:  # belt-and-braces: never let an LLM call 500 this request
         logger.exception("answer(): unexpected error calling the LLM")
-        return _degraded_response(arm_used, f"unexpected LLM error: {exc}")
+        return _fail(f"unexpected LLM error: {exc}")
 
+    usage = TokenUsage(
+        prompt=response.usage.prompt_tokens,
+        completion=response.usage.completion_tokens,
+    )
     raw_content = (response.content or "").strip()
     if raw_content.startswith("```"):
         # Retry-without-format path sometimes wraps JSON in a fence.
@@ -706,15 +747,15 @@ def answer(
         if retried_without_json_format:
             reason = f"json_validate_failed after retry; {reason}"
 
-        return _degraded_response(arm_used, reason)
+        return _fail(reason, tokens=usage)
 
     if not parsed.answer.strip():
-        return _degraded_response(arm_used, "uncited empty LLM answer rejected")
+        return _fail("uncited empty LLM answer rejected", tokens=usage)
 
     if parsed.answer.strip() and not parsed.citations and not is_passage_abstention(parsed.answer):
-        return _degraded_response(
-            arm_used,
+        return _fail(
             "uncited factual answer rejected; empty citations with a claim",
+            tokens=usage,
         )
 
     # Only the passages actually shown to the model are citable. Slicing the
@@ -735,10 +776,10 @@ def answer(
                 source, citation_quote = recovered
 
         if source is None:
-            return _degraded_response(
-                arm_used,
+            return _fail(
                 f"citation quote {raw_citation.quote[:60]!r} does not appear in any "
                 "of the passages provided",
+                tokens=usage,
             )
         title, _authors = book_meta.get(source.book_id, ("(unknown title)", []))
         citations.append(
@@ -756,7 +797,7 @@ def answer(
     try:
         _validate_citations(citations, hits)
     except CitationValidationError as exc:
-        return _degraded_response(arm_used, str(exc))
+        return _fail(str(exc), tokens=usage)
 
     latency_ms = int((time.monotonic() - start) * 1000)
     return AskResponse(
@@ -766,9 +807,7 @@ def answer(
         arm_used=arm_used,
         degraded=False,
         latency_ms=latency_ms,
-        tokens=TokenUsage(
-            prompt=response.usage.prompt_tokens, completion=response.usage.completion_tokens
-        ),
+        tokens=usage,
     )
 
 

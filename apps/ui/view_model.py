@@ -168,7 +168,26 @@ def format_degraded_banner(response: AskResponse) -> str | None:
     """
     if not response.degraded:
         return None
-    return f"Answered with a degraded backend: {response.arm_used}"
+    reason = getattr(response, "degraded_reason", None) or ""
+    if reason == "citation_mismatch":
+        return "No verified answer: the model's quote didn't match the source text."
+    if reason == "uncited_claim":
+        return "No verified answer: the model claimed a fact without a passage citation."
+    if reason == "rate_limited":
+        return "No verified answer: the language model is rate-limited right now."
+    if reason == "llm_unreachable":
+        return "No verified answer: the language model could not be reached."
+    if reason == "malformed_llm_output":
+        return "No verified answer: the model returned an unusable response."
+    return "No verified answer could be produced from the shelf right now."
+
+
+def format_degraded_trace_caption(response: AskResponse) -> str | None:
+    """Diagnostics line for a degraded ask — arm + reason code for the caption row."""
+    if not response.degraded:
+        return None
+    reason = getattr(response, "degraded_reason", None) or "degraded"
+    return f"trace: arm={response.arm_used} · reason={reason}"
 
 
 def format_discover_link_markdown(
@@ -315,6 +334,9 @@ def ask_metric_captions(ask: AskResponse) -> list[str]:
         lines.append("served from cache")
     if ask.trace_id:
         lines.append(f"trace: {ask.trace_id}")
+    degraded_trace = format_degraded_trace_caption(ask)
+    if degraded_trace is not None:
+        lines.append(degraded_trace)
     return lines
 
 

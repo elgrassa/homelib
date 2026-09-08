@@ -196,16 +196,32 @@ def test_every_door_has_a_renderer_and_vice_versa() -> None:
 
 def test_degraded_response_renders_banner() -> None:
     degraded = _make_ask_response(degraded=True, arm_used="lexical")
+    degraded.degraded_reason = "citation_mismatch"
 
     banner = format_degraded_banner(degraded)
 
-    assert banner == "Answered with a degraded backend: lexical"
+    assert "quote" in banner.lower()
+    assert "lexical" not in banner
+    assert "Answered with" not in banner
 
 
 def test_healthy_response_has_no_banner() -> None:
     healthy = _make_ask_response(degraded=False)
 
     assert format_degraded_banner(healthy) is None
+
+
+def test_degraded_trace_caption_keeps_arm_out_of_banner() -> None:
+    degraded = _make_ask_response(degraded=True, arm_used="hybrid_rerank")
+    degraded.degraded_reason = "citation_mismatch"
+    from apps.ui.view_model import format_degraded_trace_caption
+
+    assert format_degraded_banner(degraded) is not None
+    assert "hybrid_rerank" not in (format_degraded_banner(degraded) or "")
+    caption = format_degraded_trace_caption(degraded)
+    assert caption is not None
+    assert "hybrid_rerank" in caption
+    assert "citation_mismatch" in caption
 
 
 def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:

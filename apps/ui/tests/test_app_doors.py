@@ -33,7 +33,11 @@ def test_every_door_renders_without_exception(door: str) -> None:
     at.run()
     assert not at.exception, [e.value for e in at.exception]
     captions = [c.value for c in at.caption]
-    assert f"Open door: {door}" in captions
+    assert f"Open door: {door}" not in captions
+    (rotunda,) = at.get("html")
+    assert f"Facing: {door}" in rotunda.body
+    assert "hl-collapsed" in rotunda.body
+    assert door in [h.value for h in at.header]
 
 
 def test_door_grid_has_one_button_per_door() -> None:
@@ -52,10 +56,12 @@ def test_clicking_a_door_button_opens_that_door() -> None:
     at.button(key=f"door_{target}").click().run()
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == target
-    assert f"Open door: {target}" in [c.value for c in at.caption]
-    # The rotunda is filled after the grid, so the room agrees in the same run.
+    assert f"Open door: {target}" not in [c.value for c in at.caption]
+    # Door body renders above the rotunda band; room still faces the target.
     (rotunda,) = at.get("html")
     assert f"Facing: {target}" in rotunda.body
+    assert "hl-collapsed" in rotunda.body
+    assert "Roadmap" in [h.value for h in at.header]
 
 
 def test_switching_doors_does_not_render_the_previous_door_body() -> None:
@@ -81,10 +87,11 @@ def test_door_query_param_opens_that_door_and_is_consumed() -> None:
     at.run()
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == "Shelf"
-    assert "Open door: Shelf" in [c.value for c in at.caption]
+    assert "Open door: Shelf" not in [c.value for c in at.caption]
     assert "door" not in at.query_params
     (rotunda,) = at.get("html")
     assert "Facing: Shelf" in rotunda.body
+    assert "Shelf" in [h.value for h in at.header]
 
 
 def test_unknown_door_query_param_does_not_crash_the_crossroads() -> None:
@@ -93,7 +100,8 @@ def test_unknown_door_query_param_does_not_crash_the_crossroads() -> None:
     at.run()
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == "Ask"
-    assert "Open door: Ask" in [c.value for c in at.caption]
+    assert "Open door: Ask" not in [c.value for c in at.caption]
+    assert "Ask" in [h.value for h in at.header]
 
 
 def test_roadmap_door_heading_is_not_labelled_v1() -> None:

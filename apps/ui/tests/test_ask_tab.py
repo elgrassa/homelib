@@ -81,7 +81,7 @@ def test_ask_empty_degraded_answer_renders_refuse_and_degraded_banner() -> None:
     at.run()
     assert not at.exception, [e.value for e in at.exception]
     warnings = [w.value for w in at.warning]
-    assert any("degraded" in w.lower() for w in warnings)
+    assert any("verified answer" in w.lower() or "no verified" in w.lower() for w in warnings)
     visible = " ".join(str(getattr(block, "value", block)) for block in at.markdown)
     visible += " ".join(str(getattr(block, "value", block)) for block in at.text)
     assert "do not answer" in visible.lower() or "passages do not answer" in visible.lower()

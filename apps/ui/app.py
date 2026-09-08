@@ -69,11 +69,23 @@ from apps.ui.view_model import (
 Client = ApiClient | InProcessClient
 
 
+_ASK_EXAMPLE_QUESTIONS: tuple[str, ...] = (
+    "Who wrote Walden?",
+    "What does Machiavelli say about being feared versus loved?",
+    'Where does Thoreau say he went to the woods "to live deliberately"?',
+)
+
+
 def render_ask_tab(client: Client) -> None:
     st.header("Ask")
+    st.caption("Try a known-good starter, or write your own question.")
+    example_cols = st.columns(len(_ASK_EXAMPLE_QUESTIONS))
+    for col, example in zip(example_cols, _ASK_EXAMPLE_QUESTIONS, strict=True):
+        if col.button(example, key=f"ask_example_{example[:24]}"):
+            st.session_state["ask_query"] = example
     query = st.text_input("Ask your library a question", key="ask_query")
     k = st.slider("Number of results", min_value=1, max_value=10, value=5, key="ask_k")
-    if st.button("Ask", key="ask_submit"):
+    if st.button("Ask", key="ask_submit", type="primary"):
         if not query.strip():
             st.error("Enter a question so Ask can search the shelf.")
         else:
@@ -116,6 +128,8 @@ def render_ask_tab(client: Client) -> None:
     with down_col:
         if st.button("👎", key=f"vote_down_{last_ask.request_id}", disabled=voted):
             _cast_vote(client, last_ask.request_id, "down")
+    if voted:
+        st.caption("Thanks — your feedback for this answer was recorded.")
 
     _render_citation_expanders(client, last_ask.citations)
 
@@ -166,6 +180,8 @@ def _cast_vote(client: Client, request_id: str, feedback: Literal["up", "down"])
     else:
         feedback_sent: set[str] = st.session_state.setdefault("feedback_sent", set())
         st.session_state["feedback_sent"] = record_vote(feedback_sent, request_id)
+        label = "Thanks — marked helpful." if feedback == "up" else "Thanks — marked not helpful."
+        st.toast(label)
 
 
 def render_mentor_tab(client: Client) -> None:
@@ -444,58 +460,65 @@ def render_library_tab(client: Client) -> None:
         if not anchor:
             st.write(quote)
             continue
-        try:
-            block = client.get_block(anchor)
-        except (ApiClientError, ApiUnavailableError) as exc:
-            st.error(format_api_error_message(exc))
-            st.write(f"`{anchor}` — {quote}")
-            continue
+        # Prefer hit metadata for the expander label so we do not N+1 fetch
+        # every block on each Streamlit rerun (open only when expanded).
+        raw_section = hit.get("section_path")
+        hit_section: list[str] = (
+            [str(s) for s in raw_section] if isinstance(raw_section, list) else []
+        )
+        hit_page = hit.get("page")
+        hit_ordinal = hit.get("ordinal")
         label = format_scene_hit_label(
-            book_title=selected.title if selected is not None else block.book_id,
+            book_title=selected.title
+            if selected is not None
+            else str(hit.get("book_id") or anchor),
             authors=list(selected.authors) if selected is not None else [],
-            section_path=list(block.section_path),
-            page=block.provenance.page,
-            ordinal=block.ordinal,
+            section_path=hit_section,
+            page=int(hit_page) if isinstance(hit_page, int) else None,
+            ordinal=int(hit_ordinal) if isinstance(hit_ordinal, int) else 0,
         )
         with st.expander(label, expanded=False):
             st.write(quote)
-            st.caption(f"block `{block.block_id}`")
-            # Index disambiguates when multiple hits share open_anchor/block_id.
+            st.caption(f"block `{anchor}`")
             passage_key = f"scene_passage_{idx}_{anchor}"
             ordinal_key = f"scene_ordinal_{idx}_{anchor}"
             if st.button("Open this passage", key=f"open_{passage_key}"):
                 st.session_state[passage_key] = True
+            if not st.session_state.get(passage_key):
+                continue
+            try:
+                block = client.get_block(anchor)
+            except (ApiClientError, ApiUnavailableError) as exc:
+                st.error(format_api_error_message(exc))
+                continue
+            if ordinal_key not in st.session_state:
                 st.session_state[ordinal_key] = int(block.ordinal)
-            if st.session_state.get(passage_key):
-                read_ordinal = int(st.session_state.get(ordinal_key, block.ordinal))
-                try:
-                    reading = client.get_book_block(block.book_id, ordinal=read_ordinal)
-                except (ApiClientError, ApiUnavailableError) as exc:
-                    st.error(format_api_error_message(exc))
-                    reading = block
-                    read_ordinal = int(block.ordinal)
-                    st.session_state[ordinal_key] = read_ordinal
-                st.text(reading.text)
-                nav_prev, nav_next, nav_proj = st.columns(3)
-                with nav_prev:
-                    if (
-                        st.button("Previous passage", key=f"prev_{passage_key}")
-                        and read_ordinal > 0
-                    ):
-                        st.session_state[ordinal_key] = read_ordinal - 1
-                        st.rerun()
-                with nav_next:
-                    if st.button("Next passage", key=f"next_{passage_key}"):
-                        st.session_state[ordinal_key] = read_ordinal + 1
-                        st.rerun()
-                with nav_proj:
-                    if st.button("Continue in Projection", key=f"proj_{passage_key}"):
-                        st.session_state["door"] = "Projection"
-                        st.session_state["projection_source"] = "shelf"
-                        st.session_state["projection_source_radio"] = "shelf"
-                        st.session_state[f"proj_ordinal:{block.book_id}"] = read_ordinal
-                        st.session_state["proj_book_id"] = block.book_id
-                        st.rerun()
+            read_ordinal = int(st.session_state.get(ordinal_key, block.ordinal))
+            try:
+                reading = client.get_book_block(block.book_id, ordinal=read_ordinal)
+            except (ApiClientError, ApiUnavailableError) as exc:
+                st.error(format_api_error_message(exc))
+                reading = block
+                read_ordinal = int(block.ordinal)
+                st.session_state[ordinal_key] = read_ordinal
+            st.text(reading.text)
+            nav_prev, nav_next, nav_proj = st.columns(3)
+            with nav_prev:
+                if st.button("Previous passage", key=f"prev_{passage_key}") and read_ordinal > 0:
+                    st.session_state[ordinal_key] = read_ordinal - 1
+                    st.rerun()
+            with nav_next:
+                if st.button("Next passage", key=f"next_{passage_key}"):
+                    st.session_state[ordinal_key] = read_ordinal + 1
+                    st.rerun()
+            with nav_proj:
+                if st.button("Continue in Projection", key=f"proj_{passage_key}"):
+                    st.session_state["door"] = "Projection"
+                    st.session_state["projection_source"] = "shelf"
+                    st.session_state["projection_source_radio"] = "shelf"
+                    st.session_state[f"proj_ordinal:{block.book_id}"] = read_ordinal
+                    st.session_state["proj_book_id"] = block.book_id
+                    st.rerun()
             # :8502 companion is absent on Cloud demo — keep the link for
             # self-hosted / explicit official viewer only.
             if official_viewer_enabled() or os.environ.get("APP_MODE", "selfhosted") != "demo":
@@ -519,23 +542,24 @@ def render_observatory_tab(client: Client) -> None:
         if not points:
             chart_id = str(chart.get("id") or "")
             if chart_id == "judged_relevance":
-                st.write(
-                    "(empty until an operator runs "
-                    "`uv run python scripts/judge_recent.py` — off by default)"
-                )
+                st.write("No judged runs yet.")
             else:
-                st.write(
-                    "(no data yet — run `uv run python scripts/demo_traffic.py --n 40` "
-                    "or make asks so query_log/spans populate)"
-                )
+                st.write("No data yet for this chart.")
             continue
+        buckets = [str(p.get("bucket") or "") for p in points]
+        values = [float(p.get("value") or 0) for p in points]
+        # Explicit non-empty domain avoids Vega "Infinite extent" when a single
+        # point or degenerate range would otherwise leave the scale undefined.
+        if not any(values):
+            values = [0.0 for _ in values] or [0.0]
+            buckets = buckets or ["—"]
         st.bar_chart(
-            {
-                "bucket": [p.get("bucket") for p in points],
-                "value": [p.get("value") for p in points],
-            },
+            {"bucket": buckets, "value": values},
             x="bucket",
             y="value",
+            x_label="Bucket",
+            y_label="Value",
+            color="#c49a3c",
             width="stretch",
         )
 
@@ -838,7 +862,7 @@ def main() -> None:
                 flex-wrap: wrap;
                 gap: 0.5rem;
               }
-              .st-key-door_navigation [data-testid="column"] {
+              .st-key-door-navigation [data-testid="column"] {
                 flex: 1 1 9rem;
                 min-width: 0;
                 width: auto;
@@ -851,26 +875,29 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
-        # The rotating room (specs/rotunda.md), rendered inline: Streamlit's
-        # iframe sandbox blocks parent navigation, so the fragment shares this
-        # page and Enter is a plain `?door=` link. The button grid beneath stays
-        # the accessible path. The slot is reserved above the grid but filled
-        # after it, so a grid click and the room agree within the same run.
-        rotunda_slot = st.empty()
+        # Door body first so Ask / Mentor stay above the fold; rotunda collapses
+        # to a nav band underneath (live-demo audit P2-1).
+        try:
+            DOOR_RENDERERS[door](client)
+        finally:
+            persist_demo_session(client, st.session_state)
+        st.divider()
         with st.container(key="door_navigation"):
             cols = st.columns(len(CROSSROADS_DOORS))
             for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
                 if col.button(door_label, key=f"door_{door_label}", width="stretch"):
                     st.session_state["door"] = normalize_door(door_label)
+                    st.rerun()
         # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
         # and DOOR_COPY only — never from user input.
-        rotunda_slot.html(
-            build_rotunda_html(CROSSROADS_DOORS, normalize_door(st.session_state["door"])),
+        st.html(
+            build_rotunda_html(
+                CROSSROADS_DOORS,
+                door,
+                collapsed=True,
+            ),
             unsafe_allow_javascript=True,
         )
-        door = normalize_door(st.session_state["door"])
-        st.caption(f"Open door: {door}")
-        st.divider()
     else:
         st.markdown(
             "<style>"
@@ -881,12 +908,13 @@ def main() -> None:
             "</style>",
             unsafe_allow_html=True,
         )
+        try:
+            DOOR_RENDERERS[door](client)
+        finally:
+            persist_demo_session(client, st.session_state)
+        return
 
-    try:
-        DOOR_RENDERERS[door](client)
-    finally:
-        # A 401 remint inside any call must reach the next rerun (view_model).
-        persist_demo_session(client, st.session_state)
+    return
 
 
 if __name__ == "__main__":

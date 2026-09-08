@@ -400,8 +400,8 @@ def test_mentor_invalid_structured_output_abstains() -> None:
     assert response.citations == []
 
 
-def test_mentor_invalid_citation_keeps_proposal_but_marks_it_degraded() -> None:
-    """A useful path cannot make a fabricated passage quote look verified."""
+def test_mentor_invalid_citation_clears_proposal_and_abstains() -> None:
+    """A fabricated passage quote must not leave an ungrounded path on screen."""
     client = _ScriptedClient(
         [_intake_json(citations=[{"passage": 1, "quote": "Invented source text."}])]
     )
@@ -416,8 +416,9 @@ def test_mentor_invalid_citation_keeps_proposal_but_marks_it_degraded() -> None:
     )
 
     assert response.degraded is True
-    assert response.proposed_path is not None
-    assert response.proposed_path.title == "Start with Stoicism"
+    assert response.proposed_path is None
+    assert response.proposed_area is None
+    assert response.proposed_wing is None
     assert response.citations == []
 
 
@@ -577,3 +578,29 @@ def test_mentor_unknown_tool_twice_stops_within_two_rounds() -> None:
     assert response.rounds_used <= 2
     assert "enough indexed sources" in response.rationale.lower()
     assert len(client._responses) == 1  # third scripted reply unused
+
+
+def test_mentor_abstains_when_goal_is_stopwords_only_even_with_hits() -> None:
+    """'get a job' must not treat Ford tractor hits as on-goal evidence."""
+    tractor_hit = Hit(
+        chunk_id="c-ford",
+        book_id="ford",
+        score=1.0,
+        rank=1,
+        text="tractor to attend to the excessively hard labour of ploughing",
+        section_path=["Ch"],
+        page=1,
+        block_ids=["blk-ford"],
+    )
+    client = _ScriptedClient([])
+    response = mentor_intake(
+        "get a job",
+        [],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [],
+        shelf_search=lambda _query, _k: [tractor_hit],
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert len(client._responses) == 0  # LLM never called — early abstention
