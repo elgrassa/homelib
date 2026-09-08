@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -59,6 +60,7 @@ __all__ = [
     "OpenAICompatibleClient",
     "TokenUsage",
     "answer",
+    "is_passage_abstention",
 ]
 
 logger = logging.getLogger(__name__)
@@ -378,6 +380,31 @@ class _RawAnswer(BaseModel):
         return [item for item in value if isinstance(item, dict)]
 
 
+# Honest passage-path refusals may omit citations. Any other non-empty answer
+# without a valid citation is an ungrounded claim and must fail closed.
+_PASSAGE_ABSTENTION = re.compile(
+    r"("
+    r"passages? do not answer|"
+    r"none of the (provided )?passages|"
+    r"provided passages do not|"
+    r"don'?t have (enough )?information|"
+    r"do not have (enough )?information|"
+    r"cannot (answer|determine|find)|"
+    r"not (enough|sufficient) (information|context|evidence)|"
+    r"no (relevant |matching )?(passage|information|evidence)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def is_passage_abstention(answer: str) -> bool:
+    """True when ``answer`` is an honest refusal rather than a factual claim."""
+    text = answer.strip()
+    if not text:
+        return True
+    return _PASSAGE_ABSTENTION.search(text) is not None
+
+
 # ── Book metadata lookup (test seam) ────────────────────────────────────────
 
 
@@ -537,13 +564,15 @@ def _is_rate_limit_failure(reason: object) -> bool:
     return "429" in text or "rate_limit" in text or "rate limit" in text
 
 
+def _is_uncited_failure(reason: object) -> bool:
+    return "uncited" in str(reason).lower()
+
+
 def _degraded_response(arm_used: str, reason: str) -> AskResponse:
     logger.warning("answer() returning a degraded response: %s", reason)
-    # Empty answer on Groq JSON-validate / truncated-JSON failure so the Ask UI
-    # refuse+#A1 path (`format_ask_answer_body`) can show shelf counts instead
-    # of a generic "try again" that hides the inventory miss. Rate limits get
-    # a clearer line.
-    if _is_json_validate_failure(reason):
+    # Empty answer on malformed JSON and uncited claims lets the Ask UI show
+    # its grounded refusal and shelf next steps. Rate limits get a clearer line.
+    if _is_json_validate_failure(reason) or _is_uncited_failure(reason):
         answer_text = ""
     elif _is_rate_limit_failure(reason):
         answer_text = _RATE_LIMITED_DEGRADED_ANSWER
@@ -632,6 +661,12 @@ def answer(
         if retried_without_json_format:
             reason = f"json_validate_failed after retry; {reason}"
         return _degraded_response(arm_used, reason)
+
+    if parsed.answer.strip() and not parsed.citations and not is_passage_abstention(parsed.answer):
+        return _degraded_response(
+            arm_used,
+            "uncited factual answer rejected; empty citations with a claim",
+        )
 
     # Only the passages actually shown to the model are citable. Slicing the
     # same way `_build_context_prompt` does keeps the two in step.

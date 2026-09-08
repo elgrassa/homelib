@@ -142,8 +142,7 @@ def answer_shelf_meta(
     if not shelf:
         body = (
             "This shelf has no books yet. Add or ingest titles, then ask again "
-            "about what is available."
-            + catalog_note
+            "about what is available." + catalog_note
         )
     elif genre:
         matched = [b for b in shelf if _book_matches_genre(b, genre)]
@@ -164,16 +163,12 @@ def answer_shelf_meta(
             )
     else:
         lines = "\n".join(f"- {_format_book_line(b)}" for b in shelf)
-        body = (
-            f"This shelf has {len(shelf)} full-text books:{catalog_note}\n{lines}"
-        )
+        body = f"This shelf has {len(shelf)} full-text books:{catalog_note}\n{lines}"
 
     if catalog_entries:
         extras = "\n".join(f"- {_catalog_link_line(e)}" for e in catalog_entries[:5])
         if extras:
-            body = (
-                f"{body}\n\nRelated catalog matches (not on this shelf):\n{extras}"
-            )
+            body = f"{body}\n\nRelated catalog matches (not on this shelf):\n{extras}"
 
     latency_ms = int((time.monotonic() - start) * 1000)
     return AskResponse(
