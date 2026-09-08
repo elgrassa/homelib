@@ -94,14 +94,14 @@ def render_ask_tab(client: Client) -> None:
     if banner is not None:
         st.warning(banner)
     summary = None
-    empty_answer = not (last_ask.answer or "").strip()
-    if empty_answer:
+    needs_shelf_fallback = needs_ask_shelf_fallback(last_ask.answer or "")
+    if needs_shelf_fallback:
         try:
             summary = library_summary(client.list_books())
         except (ApiClientError, ApiUnavailableError):
             summary = None
     st.write(format_ask_answer_body(last_ask.answer, summary))
-    if empty_answer:
+    if needs_shelf_fallback:
         _render_ask_catalog_links(client)
     for line in ask_metric_captions(last_ask):
         st.caption(line)

@@ -236,17 +236,17 @@ def _discover_resources(q: str | None) -> ResourceList:
     import os
 
     mode = os.environ.get("HOMELIB_CONNECTOR_MODE", "snapshot").strip().lower()
-    if mode not in {"live", "federate"}:
+    if mode not in {"live", "federate", "fixture"}:
         return _discover_from_catalog(q)
 
     from homelib_rag.connectors import build_discover_connectors, federate_connectors
 
     needle = (q or "").strip()
-    if not needle:
+    if not needle and mode != "fixture":
         # Live connectors need a query; fall back to snapshot browse for empty q.
         return _discover_from_catalog(q)
 
-    result = federate_connectors(build_discover_connectors(), needle)
+    result = federate_connectors(build_discover_connectors(mode=mode), needle)
     items: list[ResourceSummary] = []
     for item in result.items:
         primary = item.attributions[0]

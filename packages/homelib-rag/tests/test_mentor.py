@@ -123,8 +123,7 @@ def _intake_json(**overrides: Any) -> LLMResponse:
 def _tool_then_intake(*extra: LLMResponse) -> list[LLMResponse]:
     """Scripted agent: one tool round, then final intake JSON.
 
-    Mentor honesty refuses a proposed path when ``tool_calls`` is empty
-    (LIVE #M1 signature), so happy-path fixtures must call a tool first.
+    Used by tests that specifically verify tool dispatch and reporting.
     """
     tool_call = {
         "id": "c1",
@@ -282,6 +281,27 @@ def test_mentor_response_reports_tool_calls() -> None:
     assert response.tool_calls == ["get_block"]
     assert response.rounds_used == 2
     assert response.degraded is False
+
+
+def test_mentor_accepts_grounded_in_context_path_without_optional_tool_call() -> None:
+    """LIVE: retrieved evidence is already in the prompt; a direct final answer is valid."""
+    client = _ScriptedClient([_intake_json()])
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+
+    assert response.degraded is False
+    assert response.proposed_path is not None
+    assert response.proposed_path.title == "Start with Stoicism"
+    assert response.tool_calls == []
+    assert response.rounds_used == 1
 
 
 def test_mentor_intake_degrades_when_llm_down() -> None:

@@ -8,7 +8,7 @@ maintainable product rather than a submission.
 whose output is recorded in [`docs/evidence.md`](docs/evidence.md) — not "the
 code exists". Anything unverified is `partial`, however finished it looks.
 
-Last updated: 2026-09-06 (`just drill` PASSED on the merged tip; the readiness stack has landed on `main`; WP11 residual = public snapshot + Cloud deploy, owner step, pending).
+Last updated: 2026-09-08 (`just drill` PASSED on the merged tip; Cloud demo live at https://homelib.streamlit.app/; WP11 residual = owner `just publish` + submission SHA + peers).
 
 ---
 
@@ -132,7 +132,7 @@ v1 evidence above stays. This section tracks the rebuild. Status vocabulary unch
 | **WP08** | Thin Streamlit e2e (mockups are UX SOT) | ✅ done — Crossroads doors → Ask/Mentor/Roadmap/Coffee Table/Shelf/Observatory/Projection (`DOOR_RENDERERS` ≡ `CROSSROADS_DOORS`); rotunda PR-D |
 | **WP09** | Projection; static doors before rotunda | ✅ done — one-page projector toggle + progress save; rotunda shipped in PR-D (inline `st.html`, static grid kept beneath) |
 | **WP10** | Observatory ≥5 charts + feedback | ✅ done — `GET /v1/observatory` + UI + `scripts/demo_traffic.py` |
-| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅ (2026-09-05; one earlier re-run failed under host load, see §E.9); docs synced. The readiness stack has since merged into `main`, every head green in CI, smoke PASSED on the tip. **2026-09-06: public snapshot + Cloud deploy: owner step, pending.** Residual: `just publish`, Streamlit Cloud (Python 3.13, `GROQ_API_KEY` or `LLM_*` + `HOMELIB_SQLITE_PATH=data/homelib.sqlite` secrets — rehearsed cold-start + degraded ask, not with a real key), submit, peer×3 |
+| **WP11** | Docs, drill, owner publish + Cloud | 🟡 drill ✅; Cloud demo live at https://homelib.streamlit.app/ (2026-09-08). Residual: owner `just publish` / public snapshot, submission SHA in evidence, peer×3 |
 
 **Progress (2026-09-04):** WP00–WP10 on `v2` @ `d6f9946` (PR #15). **`just drill` PASSED** (criterion 9). Compose fleet all healthy. **v2 build ≈95%** of WP00–WP11. Remaining: Mon owner publish/Cloud/submit/peer×3. `v2`→`main` unblocked on drill.
 

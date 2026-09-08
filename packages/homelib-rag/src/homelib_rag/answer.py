@@ -662,6 +662,9 @@ def answer(
             reason = f"json_validate_failed after retry; {reason}"
         return _degraded_response(arm_used, reason)
 
+    if not parsed.answer.strip():
+        return _degraded_response(arm_used, "uncited empty LLM answer rejected")
+
     if parsed.answer.strip() and not parsed.citations and not is_passage_abstention(parsed.answer):
         return _degraded_response(
             arm_used,

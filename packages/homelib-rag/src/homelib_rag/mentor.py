@@ -552,12 +552,10 @@ def mentor_intake(
         or parsed.proposed_area is not None
         or parsed.proposed_wing is not None
     )
-    # Prefer honesty: unrelated books/goals in the proposal, or a path with
-    # empty tool_calls (LIVE #M1 signature tool_calls=[], rounds_used=1) →
-    # force abstention rather than invent a labour-market path.
+    # Prefer honesty: unrelated books/goals in the proposal force abstention.
+    # Tool calls are optional because the initial on-goal shelf/catalog
+    # evidence is already present in the prompt.
     if has_proposal and not _proposal_aligns_with_goal(goal, interests, parsed):
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
-    if parsed.proposed_path is not None and not tool_calls:
         return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     try:

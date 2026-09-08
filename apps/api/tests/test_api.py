@@ -566,7 +566,11 @@ def test_cost_usd_zero_under_local_default(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.delenv("LLM_PRICE_PER_1K_COMPLETION", raising=False)
     logged: list[QueryLogRow] = []
     fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
-    deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
+    deps = _make_deps(
+        llm_client=fake_llm,
+        log_query=logged.append,
+        retrieve=lambda query, k, arm: ([_hit()], arm, False),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -584,7 +588,11 @@ def test_cost_usd_computed_from_prices(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PRICE_PER_1K_COMPLETION", "4.0")
     logged: list[QueryLogRow] = []
     fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
-    deps = _make_deps(llm_client=fake_llm, log_query=logged.append)
+    deps = _make_deps(
+        llm_client=fake_llm,
+        log_query=logged.append,
+        retrieve=lambda query, k, arm: ([_hit()], arm, False),
+    )
     app.dependency_overrides[get_deps] = lambda: deps
 
     resp = client.post("/v1/ask", json={"query": "q"})
@@ -633,7 +641,10 @@ def test_answer_log_written_when_enabled(tmp_path: Any, monkeypatch: pytest.Monk
     monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
     monkeypatch.setenv("HOMELIB_LOG_ANSWERS", "1")
     deps = _make_deps(
-        llm_client=_ScriptedClient([_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])])
+        llm_client=_ScriptedClient(
+            [_llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}])]
+        ),
+        retrieve=lambda query, k, arm: ([_hit()], arm, False),
     )
     app.dependency_overrides[get_deps] = lambda: deps
 

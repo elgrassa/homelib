@@ -272,6 +272,7 @@ def test_discover_resources_returns_federated_fixture_hits(
 def test_discover_resources_degrades_when_one_connector_times_out(
     sqlite_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "fixture")
     from pathlib import Path as PathType
 
     from homelib_rag.connectors import ConnectorName, FixtureConnector, SlowConnector

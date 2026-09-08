@@ -836,6 +836,18 @@ def test_factual_answer_with_empty_citations_is_not_trusted() -> None:
     assert result.answer == ""
 
 
+def test_empty_llm_answer_is_degraded() -> None:
+    """Valid JSON with no answer is still an unusable generation, not success."""
+    hits = [_hit()]
+    client = _ScriptedClient([_llm_json("", [])])
+
+    result = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert result.degraded is True
+    assert result.answer == ""
+    assert result.citations == []
+
+
 def test_bare_integer_citations_do_not_become_trusted_uncited_answers() -> None:
     """Groq `citations: [1]` must not coerce to [] and trust the claim."""
     hits = [_hit()]

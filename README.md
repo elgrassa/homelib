@@ -27,8 +27,8 @@ fallback, not the reviewer path. When `HOMELIB_SQLITE_PATH` is set (the tip
 product path), asks and feedback land in SQLite, and the UI's Observatory
 door serves the in-app charts. Never commit an API key.
 
-**Live demo:** _URL to be added after Cloud deploy_
-**Submission commit:** _SHA to be added_
+**Live demo:** https://homelib.streamlit.app/
+**Submission commit:** record on `main` at submit time (see [`docs/evidence.md`](docs/evidence.md))
 
 ### DO-NOT-CLAIM (public / LinkedIn)
 
@@ -471,7 +471,7 @@ Floor without any bonus, on the statuses above: **21/21** done, with row 9
 flagged for a quiet-box drill re-run. See `CHECKLIST.md` for the
 engineering-quality checklist behind this table.
 
-**Public demo URL:** none yet — see "Live demo" at the top of this README
+**Public demo URL:** https://homelib.streamlit.app/ — see "Live demo" at the top of this README
 (bonus row above).
 **Submission commit:** to be recorded in [`docs/evidence.md`](docs/evidence.md)
 at submission time (see "Submission commit" at the top of this README).
