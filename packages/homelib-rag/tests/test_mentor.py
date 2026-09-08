@@ -227,7 +227,9 @@ def test_path_schema_fail_closed() -> None:
 
 
 def test_build_path_rejects_empty_steps_and_accepts_grounded_steps() -> None:
-    catalog = lambda _goal, _subjects: [_catalog_entry("/works/OL1W")]
+    def catalog(_goal: str, _subjects: list[str] | None) -> list[CatalogEntry]:
+        return [_catalog_entry("/works/OL1W")]
+
     with pytest.raises(RoadmapParseError, match="at least one step"):
         build_path(
             "Empty path",
