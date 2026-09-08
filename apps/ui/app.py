@@ -57,6 +57,7 @@ from apps.ui.view_model import (
     official_viewer_enabled,
     parse_interests,
     persist_demo_session,
+    playlist_item_can_accept,
     playlist_visible_items,
     projection_wants_chrome_hidden,
     read_port,
@@ -288,9 +289,7 @@ def render_coffee_table_tab(client: Client) -> None:
         for item in items:
             cols = st.columns([4, 1, 1])
             cols[0].write(format_playlist_item_line(item, title_by_resource_id))
-            if cols[1].button(
-                "Accept", key=f"acc_{item['id']}", disabled=item.get("status") != "proposed"
-            ):
+            if playlist_item_can_accept(item) and cols[1].button("Accept", key=f"acc_{item['id']}"):
                 try:
                     client.accept_playlist([item["id"]])
                     st.rerun()
@@ -537,6 +536,7 @@ def render_observatory_tab(client: Client) -> None:
             },
             x="bucket",
             y="value",
+            width="stretch",
         )
 
 
@@ -651,10 +651,10 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
     ordinal = int(st.session_state.get(ordinal_key, 0))
     cols = st.columns([1, 1, 2])
     with cols[0]:
-        if st.button("Previous", key="proj_prev", use_container_width=True) and ordinal > 0:
+        if st.button("Previous", key="proj_prev", width="stretch") and ordinal > 0:
             ordinal -= 1
     with cols[1]:
-        if st.button("Next", key="proj_next", use_container_width=True):
+        if st.button("Next", key="proj_next", width="stretch"):
             ordinal += 1
     st.session_state[ordinal_key] = ordinal
 
@@ -830,16 +830,38 @@ def main() -> None:
             "HomeLib — a private academic shelf you can ask, with citations that open the page. "
             f"{len(CROSSROADS_DOORS)} Crossroads doors."
         )
+        st.markdown(
+            """
+            <style>
+            @media (max-width: 700px) {
+              .st-key-door_navigation [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+              }
+              .st-key-door_navigation [data-testid="column"] {
+                flex: 1 1 9rem;
+                min-width: 0;
+                width: auto;
+              }
+              .st-key-door_navigation button {
+                white-space: normal;
+              }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         # The rotating room (specs/rotunda.md), rendered inline: Streamlit's
         # iframe sandbox blocks parent navigation, so the fragment shares this
         # page and Enter is a plain `?door=` link. The button grid beneath stays
         # the accessible path. The slot is reserved above the grid but filled
         # after it, so a grid click and the room agree within the same run.
         rotunda_slot = st.empty()
-        cols = st.columns(len(CROSSROADS_DOORS))
-        for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
-            if col.button(door_label, key=f"door_{door_label}"):
-                st.session_state["door"] = normalize_door(door_label)
+        with st.container(key="door_navigation"):
+            cols = st.columns(len(CROSSROADS_DOORS))
+            for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
+                if col.button(door_label, key=f"door_{door_label}", width="stretch"):
+                    st.session_state["door"] = normalize_door(door_label)
         # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
         # and DOOR_COPY only — never from user input.
         rotunda_slot.html(

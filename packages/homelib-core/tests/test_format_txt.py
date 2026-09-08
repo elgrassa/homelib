@@ -89,6 +89,22 @@ def test_parse_txt_plaintext_heading_heuristic(tmp_path: Path) -> None:
     _assert_offsets_dense_and_stable(doc, "mybook")
 
 
+def test_parse_txt_recognizes_walden_where_i_lived_heading(tmp_path: Path) -> None:
+    """The committed Gutenberg text uses lowercase ``and`` in this heading."""
+    path = tmp_path / "walden.txt"
+    path.write_text(
+        "Where I Lived, and What I Lived For\n\n"
+        "At a certain season of our life we consider every spot.\n",
+        encoding="utf-8",
+    )
+
+    doc, _result = parse_txt(path, book_id="walden")
+
+    assert len(doc.blocks) == 1
+    assert doc.blocks[0].section_path == ["Where I Lived, and What I Lived For"]
+    assert doc.blocks[0].text.startswith("At a certain season")
+
+
 def test_parse_txt_no_heading_is_single_block(tmp_path: Path) -> None:
     path = tmp_path / "flat.txt"
     path.write_text("just some plain body text\nacross two lines\n", encoding="utf-8")

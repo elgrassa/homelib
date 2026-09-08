@@ -58,6 +58,30 @@ def test_manual_survives_regeneration(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_repeated_manual_add_keeps_one_active_playlist_item(tmp_path: Path) -> None:
+    conn = _db(tmp_path)
+    try:
+        book_id = str(conn.execute("SELECT book_id FROM books LIMIT 1").fetchone()[0])
+        first = ct.add_item(
+            conn,
+            principal_id="local-user",
+            resource_id=book_id,
+            origin=ct.PlaylistOrigin.MANUAL_SHELF,
+        )
+        second = ct.add_item(
+            conn,
+            principal_id="local-user",
+            resource_id=book_id,
+            origin=ct.PlaylistOrigin.MANUAL_SHELF,
+        )
+
+        assert len(first.items) == 1
+        assert len(second.items) == 1
+        assert second.items[0].id == first.items[0].id
+    finally:
+        conn.close()
+
+
 def test_no_silent_reinsert_of_completed_or_removed(tmp_path: Path) -> None:
     conn = _db(tmp_path)
     try:

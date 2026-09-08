@@ -23,9 +23,10 @@ from typing import Literal
 from homelib_core.models import Block, BookDoc, ExtractionResult, Provenance, make_block_id
 
 EXTRACTOR_NAME = "homelib-core.formats.txt"
-EXTRACTOR_VERSION = "1.0.0"
+EXTRACTOR_VERSION = "1.1.0"
 
 _MAX_HEADING_LEN = 80
+_KNOWN_PLAINTEXT_HEADINGS = frozenset({"Where I Lived, and What I Lived For"})
 
 _MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(\S.*?)\s*$")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -52,7 +53,7 @@ def _plaintext_heading(line: str, next_line: str | None) -> str | None:
         return None
     if not any(char.isalpha() for char in stripped):
         return None
-    if stripped.upper() == stripped or stripped.istitle():
+    if stripped.upper() == stripped or stripped.istitle() or stripped in _KNOWN_PLAINTEXT_HEADINGS:
         return stripped
     return None
 

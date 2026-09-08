@@ -236,6 +236,13 @@ def add_item(
 ) -> Playlist:
     owner = _require_write_principal(conn, principal_id)
     playlist_id = _current_playlist_id(conn, owner)
+    existing = conn.execute(
+        "SELECT id FROM playlist_item WHERE playlist_id = ? AND resource_id = ? "
+        "AND status != 'removed'",
+        (playlist_id, resource_id),
+    ).fetchone()
+    if existing is not None:
+        return get_playlist(conn, owner)
     manual = origin in (PlaylistOrigin.MANUAL_SHELF, PlaylistOrigin.MANUAL_DISCOVER)
     status = PlaylistStatus.QUEUED if manual else PlaylistStatus.PROPOSED
     accepted = _now_iso() if manual else None

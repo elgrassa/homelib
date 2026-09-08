@@ -87,11 +87,6 @@ jobs:
       - name: Secret scan (gitleaks, full history)
         run: gitleaks git --config .gitleaks.toml --redact --no-banner .
 
-      - name: Type check (mypy --strict)
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          uv run mypy
-
       # Fast tests only. The corpus-scale integration tests run in `full-suite`
       # below, on the lane sized for them. This job exists to say "the code is
       # wrong" in a couple of minutes, not to be exhaustive.
@@ -130,7 +125,12 @@ jobs:
     # sitting in state 5 behind another project's backlog. Nothing here needs
     # e2e specifically; it needs "not the quick lane".
     runs-on: [macos-arm64, heavy]
-    timeout-minutes: 45
+    # Cold uv sync on this hostexecutor lane has measured ~11–15m alone. The
+    # full coverage suite locally is ~11–15m more. A 45m job timeout killed
+    # PR #52 mid-suite (run 13657: cancelled at ~45% with context deadline
+    # exceeded) and the quick-lane mypy step the same way after sync+gitleaks
+    # left almost no budget. Heavy daemon cap is 2h — keep this under it.
+    timeout-minutes: 90
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
@@ -149,6 +149,13 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv --version
           uv sync --frozen --all-extras
+
+      # Moved off the quick gate: after a cold sync, mypy alone was SIGKILL'd
+      # at 13m53s inside the 20m/25m quick budget (PR #52 run 13657).
+      - name: Type check (mypy --strict)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run mypy
 
       - name: Test (full suite + coverage floor)
         run: |

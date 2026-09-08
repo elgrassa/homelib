@@ -209,6 +209,17 @@ def test_load_manifest_round_trip(tmp_path: Path) -> None:
     assert [e.book_id for e in loaded] == ["book-a", "book-b"]
 
 
+def test_load_manifest_accepts_rights_status_used_by_committed_manifest(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path, [_entry("book-a", "a" * 64)])
+    rows = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    rows[0]["rights_status"] = "public_domain"
+    manifest_path.write_text(yaml.safe_dump(rows), encoding="utf-8")
+
+    loaded = load_manifest(manifest_path)
+
+    assert loaded[0].rights_status == "public_domain"
+
+
 def test_main_requires_a_mode(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         main(["--manifest", str(tmp_path / "manifest.yaml")])

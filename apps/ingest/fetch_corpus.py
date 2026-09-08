@@ -47,6 +47,7 @@ class ManifestEntry:
     sha256: str
     format: str
     license_note: str
+    rights_status: str = ""
 
 
 @dataclass(frozen=True)

@@ -161,6 +161,41 @@ def test_sync_staging_rolls_back_on_catalog_error(tmp_path: Path) -> None:
     conn.close()
 
 
+def test_sync_staging_removes_block_replaced_by_new_provenance_id(tmp_path: Path) -> None:
+    db_path = _fresh_db(tmp_path)
+    staging_path = staging_db_path(db_path)
+    _create_minimal_staging(staging_path)
+
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        "INSERT INTO books (book_id, title, rights_status) VALUES ('b1', 'T', 'public_domain')"
+    )
+    conn.execute(
+        "INSERT INTO blocks "
+        "(block_id, book_id, ordinal, section_path, text, char_start, char_end, format) "
+        "VALUES ('old-section-id', 'b1', 0, '[\"Wrong\"]', 'text', 0, 4, 'txt')"
+    )
+    conn.commit()
+    conn.close()
+
+    staging = connect(staging_path)
+    staging.execute(
+        "INSERT INTO blocks VALUES "
+        "('correct-section-id', 'b1', 0, '[\"Correct\"]', 'text', 0, 4, 'txt', NULL, NULL, "
+        "'correct')"
+    )
+    staging.commit()
+    staging.close()
+
+    _sync_staging_to_canonical(db_path, rights_by_book={"b1": "public_domain"})
+
+    conn = connect(db_path)
+    block_ids = [str(row[0]) for row in conn.execute("SELECT block_id FROM blocks")]
+    conn.close()
+    assert block_ids == ["correct-section-id"]
+
+
 def test_sync_chunk_embeddings_stores_float32_blob(tmp_path: Path) -> None:
     import apps.ingest.sqlite_pipeline as mod
 

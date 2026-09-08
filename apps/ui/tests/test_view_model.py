@@ -39,6 +39,7 @@ from apps.ui.view_model import (
     normalize_level,
     observatory_chart_titles,
     parse_interests,
+    playlist_item_can_accept,
     playlist_visible_items,
     record_vote,
     resolve_prerequisite_titles,
@@ -371,7 +372,17 @@ def test_format_citation_label_includes_book_section_and_page() -> None:
 def test_format_citation_label_handles_missing_page_and_section() -> None:
     citation = _make_citation(book_title="Walden", section_path=[], page=None)
 
-    assert format_citation_label(citation) == "Walden · — · page —"
+    assert format_citation_label(citation) == "Walden · source block"
+
+
+def test_format_citation_label_uses_txt_section_without_fake_page() -> None:
+    citation = _make_citation(
+        book_title="Walden",
+        section_path=["Where I Lived, and What I Lived For"],
+        page=None,
+    )
+
+    assert format_citation_label(citation) == "Walden · Where I Lived, and What I Lived For"
 
 
 def test_format_scene_hit_label_includes_book_author_section_and_page() -> None:
@@ -511,7 +522,14 @@ def test_playlist_item_line_uses_book_title_not_resource_id() -> None:
     assert "Acres of Diamonds" in titled
     assert "conwell-acres-of-diamonds" not in titled
     assert "queued" in titled
+    assert titled.startswith("1. ")
     assert "conwell-acres-of-diamonds" in untitled
+
+
+def test_only_proposed_coffee_table_items_offer_acceptance() -> None:
+    assert playlist_item_can_accept({"status": "proposed"}) is True
+    assert playlist_item_can_accept({"status": "queued"}) is False
+    assert playlist_item_can_accept({"status": "completed"}) is False
 
 
 def test_book_choice_label_is_the_title() -> None:

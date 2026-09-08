@@ -195,6 +195,27 @@ def test_the_full_suite_does_not_run_on_the_quick_lane() -> None:
             )
 
 
+def test_mypy_and_full_suite_live_on_heavy_with_room_for_cold_sync() -> None:
+    """PR #52 run 13657: quick-lane mypy and 45m heavy suite both hit deadline.
+
+    After a cold uv sync, mypy was SIGKILL'd inside the quick budget; the
+    coverage suite died mid-run under a 45m job timeout. Keep both on heavy
+    with a timeout under the 2h daemon cap but above measured cold cost.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    full = workflow["jobs"]["full-suite"]
+    gate = workflow["jobs"]["gate"]
+    full_cmds = " ".join(str(step.get("run", "")) for step in full["steps"])
+    gate_cmds = " ".join(str(step.get("run", "")) for step in gate["steps"])
+
+    assert "quick" not in full["runs-on"]
+    assert "heavy" in full["runs-on"]
+    assert int(full["timeout-minutes"]) >= 90
+    assert int(full["timeout-minutes"]) < 120
+    assert "uv run mypy" in full_cmds
+    assert "uv run mypy" not in gate_cmds
+
+
 def test_compose_pins_the_ollama_context_window() -> None:
     """An unpinned context window fails silently, which is the worst kind.
 

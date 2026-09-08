@@ -243,6 +243,23 @@ def _purge_non_indexable_corpus(conn: sqlite3.Connection, *, indexable_book_ids:
     conn.execute("DELETE FROM blocks")
 
 
+def _purge_stale_corpus_rows(conn: sqlite3.Connection) -> None:
+    """Remove canonical rows whose regenerated IDs disappeared from staging."""
+    conn.execute(
+        "DELETE FROM chunk_embeddings WHERE NOT EXISTS "
+        "(SELECT 1 FROM staging.chunk_embeddings AS incoming "
+        "WHERE incoming.chunk_id = chunk_embeddings.chunk_id)"
+    )
+    conn.execute(
+        "DELETE FROM chunks WHERE NOT EXISTS "
+        "(SELECT 1 FROM staging.chunks AS incoming WHERE incoming.chunk_id = chunks.chunk_id)"
+    )
+    conn.execute(
+        "DELETE FROM blocks WHERE NOT EXISTS "
+        "(SELECT 1 FROM staging.blocks AS incoming WHERE incoming.block_id = blocks.block_id)"
+    )
+
+
 def _sync_books(conn: sqlite3.Connection, *, rights_by_book: dict[str, str]) -> None:
     rows = conn.execute(
         "SELECT book_id, title, authors, language, source_url, license_note FROM staging.books"
@@ -405,6 +422,7 @@ def _sync_staging_to_canonical(
         with conn:
             _sync_books(conn, rights_by_book=rights_by_book)
             _purge_non_indexable_corpus(conn, indexable_book_ids=indexable_book_ids)
+            _purge_stale_corpus_rows(conn)
             _sync_blocks(conn, indexable_book_ids=indexable_book_ids)
             _sync_chunks(conn, indexable_book_ids=indexable_book_ids)
             _sync_chunk_embeddings(conn, indexable_book_ids=indexable_book_ids)

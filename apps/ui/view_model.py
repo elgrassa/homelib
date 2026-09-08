@@ -289,10 +289,15 @@ def block_id_for_citation(citation: Citation) -> str:
 
 
 def format_citation_label(citation: Citation) -> str:
-    """``book_title · section_path · page`` label for a citation expander."""
-    section = " / ".join(citation.section_path) if citation.section_path else "—"
-    page = str(citation.page) if citation.page is not None else "—"
-    return f"{citation.book_title} · {section} · page {page}"
+    """Citation location without pretending page metadata exists for TXT."""
+    parts = [citation.book_title]
+    if citation.section_path:
+        parts.append(" / ".join(citation.section_path))
+    if citation.page is not None:
+        parts.append(f"page {citation.page}")
+    elif not citation.section_path:
+        parts.append("source block")
+    return " · ".join(parts)
 
 
 def ask_metric_captions(ask: AskResponse) -> list[str]:
@@ -412,12 +417,18 @@ def playlist_visible_items(playlist: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def format_playlist_item_line(item: Mapping[str, Any], titles: Mapping[str, str]) -> str:
-    """Coffee Table row: ordinal, book title (or resource id), status."""
+    """Coffee Table row: one-based position, book title (or resource id), status."""
     resource_id = str(item.get("resource_id") or "")
     title = titles.get(resource_id) or resource_id or "—"
     ordinal = item.get("ordinal")
+    position = ordinal + 1 if isinstance(ordinal, int) else "—"
     status = item.get("status") or "—"
-    return f"{ordinal} {title} · {status}"
+    return f"{position}. {title} · {status}"
+
+
+def playlist_item_can_accept(item: Mapping[str, Any]) -> bool:
+    """Only Mentor-proposed rows need an explicit acceptance action."""
+    return item.get("status") == "proposed"
 
 
 def format_book_choice_label(book: BookSummary) -> str:
