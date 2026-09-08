@@ -61,22 +61,36 @@ def test_gitleaks_runs_in_ci() -> None:
     assert "gitleaks" in commands, "no gitleaks step in the CI gate job"
 
 
-def test_ci_checks_out_full_history_for_the_secret_scan() -> None:
-    """A shallow clone would make the history scan vacuous.
+def test_ci_gitleaks_scopes_pr_history_but_keeps_full_checkout() -> None:
+    """PR scans must not hang on full history; checkout stays deep for main.
 
-    `gitleaks git` reads the git log. With actions/checkout's default depth of
-    1 it sees a single commit and reports clean on every run — passing not
-    because the history is clean but because it was never looked at.
+    Quick-lane runs 184/185: full-history gitleaks after cold uv sync blew the
+    20m deadline. PRs scan base..head; push-to-main still scans everything.
+    fetch-depth: 0 stays so the main-branch full scan is not vacuous.
     """
     checkout = next(
         step for step in _gate_steps() if "actions/checkout" in str(step.get("uses", ""))
     )
     options = checkout.get("with")
-    assert isinstance(options, dict), "checkout step has no `with:` block, so no fetch-depth"
+    assert isinstance(options, dict)
+    assert options.get("fetch-depth") == 0
 
-    assert options.get("fetch-depth") == 0, (
-        "CI checkout is shallow, so the gitleaks history scan would see one commit"
+    gitleaks = next(step for step in _gate_steps() if "gitleaks" in str(step.get("run", "")))
+    script = str(gitleaks.get("run", ""))
+    assert "pull_request" in script
+    assert "--log-opts=" in script
+    assert "pull_request.base.sha" in script
+    assert "gitleaks git" in script
+
+
+def test_graph_guard_does_not_rebuild_on_the_quick_lane() -> None:
+    """Advisory `graphify update` on PRs SIGKILL'd under the quick deadline."""
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    guard_cmds = " ".join(
+        str(step.get("run", "")) for step in workflow["jobs"]["graph-guard"]["steps"]
     )
+    assert "graphify update" not in guard_cmds
+    assert "graphify-out/" in guard_cmds
 
 
 def test_just_ci_includes_the_secret_scan() -> None:

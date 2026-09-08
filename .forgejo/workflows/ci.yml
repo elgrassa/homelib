@@ -82,10 +82,20 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
-      # Scans HISTORY, not the working tree: a secret that was committed and
-      # later deleted is still in the repo, and this one goes public.
-      - name: Secret scan (gitleaks, full history)
-        run: gitleaks git --config .gitleaks.toml --redact --no-banner .
+      # Scans HISTORY, not the working tree. On pull_request, only the commits
+      # this PR adds — a full-history scan hangs for ~20m on early binary
+      # blobs (corpus snapshots) and blows the quick-lane deadline (runs
+      # 184/185). On push to main, scan the whole history (fetch-depth: 0).
+      - name: Secret scan (gitleaks)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            gitleaks git --config .gitleaks.toml --redact --no-banner \
+              --log-opts="${base}..${head}" .
+          else
+            gitleaks git --config .gitleaks.toml --redact --no-banner .
+          fi
 
       # Fast tests only. The corpus-scale integration tests run in `full-suite`
       # below, on the lane sized for them. This job exists to say "the code is
@@ -205,14 +215,9 @@ jobs:
             exit 1
           fi
           echo "graphify-out/ untouched"
-      - name: Graph generation smoke (advisory)
-        run: |
-          command -v graphify >/dev/null || { echo "::warning::graphify not installed on runner — skipping"; exit 0; }
-          # PYTHONHASHSEED pinned: graphify's import tie-breaks and community
-          # detection follow Python hash order — unpinned, identical input can
-          # produce different graphs (live-observed).
-          PYTHONHASHSEED=0 graphify update . >/dev/null || { echo "::warning::graphify update failed on this tree — the post-merge refresh will fail the same way"; exit 0; }
-          echo "graph generation OK"
+      # Advisory generation moved off the quick lane: a cold `graphify update`
+      # on this tree exceeds the 10–20m daemon budget (run 184 SIGKILL). The
+      # post-merge graph-refresh job on main remains the authoritative rebuild.
 
   # Canonical post-merge graph refresh, adapted from a shared CI template.
   # Homelib: the graph is refreshed on main only. Until 2026-09-06 it was
