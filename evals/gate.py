@@ -273,9 +273,7 @@ def load_committed_retrieval_metrics(path: Path) -> dict[str, float]:
     if winner_row is None:
         raise ValueError("hybrid_rerank row missing from retrieval report")
 
-    hit_rate = _require_unit_interval(
-        "hybrid_rerank.hit_rate_at_5", float(winner_row[hit_i])
-    )
+    hit_rate = _require_unit_interval("hybrid_rerank.hit_rate_at_5", float(winner_row[hit_i]))
     mrr = _require_unit_interval("hybrid_rerank.mrr_at_5", float(winner_row[mrr_i]))
     return {
         "hybrid_rerank.hit_rate_at_5": hit_rate,

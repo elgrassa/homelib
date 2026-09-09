@@ -645,9 +645,7 @@ def test_main_writes_a_report_and_passes_the_judge_gate(
             _variant_score("concise", n=5, suggested=3.9),
             _variant_score("cited_first", n=5, suggested=4.4),
             _variant_score("stepwise", n=5, suggested=4.0),
-            _variant_score_with_faithfulness(
-                "production", n=5, suggested=3.5, faithfulness=4.0
-            ),
+            _variant_score_with_faithfulness("production", n=5, suggested=3.5, faithfulness=4.0),
         ],
     )
     report = tmp_path / "llm_eval.md"
@@ -675,9 +673,7 @@ def test_main_fails_the_gate_when_judge_faithfulness_regresses(
             _variant_score("concise", n=5, suggested=3.9),
             _variant_score("cited_first", n=5, suggested=4.4),
             _variant_score("stepwise", n=5, suggested=4.0),
-            _variant_score_with_faithfulness(
-                "production", n=5, suggested=3.5, faithfulness=4.0
-            ),
+            _variant_score_with_faithfulness("production", n=5, suggested=3.5, faithfulness=4.0),
         ],
     )
 
@@ -698,18 +694,10 @@ def test_judge_gate_uses_production_even_when_challenger_wins(
     _stub_run(
         monkeypatch,
         [
-            _variant_score_with_faithfulness(
-                "concise", n=5, suggested=3.0, faithfulness=3.0
-            ),
-            _variant_score_with_faithfulness(
-                "cited_first", n=5, suggested=3.1, faithfulness=3.1
-            ),
-            _variant_score_with_faithfulness(
-                "stepwise", n=5, suggested=4.9, faithfulness=4.9
-            ),
-            _variant_score_with_faithfulness(
-                "production", n=5, suggested=2.0, faithfulness=2.0
-            ),
+            _variant_score_with_faithfulness("concise", n=5, suggested=3.0, faithfulness=3.0),
+            _variant_score_with_faithfulness("cited_first", n=5, suggested=3.1, faithfulness=3.1),
+            _variant_score_with_faithfulness("stepwise", n=5, suggested=4.9, faithfulness=4.9),
+            _variant_score_with_faithfulness("production", n=5, suggested=2.0, faithfulness=2.0),
         ],
     )
     report = tmp_path / "llm_eval.md"
