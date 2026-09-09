@@ -466,3 +466,36 @@ def test_browse_catalog_matches_author_needle(
     assert total == 1
     assert page[0].title == "Meditations"
     conn.close()
+
+
+def test_search_catalog_falls_back_when_subject_filter_misses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LIVE: Stoicism interest is not an exact OL subject in the snapshot."""
+    from homelib_rag.sqlite_index import search_catalog
+
+    db_path = tmp_path / "catalog-fallback.sqlite"
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    conn = connect(db_path)
+    migrate(conn)
+    conn.execute(
+        """
+        INSERT INTO catalog (
+            ol_key, title, authors, subjects, first_publish_year, description, provenance_note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "OL9W",
+            "Handbook of Stoicism",
+            json.dumps(["Epictetus"]),
+            json.dumps(["Philosophy"]),
+            1800,
+            None,
+            "test",
+        ),
+    )
+    conn.commit()
+    hits = search_catalog("calm", ["stoicism"], conn=conn)
+    assert hits
+    assert hits[0].title == "Handbook of Stoicism"
+    conn.close()

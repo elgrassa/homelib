@@ -227,7 +227,7 @@ def test_degraded_trace_caption_keeps_arm_out_of_banner() -> None:
 def test_ask_answer_body_refuses_when_llm_returns_empty() -> None:
     """Inventory questions often get answer=\"\" — that must not render blank."""
     body = format_ask_answer_body(
-        "", LibrarySummary(book_count=18, total_blocks=729, total_chunks=9168)
+        "", LibrarySummary(book_count=18, total_blocks=627, total_chunks=9119)
     )
     assert "do not answer" in body.lower()
     assert "18 books" in body
@@ -559,6 +559,40 @@ def test_observatory_chart_titles_preserve_order() -> None:
         {"charts": [{"title": "A", "id": "a"}, {"id": "b"}, {"title": "C"}]}
     )
     assert titles == ["A", "b", "C"]
+
+
+def test_observatory_bar_chart_has_finite_y_domain_and_no_bind() -> None:
+    """LIVE #51: Vega Infinite extent / scale-bind warnings on Observatory."""
+    from apps.ui.view_model import observatory_bar_chart
+
+    chart = observatory_bar_chart(
+        [
+            {"bucket": "all", "value": 12.0, "series": "p50"},
+            {"bucket": "all", "value": 40.0, "series": "p95"},
+        ]
+    )
+    dumped = chart.to_dict()
+    y_scale = dumped["encoding"]["y"]["scale"]
+    assert y_scale.get("domain") == [0, 40.0] or (
+        y_scale.get("domainMin") == 0 and y_scale.get("domainMax") >= 40.0
+    )
+    assert dumped["encoding"]["y"].get("stack") is None
+    assert "selection" not in dumped
+    assert "params" not in dumped or not any(
+        "bind" in str(param).lower() for param in (dumped.get("params") or [])
+    )
+
+
+def test_observatory_bar_chart_empty_points_still_finite() -> None:
+    from apps.ui.view_model import observatory_bar_chart
+
+    chart = observatory_bar_chart([])
+    dumped = chart.to_dict()
+    y_scale = dumped["encoding"]["y"]["scale"]
+    domain = y_scale.get("domain") or [y_scale.get("domainMin"), y_scale.get("domainMax")]
+    assert domain[0] == 0
+    assert domain[1] >= 1.0
+    assert dumped["encoding"]["y"].get("stack") is None
 
 
 # ── H3: demo session minted once per browser session, re-attached per rerun ──

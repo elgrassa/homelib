@@ -37,7 +37,13 @@ from homelib_rag import agent as agent_module
 from homelib_rag import answer as answer_module
 from homelib_rag import roadmap as roadmap_module
 from homelib_rag.answer import LLMUnreachableError, OpenAICompatibleClient
-from homelib_rag.hybrid import hybrid_search
+from homelib_rag.hybrid import (
+    boost_books_named_in_query,
+    hybrid_search,
+    merge_unique_hits,
+    promote_query_overlap,
+)
+from homelib_rag.index import search_lexical
 from homelib_rag.models import Hit
 from homelib_rag.rerank import rerank
 from homelib_rag.rewrite import rewrite_query
@@ -323,6 +329,37 @@ def _resolve_arm(requested: str | None) -> str:
     return os.environ.get(_DEFAULT_ARM_ENV, _FALLBACK_DEFAULT_ARM)
 
 
+def _book_titles_for_boost() -> dict[str, str]:
+    """Shelf titles used to boost Ask hits when the question names a book."""
+    try:
+        if os.environ.get("HOMELIB_SQLITE_PATH", "").strip():
+            from apps.api import sqlite_deps
+
+            return {book.book_id: book.title for book in sqlite_deps.sqlite_list_books()}
+        return {book.book_id: book.title for book in _default_list_books()}
+    except Exception as exc:
+        logger.warning("book title boost unavailable: %s", exc)
+        return {}
+
+
+def _ground_hits_for_ask(query: str, hits: list[Hit], k: int) -> list[Hit]:
+    """Merge lexical candidates, promote overlap, boost named shelf titles.
+
+    Scene search already promotes exact phrases inside one book; Ask questions
+    rarely equal a passage, so we widen the candidate set and re-rank by
+    content overlap (LIVE: living-deliberately abstained while Shelf found it).
+    """
+    try:
+        extra = search_lexical(query, max(k * 2, 10))
+    except Exception as exc:
+        logger.warning("ask lexical merge failed: %s", exc)
+        extra = []
+    merged = merge_unique_hits(hits, extra, k=max(k * 3, 15))
+    promoted = promote_query_overlap(query, merged)
+    boosted = boost_books_named_in_query(query, promoted, _book_titles_for_boost())
+    return [hit.model_copy(update={"rank": rank}) for rank, hit in enumerate(boosted[:k], start=1)]
+
+
 def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, bool]:
     """Production `Deps.retrieve`: `hybrid_search` (+ optional rerank).
 
@@ -352,6 +389,7 @@ def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, boo
         return [], search_mode, True
 
     degraded = mode_used != search_mode
+    arm_used = mode_used
     if use_rerank and not degraded and hits:
         # The `rerank` stage span is opened here, around the real cross-encoder
         # call, so `time_per_stage` shows what reranking actually costs; it
@@ -361,8 +399,10 @@ def _default_retrieve(query: str, k: int, arm: str) -> tuple[list[Hit], str, boo
             reranked = rerank(query, hits)
             rerank_span.set_attribute("applied", reranked is not None)
         if reranked is not None:
-            return reranked, "hybrid_rerank", False
-    return hits, mode_used, degraded
+            hits = reranked
+            arm_used = "hybrid_rerank"
+    grounded = _ground_hits_for_ask(query, hits, k)
+    return grounded, arm_used, degraded
 
 
 # `/health` must stay snappy during a long `/v1/ask` (Groq/Ollama can sit near
@@ -696,6 +736,20 @@ def _build_default_deps() -> Deps:
                 raise KeyError(f"{book_id}@{ordinal}") from exc
         return agent_module.get_book_block(book_id, ordinal)
 
+    list_books = sqlite_deps.sqlite_list_books if use_sqlite else _default_list_books
+
+    def _catalog_search(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]:
+        from homelib_rag.shelf_catalog import merge_catalog_with_shelf, shelf_catalog_entries
+
+        catalog = agent_module.search_catalog(query, subjects)
+        try:
+            books = [(book.book_id, book.title, list(book.authors)) for book in list_books()]
+        except Exception as exc:
+            logger.warning("shelf catalog enrichment skipped: %s", exc)
+            return catalog
+        shelf = shelf_catalog_entries(query, subjects, books)
+        return merge_catalog_with_shelf(catalog, shelf)
+
     return Deps(
         llm_client=client,
         llm_provider=_infer_provider(client.base_url),
@@ -704,8 +758,8 @@ def _build_default_deps() -> Deps:
         counts=sqlite_deps.sqlite_counts if use_sqlite else _default_counts,
         retrieve=_default_retrieve,
         rewrite_query=rewrite_query,
-        catalog_search=agent_module.search_catalog,
-        list_books=sqlite_deps.sqlite_list_books if use_sqlite else _default_list_books,
+        catalog_search=_catalog_search,
+        list_books=list_books,
         get_block=_get_block,
         get_book_block=_get_book_block,
         log_query=sqlite_deps.sqlite_log_query if use_sqlite else _default_log_query,

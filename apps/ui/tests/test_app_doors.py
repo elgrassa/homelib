@@ -77,6 +77,8 @@ def test_switching_doors_does_not_render_the_previous_door_body() -> None:
     assert at.session_state["door"] == "Projection"
     assert "Projection" in [header.value for header in at.header]
     assert "Ask your library a question" not in [widget.label for widget in at.text_input]
+    # Same-run settle: Shelf-only controls must not linger under Projection.
+    assert "Scene search" not in [widget.label for widget in at.text_input]
 
 
 def test_door_query_param_opens_that_door_and_is_consumed() -> None:

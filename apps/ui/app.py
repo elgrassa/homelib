@@ -53,6 +53,7 @@ from apps.ui.view_model import (
     normalize_level,
     normalize_official_language,
     normalize_projection_source,
+    observatory_bar_chart,
     observatory_chart_titles,
     official_viewer_enabled,
     parse_interests,
@@ -546,22 +547,7 @@ def render_observatory_tab(client: Client) -> None:
             else:
                 st.write("No data yet for this chart.")
             continue
-        buckets = [str(p.get("bucket") or "") for p in points]
-        values = [float(p.get("value") or 0) for p in points]
-        # Explicit non-empty domain avoids Vega "Infinite extent" when a single
-        # point or degenerate range would otherwise leave the scale undefined.
-        if not any(values):
-            values = [0.0 for _ in values] or [0.0]
-            buckets = buckets or ["—"]
-        st.bar_chart(
-            {"bucket": buckets, "value": values},
-            x="bucket",
-            y="value",
-            x_label="Bucket",
-            y_label="Value",
-            color="#c49a3c",
-            width="stretch",
-        )
+        st.altair_chart(observatory_bar_chart(points), width="stretch")
 
 
 def render_projection_tab(client: Client) -> None:
@@ -877,10 +863,14 @@ def main() -> None:
         )
         # Door body first so Ask / Mentor stay above the fold; rotunda collapses
         # to a nav band underneath (live-demo audit P2-1).
-        try:
-            DOOR_RENDERERS[door](client)
-        finally:
-            persist_demo_session(client, st.session_state)
+        # Clear + remount the body slot when the door changes so previous-door
+        # widgets cannot linger under the new heading (LIVE #48).
+        body_slot = st.empty()
+        with body_slot.container(key=f"door_body_{door}"):
+            try:
+                DOOR_RENDERERS[door](client)
+            finally:
+                persist_demo_session(client, st.session_state)
         st.divider()
         with st.container(key="door_navigation"):
             cols = st.columns(len(CROSSROADS_DOORS))
@@ -908,10 +898,12 @@ def main() -> None:
             "</style>",
             unsafe_allow_html=True,
         )
-        try:
-            DOOR_RENDERERS[door](client)
-        finally:
-            persist_demo_session(client, st.session_state)
+        body_slot = st.empty()
+        with body_slot.container(key=f"door_body_{door}"):
+            try:
+                DOOR_RENDERERS[door](client)
+            finally:
+                persist_demo_session(client, st.session_state)
         return
 
     return

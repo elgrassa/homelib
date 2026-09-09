@@ -48,7 +48,7 @@ def call(method, path, body=None, headers=None, timeout=330):
 
 status, health = call("GET", "/health")
 print("health:", json.dumps(health))
-assert health["db"] is True and health["books"] == 18 and health["chunks"] == 9168, health
+assert health["db"] is True and health["books"] == 18 and health["chunks"] == 9119, health
 assert health["status"] == "ok", "health not ok (LLM unreachable or store empty?)"
 
 # H1 — with DATABASE_URL unset, the answer path must still fill book titles.

@@ -23,10 +23,17 @@ from typing import Literal
 from homelib_core.models import Block, BookDoc, ExtractionResult, Provenance, make_block_id
 
 EXTRACTOR_NAME = "homelib-core.formats.txt"
-EXTRACTOR_VERSION = "1.1.0"
+EXTRACTOR_VERSION = "1.2.0"
 
 _MAX_HEADING_LEN = 80
 _KNOWN_PLAINTEXT_HEADINGS = frozenset({"Where I Lived, and What I Lived For"})
+# Gutenberg poem attributions: "T. CAREW." / "BY AUTHOR" — not chapter titles.
+_BYLINE_RE = re.compile(
+    r"^(?:"
+    r"[A-Z]\.\s*[A-Z][A-Z.\s'-]{0,40}\.?|"
+    r"BY\s+[A-Z][A-Z.\s'-]{1,60}"
+    r")$",
+)
 
 _MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(\S.*?)\s*$")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -44,6 +51,23 @@ def _markdown_heading(line: str) -> tuple[int, str] | None:
     return len(match.group(1)), match.group(2)
 
 
+def _is_poem_byline(stripped: str) -> bool:
+    """True for short all-caps attributions that look like author bylines."""
+    if stripped in _KNOWN_PLAINTEXT_HEADINGS:
+        return False
+    # Real chapter markers keep a trailing period ("CHAPTER I.") — exclude them.
+    if stripped.upper().startswith("CHAPTER"):
+        return False
+    if _BYLINE_RE.match(stripped):
+        return True
+    # Short all-caps ending in a period (e.g. "T. CAREW.") with few tokens.
+    if stripped.endswith(".") and stripped.upper() == stripped:
+        tokens = [t for t in re.split(r"\s+", stripped.rstrip(".")) if t]
+        if 1 <= len(tokens) <= 3 and all(len(t) <= 12 for t in tokens):
+            return True
+    return False
+
+
 def _plaintext_heading(line: str, next_line: str | None) -> str | None:
     """An all-caps / Title-Case line under 80 chars, followed by a blank line."""
     stripped = line.strip()
@@ -52,6 +76,8 @@ def _plaintext_heading(line: str, next_line: str | None) -> str | None:
     if next_line != "":
         return None
     if not any(char.isalpha() for char in stripped):
+        return None
+    if _is_poem_byline(stripped):
         return None
     if stripped.upper() == stripped or stripped.istitle() or stripped in _KNOWN_PLAINTEXT_HEADINGS:
         return stripped

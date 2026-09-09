@@ -372,7 +372,11 @@ def _abstention_response(
 
 
 def _passage_citations(raw: list[_RawPassageCitation], hits: list[Hit]) -> list[Citation]:
-    book_meta = _book_metadata([hit.book_id for hit in hits])
+    try:
+        book_meta = _book_metadata([hit.book_id for hit in hits])
+    except Exception as exc:  # DB unreachable — titles fall back to book_id below
+        logger.warning("mentor citations: failed to load book metadata: %s", exc)
+        book_meta = {}
     citations: list[Citation] = []
     for item in raw:
         if item.passage < 1 or item.passage > len(hits):
@@ -536,7 +540,8 @@ def mentor_intake(
     tool_calls = [record.tool_name for record in agent_result.tool_calls]
     rounds_used = agent_result.rounds_used
 
-    if agent_result.degraded or not (agent_result.final_message or "").strip():
+    raw_message = (agent_result.final_message or "").strip()
+    if not raw_message:
         return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     # Search tools ran but returned only off-topic summaries → abstain.
@@ -545,9 +550,13 @@ def mentor_intake(
         return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
     try:
-        payload = json.loads(agent_result.final_message or "{}")
+        payload = json.loads(raw_message)
         parsed = _LLMIntakeOutput.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
+        if agent_result.degraded:
+            return _abstention_response(
+                notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
+            )
         logger.warning("mentor intake parse failed: %s", exc)
         return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
@@ -562,6 +571,9 @@ def mentor_intake(
     if has_proposal and not _proposal_aligns_with_goal(goal, interests, parsed):
         return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
 
+    if not has_proposal and agent_result.degraded:
+        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+
     try:
         citations = _passage_citations(parsed.citations, hits) if hits else []
     except CitationValidationError:
@@ -574,6 +586,8 @@ def mentor_intake(
         proposed_path=parsed.proposed_path,
         rationale=parsed.rationale,
         citations=citations,
+        # Round-limit salvage: keep degraded=True when the agent loop exhausted
+        # rounds, but still surface a valid JSON proposal when one was produced.
         degraded=agent_result.degraded,
         high_stakes_notice=notice,
         tool_calls=tool_calls,

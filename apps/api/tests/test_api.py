@@ -564,6 +564,9 @@ def test_cost_usd_zero_under_local_default(monkeypatch: pytest.MonkeyPatch) -> N
     `query_log.cost_usd` is 0 even though real tokens were spent."""
     monkeypatch.delenv("LLM_PRICE_PER_1K_PROMPT", raising=False)
     monkeypatch.delenv("LLM_PRICE_PER_1K_COMPLETION", raising=False)
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
     logged: list[QueryLogRow] = []
     fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(
@@ -586,6 +589,9 @@ def test_cost_usd_computed_from_prices(monkeypatch: pytest.MonkeyPatch) -> None:
     (see `_llm_json`), so the expected value is computed the same way here."""
     monkeypatch.setenv("LLM_PRICE_PER_1K_PROMPT", "2.0")
     monkeypatch.setenv("LLM_PRICE_PER_1K_COMPLETION", "4.0")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
     logged: list[QueryLogRow] = []
     fake_llm = _ScriptedClient([_llm_json("ok", [{"passage": 1, "quote": "fox jumps"}])])
     deps = _make_deps(
@@ -1279,11 +1285,103 @@ def test_default_retrieve_applies_rerank_for_hybrid_rerank(monkeypatch: pytest.M
     hit = _hit()
     monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], "hybrid"))
     monkeypatch.setattr(main, "rerank", lambda q, hits: list(reversed(hits)))
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [])
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
 
     _hits, arm_used, degraded = main._default_retrieve("q", 5, "hybrid_rerank")
 
     assert arm_used == "hybrid_rerank"
     assert degraded is False
+
+
+def test_default_retrieve_grounds_living_deliberately_passage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LIVE: Ask abstained while Shelf scene search opened the woods passage."""
+    question = "What does Thoreau say about living deliberately in Walden?"
+    noise = Hit(
+        chunk_id="noise",
+        book_id="walden",
+        score=0.9,
+        rank=1,
+        text="The conclusion of Walden is calm.",
+        section_path=["Conclusion"],
+        page=1,
+        block_ids=["b-noise"],
+    )
+    woods = Hit(
+        chunk_id="woods",
+        book_id="walden",
+        score=0.1,
+        rank=2,
+        text=(
+            "I went to the woods because I wished to live deliberately, "
+            "to front only the essential facts of life."
+        ),
+        section_path=["Where I Lived, and What I Lived For"],
+        page=9,
+        block_ids=["b-woods"],
+    )
+    monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([noise], "hybrid"))
+    monkeypatch.setattr(main, "rerank", lambda q, hits: hits)
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [woods])
+    monkeypatch.setattr(
+        main,
+        "_book_titles_for_boost",
+        lambda: {"walden": "Walden, and On The Duty Of Civil Disobedience"},
+    )
+
+    hits, arm_used, degraded = main._default_retrieve(question, 5, "hybrid_rerank")
+
+    assert degraded is False
+    assert arm_used == "hybrid_rerank"
+    assert hits[0].chunk_id == "woods"
+    assert "live deliberately" in hits[0].text
+
+
+def test_book_titles_for_boost_sqlite_and_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", "/tmp/homelib-missing.sqlite")
+
+    class _Book:
+        def __init__(self, book_id: str, title: str) -> None:
+            self.book_id = book_id
+            self.title = title
+
+    monkeypatch.setattr(
+        "apps.api.sqlite_deps.sqlite_list_books",
+        lambda: [_Book("walden", "Walden")],
+    )
+    assert main._book_titles_for_boost() == {"walden": "Walden"}
+
+    monkeypatch.setattr(
+        "apps.api.sqlite_deps.sqlite_list_books",
+        lambda: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+    assert main._book_titles_for_boost() == {}
+
+
+def test_book_titles_for_boost_uses_default_list_books(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HOMELIB_SQLITE_PATH", raising=False)
+
+    class _Book:
+        book_id = "walden"
+        title = "Walden"
+
+    monkeypatch.setattr(main, "_default_list_books", lambda: [_Book()])
+    assert main._book_titles_for_boost() == {"walden": "Walden"}
+
+
+def test_ground_hits_for_ask_tolerates_lexical_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    hit = _hit()
+    monkeypatch.setattr(
+        main,
+        "search_lexical",
+        lambda q, k: (_ for _ in ()).throw(RuntimeError("fts down")),
+    )
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
+    grounded = main._ground_hits_for_ask("q", [hit], k=3)
+    assert grounded[0].chunk_id == hit.chunk_id
+    assert grounded[0].rank == 1
 
 
 def test_default_retrieve_emits_timed_rerank_span(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1298,6 +1396,8 @@ def test_default_retrieve_emits_timed_rerank_span(monkeypatch: pytest.MonkeyPatc
     hit = _hit()
     monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit, hit], "hybrid"))
     monkeypatch.setattr(main, "rerank", lambda q, hits: list(reversed(hits)))
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [])
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
 
     _hits, arm_used, _degraded = main._default_retrieve("q", 5, "hybrid_rerank")
 
@@ -1315,6 +1415,8 @@ def test_default_retrieve_keeps_hybrid_order_when_rerank_unavailable(
     hit = _hit()
     monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], "hybrid"))
     monkeypatch.setattr(main, "rerank", lambda q, hits: None)
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [])
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
 
     _hits, arm_used, degraded = main._default_retrieve("q", 5, "hybrid_rerank")
 
@@ -1388,10 +1490,12 @@ def test_default_retrieve_single_arms(
 ) -> None:
     hit = _hit()
     monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], expected_mode))
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [])
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
 
     hits, arm_used, degraded = main._default_retrieve("q", 5, arm)
 
-    assert hits == [hit]
+    assert hits[0].chunk_id == hit.chunk_id
     assert arm_used == expected_mode
     assert degraded is False
 
@@ -1401,6 +1505,8 @@ def test_default_retrieve_marks_degraded_when_search_falls_back(
 ) -> None:
     hit = _hit()
     monkeypatch.setattr(main, "hybrid_search", lambda q, k, *, mode: ([hit], "lexical"))
+    monkeypatch.setattr(main, "search_lexical", lambda q, k: [])
+    monkeypatch.setattr(main, "_book_titles_for_boost", lambda: {})
 
     _hits, arm_used, degraded = main._default_retrieve("q", 5, "hybrid")
 
@@ -1618,6 +1724,75 @@ def test_get_deps_returns_same_singleton(monkeypatch: pytest.MonkeyPatch) -> Non
         assert main.get_deps() is main.get_deps()
     finally:
         main._deps_singleton = None
+
+
+def test_build_default_deps_catalog_search_merges_shelf(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from homelib_core.models import CatalogEntry
+
+    from apps.api import sqlite_deps
+
+    class _Book:
+        book_id = "aurelius-meditations"
+        title = "Meditations"
+
+        @property
+        def authors(self) -> list[str]:
+            return ["Marcus Aurelius"]
+
+    class _Client:
+        base_url = "http://localhost:11434/v1"
+
+    monkeypatch.setattr(sqlite_deps, "sqlite_path", lambda: None)
+    monkeypatch.setattr(main.answer_module, "default_llm_client", lambda: _Client())
+    monkeypatch.setattr(main.agent_module, "search_catalog", lambda q, subjects: [])
+    monkeypatch.setattr(main, "_default_list_books", lambda: [_Book()])
+    monkeypatch.setattr(main, "_infer_provider", lambda base_url: "local")
+    monkeypatch.setattr(main, "_default_llm_reachable", lambda base_url: True)
+    monkeypatch.setattr(main, "_default_db_reachable", lambda: True)
+    monkeypatch.setattr(main, "_default_counts", lambda: (1, 1))
+
+    deps = main._build_default_deps()
+    entries = deps.catalog_search("calm", ["stoicism"])
+    assert any(e.ol_key == "shelf:aurelius-meditations" for e in entries)
+    assert all(isinstance(e, CatalogEntry) for e in entries)
+
+
+def test_build_default_deps_catalog_search_skips_shelf_on_list_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from homelib_core.models import CatalogEntry
+
+    from apps.api import sqlite_deps
+
+    class _Client:
+        base_url = "http://localhost:11434/v1"
+
+    catalog_only = [
+        CatalogEntry(
+            ol_key="/works/OL1W",
+            title="Other",
+            authors=["A"],
+            subjects=[],
+            provenance_note="ol",
+        )
+    ]
+    monkeypatch.setattr(sqlite_deps, "sqlite_path", lambda: None)
+    monkeypatch.setattr(main.answer_module, "default_llm_client", lambda: _Client())
+    monkeypatch.setattr(main.agent_module, "search_catalog", lambda q, subjects: catalog_only)
+    monkeypatch.setattr(
+        main,
+        "_default_list_books",
+        lambda: (_ for _ in ()).throw(RuntimeError("list failed")),
+    )
+    monkeypatch.setattr(main, "_infer_provider", lambda base_url: "local")
+    monkeypatch.setattr(main, "_default_llm_reachable", lambda base_url: True)
+    monkeypatch.setattr(main, "_default_db_reachable", lambda: True)
+    monkeypatch.setattr(main, "_default_counts", lambda: (1, 1))
+
+    deps = main._build_default_deps()
+    assert deps.catalog_search("q", None) == catalog_only
 
 
 def test_post_ingest_reraises_http_exception_unchanged() -> None:

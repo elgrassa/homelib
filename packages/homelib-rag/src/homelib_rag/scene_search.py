@@ -271,13 +271,9 @@ def _fuse_hits(lexical_hits: list[Hit], vector_hits: list[Hit], k: int) -> tuple
 
 def _promote_verbatim_phrase(query: str, hits: list[Hit]) -> list[Hit]:
     """Keep exact body matches ahead of semantic/reranker approximations."""
-    needle = " ".join(query.split()).casefold()
-    if not needle:
-        return hits
-    return sorted(
-        hits,
-        key=lambda hit: needle not in " ".join(hit.text.split()).casefold(),
-    )
+    from homelib_rag.hybrid import promote_verbatim_phrase
+
+    return promote_verbatim_phrase(query, hits)
 
 
 def _smart_hits(

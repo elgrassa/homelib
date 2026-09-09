@@ -107,9 +107,11 @@ class _LLMRoadmapOutput(BaseModel):
 
 def _candidate_line(i: int, entry: CatalogEntry) -> str:
     desc = f" description={entry.description!r}" if entry.description else ""
+    book_id = entry.ol_key.removeprefix("shelf:") if entry.ol_key.startswith("shelf:") else None
+    book_bit = f" book_id={book_id!r}" if book_id else ""
     return (
-        f"[{i}] ol_key={entry.ol_key!r} title={entry.title!r} authors={entry.authors!r} "
-        f"subjects={entry.subjects!r}{desc}"
+        f"[{i}] ol_key={entry.ol_key!r}{book_bit} title={entry.title!r} "
+        f"authors={entry.authors!r} subjects={entry.subjects!r}{desc}"
     )
 
 
@@ -167,6 +169,9 @@ def _parse_and_validate(
                 f"step references ol_key {step.ol_key!r}, which is not among the "
                 "retrieved candidates (invented book)"
             )
+        if step.ol_key is not None and step.ol_key.startswith("shelf:"):
+            step.book_id = step.ol_key.removeprefix("shelf:")
+            step.ol_key = None
 
     steps = sorted(parsed.steps, key=lambda s: s.order)[:max_steps]
     return RoadmapResponse(

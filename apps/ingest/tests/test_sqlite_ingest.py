@@ -27,7 +27,7 @@ from apps.store.sqlite import connect, migrate
 
 GROUND_TRUTH_PATH = REPO_ROOT / "evals" / "ground_truth.jsonl"
 INGEST_DIR = REPO_ROOT / "apps" / "ingest"
-V1_CHUNK_IDS_SHA256 = "cc16f926742bfa9d623349d33db50713204781bdfc78ba97c1074e7ac466d713"
+V1_CHUNK_IDS_SHA256 = "349733ec7a8537112fccccfe0c50a14f5f58d89aa979c16685bef0c3683f4206"
 
 
 def _fake_embeddings(texts: list[str]) -> list[list[float]]:

@@ -523,6 +523,131 @@ def test_mentor_miss_m1_abstains_on_off_topic_industrial_shelf_hits() -> None:
     assert client._responses  # early abstention — invented path never accepted
 
 
+def test_mentor_salvages_json_when_agent_hits_round_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LIVE: Groq often exhausts max_rounds=2 with a JSON body still present."""
+    monkeypatch.setattr(
+        "homelib_rag.mentor._book_metadata",
+        lambda book_ids: {bid: ("Meditations", ["Marcus Aurelius"]) for bid in book_ids},
+    )
+    proposal = {
+        "proposed_area": {"name": "Stoicism", "copy": "Practice"},
+        "proposed_wing": None,
+        "proposed_path": {
+            "title": "Start with Meditations",
+            "kind": "reading",
+            "steps": [
+                {"order": 0, "title": "Meditations", "why": "Primary text", "est_effort": "light"}
+            ],
+        },
+        "rationale": "Meditations is on the shelf.",
+        "citations": [{"passage": 1, "quote": "Virtue is the only good."}],
+    }
+    tool_call = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "get_block", "arguments": '{"block_id": "blk1"}'},
+    }
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                content="",
+                tool_calls=[tool_call],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+            LLMResponse(
+                content=json.dumps(proposal),
+                tool_calls=[tool_call],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+        ]
+    )
+    response = mentor_intake(
+        "Stoic philosophy through Meditations",
+        ["stoicism"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+    assert response.proposed_path is not None
+    assert response.proposed_path.title == "Start with Meditations"
+    assert response.degraded is True
+    assert response.citations
+
+
+def test_mentor_citations_tolerate_book_metadata_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "homelib_rag.mentor._book_metadata",
+        lambda book_ids: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+    client = _ScriptedClient([_intake_json()])
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+    assert response.degraded is False
+    assert response.proposed_path is not None
+    assert response.citations[0].book_title == "b1"
+
+
+def test_mentor_degraded_json_without_proposal_abstains(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Round-limit salvage must not keep an empty proposal shell."""
+    monkeypatch.setattr(
+        "homelib_rag.mentor._book_metadata",
+        lambda book_ids: {bid: ("Meditations", ["Marcus Aurelius"]) for bid in book_ids},
+    )
+    empty_proposal = {
+        "proposed_area": None,
+        "proposed_wing": None,
+        "proposed_path": None,
+        "rationale": "Still thinking.",
+        "citations": [],
+    }
+    tool_call = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "get_block", "arguments": '{"block_id": "blk1"}'},
+    }
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                content="",
+                tool_calls=[tool_call],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+            LLMResponse(
+                content=json.dumps(empty_proposal),
+                tool_calls=[tool_call],
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            ),
+        ]
+    )
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+        get_block=_get_block_fixture,
+    )
+    assert response.degraded is True
+    assert response.proposed_path is None
+    assert response.proposed_area is None
+    assert "enough indexed sources" in response.rationale.lower()
+
+
 def test_mentor_stops_at_two_rounds_and_abstains_on_empty_json() -> None:
     """Bound: max_rounds=2. Empty/unparseable final JSON must not invent a path."""
     empty = LLMResponse(content="", usage=LLMUsage(prompt_tokens=1, completion_tokens=1))

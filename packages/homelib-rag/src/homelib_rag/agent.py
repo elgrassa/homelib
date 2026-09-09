@@ -174,6 +174,35 @@ def search_catalog(query: str, subjects: list[str] | None = None) -> list[Catalo
                 """,
                 (list(subjects), _MAX_CATALOG_RESULTS),
             )
+            rows = cur.fetchall()
+            if not rows:
+                # Same fallback as SQLite: interest labels are not always OL subjects.
+                like_needles = [f"%{query}%", *[f"%{s}%" for s in subjects if s.strip()]]
+                seen: set[str] = set()
+                rows = []
+                for like in like_needles:
+                    cur.execute(
+                        """
+                        SELECT ol_key, title, authors, subjects, first_publish_year,
+                               description, provenance_note
+                        FROM catalog
+                        WHERE title ILIKE %s
+                           OR EXISTS (SELECT 1 FROM unnest(subjects) s WHERE s ILIKE %s)
+                           OR EXISTS (SELECT 1 FROM unnest(authors) a WHERE a ILIKE %s)
+                        LIMIT %s
+                        """,
+                        (like, like, like, _MAX_CATALOG_RESULTS),
+                    )
+                    for row in cur.fetchall():
+                        key = str(row[0])
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        rows.append(row)
+                        if len(rows) >= _MAX_CATALOG_RESULTS:
+                            break
+                    if len(rows) >= _MAX_CATALOG_RESULTS:
+                        break
         else:
             like = f"%{query}%"
             cur.execute(
@@ -187,7 +216,7 @@ def search_catalog(query: str, subjects: list[str] | None = None) -> list[Catalo
                 """,
                 (like, like, _MAX_CATALOG_RESULTS),
             )
-        rows = cur.fetchall()
+            rows = cur.fetchall()
     return [
         CatalogEntry(
             ol_key=row[0],
@@ -352,9 +381,12 @@ def run_agent(
     history = list(messages)
     tool_call_log: list[ToolCallRecord] = []
     last_unknown_tool: str | None = None
+    last_assistant_text = ""
 
     for round_index in range(max_rounds):
         response = client.chat(history, tools=active_schemas, max_tokens=max_tokens)
+        if (response.content or "").strip():
+            last_assistant_text = response.content or ""
 
         if not response.tool_calls:
             return AgentResult(
@@ -439,7 +471,8 @@ def run_agent(
             history.append(ChatMessage(role="tool", content=summary, tool_call_id=call_id))
 
     return AgentResult(
-        final_message=f"Reached the round limit ({max_rounds}) without a final answer.",
+        final_message=last_assistant_text
+        or f"Reached the round limit ({max_rounds}) without a final answer.",
         tool_calls=tool_call_log,
         rounds_used=max_rounds,
         degraded=True,

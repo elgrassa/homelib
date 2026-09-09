@@ -57,8 +57,8 @@ def _stub_shelf_apis(block: dict) -> None:
                     "book_id": "thoreau-walden",
                     "title": "Walden",
                     "authors": ["Henry David Thoreau"],
-                    "blocks": 729,
-                    "chunks": 9168,
+                    "blocks": 627,
+                    "chunks": 9119,
                     "format": "txt",
                 }
             ],

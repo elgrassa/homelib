@@ -101,8 +101,8 @@ with urllib.request.urlopen(f"http://localhost:{port}/health", timeout=30) as re
     health = json.load(resp)
 books, chunks, status = health.get("books"), health.get("chunks"), health.get("status")
 print(f"health: status={status} books={books} chunks={chunks}")
-if books != 18 or chunks != 9168:
-    sys.exit(f"✗ expected 18 books / 9168 chunks after seed, got {books} / {chunks}")
+if books != 18 or chunks != 9119:
+    sys.exit(f"✗ expected 18 books / 9119 chunks after seed, got {books} / {chunks}")
 if status != "ok":
     sys.exit(f"✗ health status is {status!r} after seed (db/llm/seed all required for ok)")
 PY

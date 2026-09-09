@@ -105,6 +105,32 @@ def test_parse_txt_recognizes_walden_where_i_lived_heading(tmp_path: Path) -> No
     assert doc.blocks[0].text.startswith("At a certain season")
 
 
+def test_parse_txt_does_not_treat_poem_byline_as_chapter(tmp_path: Path) -> None:
+    """LIVE #49: Gutenberg Walden labels the woods passage ``T. CAREW``."""
+    path = tmp_path / "walden.txt"
+    path.write_text(
+        "ECONOMY\n\n"
+        "When I wrote the following pages.\n\n"
+        "T. CAREW.\n\n"
+        "The light of the day is gone.\n\n"
+        "Where I Lived, and What I Lived For\n\n"
+        "I went to the woods because I wished to live deliberately.\n",
+        encoding="utf-8",
+    )
+
+    doc, _result = parse_txt(path, book_id="walden")
+
+    assert [b.section_path for b in doc.blocks] == [
+        ["ECONOMY"],
+        ["Where I Lived, and What I Lived For"],
+    ]
+    woods = doc.blocks[1]
+    assert woods.section_path == ["Where I Lived, and What I Lived For"]
+    assert "live deliberately" in woods.text
+    assert "T. CAREW" in doc.blocks[0].text
+    assert not any("CAREW" in " ".join(b.section_path) for b in doc.blocks)
+
+
 def test_parse_txt_no_heading_is_single_block(tmp_path: Path) -> None:
     path = tmp_path / "flat.txt"
     path.write_text("just some plain body text\nacross two lines\n", encoding="utf-8")

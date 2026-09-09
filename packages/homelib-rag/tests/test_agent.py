@@ -131,6 +131,32 @@ def test_max_rounds_terminates_degraded() -> None:
     assert client.calls == 3
 
 
+def test_max_rounds_preserves_assistant_json_content() -> None:
+    """When the loop exhausts rounds, keep the last assistant text for salvage."""
+    proposal = (
+        '{"proposed_path": {"title": "Stoic start", "kind": "reading",'
+        ' "steps": []}, "rationale": "ok", "citations": []}'
+    )
+    responses = [
+        LLMResponse(
+            content=proposal if i == 1 else "",
+            tool_calls=[_tool_call("get_block", '{"block_id": "x"}', call_id=f"c{i}")],
+            usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+        )
+        for i in range(2)
+    ]
+    client = _ScriptedClient(responses)
+    result = run_agent(
+        [ChatMessage(role="user", content="loop")],
+        max_rounds=2,
+        client=client,
+        tools={"get_block": lambda block_id: None},
+        tool_schemas=[s for s in TOOL_SCHEMAS if s["function"]["name"] == "get_block"],
+    )
+    assert result.degraded is True
+    assert result.final_message == proposal
+
+
 def test_unknown_tool_name_repaired_then_terminated() -> None:
     """A fake LLM requests a tool name absent from TOOL_SCHEMAS twice
     consecutively; the first attempt yields a corrective tool-role message

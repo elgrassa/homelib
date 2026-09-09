@@ -492,11 +492,11 @@ def test_compose_ingest_can_write_sqlite_seed() -> None:
 def test_drill_asserts_seed_counts_via_health() -> None:
     """The drill used to seed Postgres, then ask the API — which reads SQLite —
     and never checked the counts. It must seed SQLite through the compose
-    one-shot (not a host `uv run`) and assert 18 books / 9168 chunks."""
+    one-shot (not a host `uv run`) and assert 18 books / 9119 chunks."""
     drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
     assert "run --rm --build ingest python -m apps.ingest.sqlite_pipeline" in drill
     assert "/health" in drill
-    assert "18" in drill and "9168" in drill
+    assert "18" in drill and "9119" in drill
     assert "uv run" not in drill
 
 

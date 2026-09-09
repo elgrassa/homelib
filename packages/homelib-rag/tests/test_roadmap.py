@@ -241,6 +241,38 @@ def test_repair_prompt_contains_raw_and_error_text() -> None:
     assert "Expecting value" in prompt
 
 
+def test_parse_and_validate_rewrites_shelf_ol_key_to_book_id() -> None:
+    raw = json.dumps(
+        {
+            "steps": [
+                {
+                    "order": 0,
+                    "ol_key": "shelf:aurelius-meditations",
+                    "book_id": None,
+                    "title": "Meditations",
+                    "authors": ["Marcus Aurelius"],
+                    "why": "Core Stoic text on the shelf",
+                    "prerequisites": [],
+                    "est_effort": "medium",
+                }
+            ],
+            "rationale": "Start on the shelf",
+        }
+    )
+    candidates = [
+        CatalogEntry(
+            ol_key="shelf:aurelius-meditations",
+            title="Meditations",
+            authors=["Marcus Aurelius"],
+            subjects=["stoicism"],
+            provenance_note="Full-text shelf",
+        )
+    ]
+    result = _parse_and_validate(raw, candidates)
+    assert result.steps[0].ol_key is None
+    assert result.steps[0].book_id == "aurelius-meditations"
+
+
 def test_catalog_search_called_with_goal_and_interests() -> None:
     captured: dict[str, Any] = {}
 

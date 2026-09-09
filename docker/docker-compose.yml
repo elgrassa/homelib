@@ -106,7 +106,7 @@ services:
       HOMELIB_SQLITE_PATH: ${HOMELIB_SQLITE_PATH:-/data/homelib.sqlite}
     volumes:
       # RW: progress, playlists, demo_session, query_log write here. Seed the
-      # host file first (`run_sqlite_pipeline`) — expected counts 18/729/9168.
+      # host file first (`run_sqlite_pipeline`) — expected counts 18/627/9119.
       - ../data:/data
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     depends_on:

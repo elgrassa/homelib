@@ -489,18 +489,17 @@ def search_catalog(
     out: list[CatalogEntry] = []
     for row in rows:
         entry_subjects = _json_list_or_empty(row[3])
+        authors = _json_list_or_empty(row[2])
         if wanted is not None:
             if not any(s.lower() in wanted for s in entry_subjects):
                 continue
-        elif needle not in str(row[1]).lower() and not any(
-            needle in s.lower() for s in entry_subjects
-        ):
+        elif not _catalog_row_matches_needle(needle, str(row[1]), entry_subjects, authors):
             continue
         out.append(
             CatalogEntry(
                 ol_key=str(row[0]),
                 title=str(row[1]),
-                authors=_json_list_or_empty(row[2]),
+                authors=authors,
                 subjects=entry_subjects,
                 first_publish_year=row[4],
                 description=row[5],
@@ -509,7 +508,47 @@ def search_catalog(
         )
         if len(out) >= _MAX_CATALOG_RESULTS:
             break
+    # Interests like "stoicism" are not exact Open Library subjects in the
+    # committed engineering catalog slice — fall back to substring match.
+    if not out and wanted is not None:
+        needles = {needle, *wanted}
+        for row in rows:
+            entry_subjects = _json_list_or_empty(row[3])
+            authors = _json_list_or_empty(row[2])
+            title = str(row[1])
+            if not any(
+                _catalog_row_matches_needle(n, title, entry_subjects, authors) for n in needles if n
+            ):
+                continue
+            out.append(
+                CatalogEntry(
+                    ol_key=str(row[0]),
+                    title=title,
+                    authors=authors,
+                    subjects=entry_subjects,
+                    first_publish_year=row[4],
+                    description=row[5],
+                    provenance_note=str(row[6] or ""),
+                )
+            )
+            if len(out) >= _MAX_CATALOG_RESULTS:
+                break
     return out
+
+
+def _catalog_row_matches_needle(
+    needle: str,
+    title: str,
+    subjects: list[str],
+    authors: list[str],
+) -> bool:
+    if not needle:
+        return False
+    if needle in title.lower():
+        return True
+    if any(needle in s.lower() for s in subjects):
+        return True
+    return any(needle in a.lower() for a in authors)
 
 
 def catalog_row_count(*, conn: sqlite3.Connection | None = None) -> int:

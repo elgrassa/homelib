@@ -399,7 +399,7 @@ Two sources, both committed as pinned artefacts so a reviewer never has to
 re-download anything. **Project Gutenberg** (dataset) — 18 public-domain
 books (Franklin, Adam Smith, Taylor, Ford, Thoreau, Mill, Strunk and others),
 each pinned in `data/manifest.yaml` by exact source URL and a sha256 computed
-from a real download; parsed into 729 blocks / 9,168 chunks and committed as
+from a real download; parsed into 627 blocks / 9,119 chunks and committed as
 `data/corpus_snapshot.jsonl.gz` (6 MB). **Open Library Search API**
 (API-backed source) — a **catalog snapshot** of 3,061 deduplicated works
 (title/authors/subjects/year **metadata only** — not full-text reading)

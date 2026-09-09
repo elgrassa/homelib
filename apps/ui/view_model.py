@@ -17,7 +17,7 @@ from __future__ import annotations
 import html
 import json
 import os
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -462,6 +462,49 @@ def observatory_chart_titles(payload: dict[str, Any]) -> list[str]:
     """Titles for Observatory charts, in API order."""
     charts = payload.get("charts") or []
     return [str(chart.get("title") or chart.get("id") or "") for chart in charts]
+
+
+def observatory_bar_chart(points: Sequence[Mapping[str, Any]]) -> Any:
+    """Altair bar chart with a finite y domain — no Vega Infinite-extent / bind.
+
+    LIVE #51: ``st.bar_chart`` emitted Infinite extent for value_start/value_end
+    and scale-binding warnings on Observatory. Explicit ordinal x + quantitative
+    y with domainMin/domainMax keeps Vega stable; series colors p50/p95.
+    """
+    import altair as alt
+
+    rows: list[dict[str, str | float]] = [
+        {
+            "bucket": str(point.get("bucket") or "—"),
+            "value": float(point.get("value") or 0),
+            "series": str(point.get("series") or "value"),
+        }
+        for point in points
+    ]
+    if not rows:
+        rows = [{"bucket": "—", "value": 0.0, "series": "value"}]
+    values = [float(row["value"]) for row in rows]
+    y_max = max(values) if values else 1.0
+    y_max = max(y_max, 1.0)
+    # Group by series (p50/p95 share bucket="all") and disable stacking so
+    # Vega does not invent value_start/value_end extents of ±Infinity.
+    return (
+        alt.Chart(alt.Data(values=rows))  # type: ignore[no-untyped-call]
+        .mark_bar()
+        .encode(
+            x=alt.X("bucket:N", title="Bucket"),
+            xOffset=alt.XOffset("series:N"),
+            y=alt.Y(
+                "value:Q",
+                title="Value",
+                scale=alt.Scale(domain=[0, y_max]),
+                stack=None,
+            ),
+            color=alt.Color("series:N", title="Series", legend=alt.Legend()),
+            tooltip=["bucket:N", "series:N", "value:Q"],
+        )
+        .properties(height=280)
+    )
 
 
 # Projection — This shelf vs Official preview (not a Crossroads door).

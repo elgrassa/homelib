@@ -303,17 +303,17 @@ Source: `specs/rights.md`; `docs/adrs/ADR-008-rights-gate.md`; `apps/store/sqlit
 | Metric | Value | Reproduce with |
 |---|---:|---|
 | Shelf books | 18 | `grep -c "^- book_id:" data/manifest.yaml` |
-| Blocks | 729 | `just seed-sqlite` output line (`{"books": 18, "blocks": 729, ...}`) or `docs/evidence.md` row "WP-08 snapshot" |
-| Chunks | 9,168 | `curl localhost:8010/health` (`chunks` field) or `just seed-sqlite` output |
-| Chunk embeddings | 9,168 | same seed output; one row per chunk, 1:1 |
+| Blocks | 627 | `just seed-sqlite` output line (`{"books": 18, "blocks": 627, ...}`) |
+| Chunks | 9,119 | `curl localhost:8010/health` (`chunks` field) or `just seed-sqlite` output |
+| Chunk embeddings | 9,119 | same seed output; one row per chunk, 1:1 |
 | Catalog works | 3,061 | `wc -l data/catalog.jsonl` → 3,062 lines, minus 1 provenance header line |
 | Eval questions | 235 | `wc -l evals/ground_truth.jsonl` |
-| Corpus snapshot size | 6.0 MB (6,304,720 bytes) | `ls -la data/corpus_snapshot.jsonl.gz` |
-| SQLite seed size | 28.7 MB / 27.4 MiB (28,718,275 bytes) | `ls -la data/seed/homelib.sqlite.gz` |
+| Corpus snapshot size | 6.0 MB (6,300,484 bytes) | `ls -la data/corpus_snapshot.jsonl.gz` |
+| SQLite seed size | 28.1 MB / 26.8 MiB (28,147,923 bytes) | `ls -la data/seed/homelib.sqlite.gz` |
 | Embedding dimension | 384 | `packages/homelib-rag/src/homelib_rag/index.py` (`_DEFAULT_EMBED_MODEL`), `docker/initdb/01-schema.sql` (`vector(384)`) |
 | FastAPI paths | 18 | README.md rubric table ("FastAPI (18 paths, OpenAPI-pinned)") |
 
-Source (row by row, in the same order): `data/manifest.yaml`; `docs/evidence.md` (rows "WP03 ingest", "WP11 `just drill` PASSED", "PR-B2 rehearsal", "Redeploy of `main`" — all report `18/729/9168/9168[/3061]`); `apps/api/main.py` (`Health` model, `/health` returns `books`/`chunks`); `data/catalog.jsonl`; `evals/ground_truth.jsonl`; `data/corpus_snapshot.jsonl.gz` (file listing); `data/seed/homelib.sqlite.gz` (file listing); `packages/homelib-rag/src/homelib_rag/index.py`; `docker/initdb/01-schema.sql`; `README.md`.
+Source (row by row, in the same order): `data/manifest.yaml`; `apps/ingest/sqlite_pipeline.py` (`CANONICAL_COUNTS` 18/627/9119/9119); `apps/api/main.py` (`Health` model, `/health` returns `books`/`chunks`); `data/catalog.jsonl`; `evals/ground_truth.jsonl`; `data/corpus_snapshot.jsonl.gz` (file listing); `data/seed/homelib.sqlite.gz` (file listing); `packages/homelib-rag/src/homelib_rag/index.py`; `docker/initdb/01-schema.sql`; `README.md`.
 
 ## 12. Models and providers
 

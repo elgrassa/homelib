@@ -68,9 +68,9 @@ CATALOG_PATH = REPO_ROOT / "data" / "catalog.jsonl"
 
 CANONICAL_COUNTS: dict[str, int] = {
     "books": 18,
-    "blocks": 729,
-    "chunks": 9168,
-    "chunk_embeddings": 9168,
+    "blocks": 627,
+    "chunks": 9119,
+    "chunk_embeddings": 9119,
 }
 
 
