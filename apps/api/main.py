@@ -36,7 +36,7 @@ from homelib_core.normalize import parse_file
 from homelib_rag import agent as agent_module
 from homelib_rag import answer as answer_module
 from homelib_rag import roadmap as roadmap_module
-from homelib_rag.answer import LLMUnreachableError, OpenAICompatibleClient
+from homelib_rag.answer import LLMUnreachableError, OpenAICompatibleClient, TokenUsage
 from homelib_rag.hybrid import (
     boost_books_named_in_query,
     hybrid_search,
@@ -229,7 +229,28 @@ def _demo_cache_enabled() -> bool:
     return sqlite_deps.sqlite_path() is not None
 
 
-def _maybe_cache_lookup(query: str, arm: str, model: str) -> AskResponse | None:
+def _cache_index_revision() -> str:
+    """Corpus identity for the demo answer-cache key (audit S01). Empty when
+    the store is unavailable — lookup then fails closed to a miss / store
+    no-ops via the surrounding try/except."""
+    from apps.api import sqlite_deps
+    from apps.store.sqlite import current_index_revision
+
+    try:
+        with sqlite_deps.open_store() as conn:
+            return current_index_revision(conn)
+    except Exception:
+        return ""
+
+
+def _maybe_cache_lookup(
+    query: str,
+    arm: str,
+    model: str,
+    *,
+    k: int,
+    rewrite: bool,
+) -> AskResponse | None:
     """Demo-only read-through cache lookup. Any failure here (a missing
     table, corrupt JSON) is treated as a miss, never a 500 — the same
     best-effort contract every other sqlite helper in this module follows.
@@ -239,7 +260,14 @@ def _maybe_cache_lookup(query: str, arm: str, model: str) -> AskResponse | None:
     from apps.api import sqlite_deps
     from apps.store import answer_cache
 
-    key = answer_cache.cache_key(query, arm=arm, model=model)
+    key = answer_cache.cache_key(
+        query,
+        arm=arm,
+        model=model,
+        k=k,
+        rewrite=rewrite,
+        index_revision=_cache_index_revision(),
+    )
     try:
         with sqlite_deps.open_store() as conn:
             return answer_cache.lookup(conn, key)
@@ -248,13 +276,28 @@ def _maybe_cache_lookup(query: str, arm: str, model: str) -> AskResponse | None:
         return None
 
 
-def _maybe_cache_store(query: str, arm: str, model: str, result: AskResponse) -> None:
+def _maybe_cache_store(
+    query: str,
+    arm: str,
+    model: str,
+    result: AskResponse,
+    *,
+    k: int,
+    rewrite: bool,
+) -> None:
     if not _demo_cache_enabled():
         return
     from apps.api import sqlite_deps
     from apps.store import answer_cache
 
-    key = answer_cache.cache_key(query, arm=arm, model=model)
+    key = answer_cache.cache_key(
+        query,
+        arm=arm,
+        model=model,
+        k=k,
+        rewrite=rewrite,
+        index_revision=_cache_index_revision(),
+    )
     try:
         with sqlite_deps.open_store() as conn:
             answer_cache.store(conn, key, result)
@@ -877,7 +920,13 @@ def post_ask(
             # Do not write shelf_meta answers into the hybrid-arm cache key.
         else:
             with tracer.start_as_current_span("cache") as cache_span:
-                cached = _maybe_cache_lookup(req.query, resolved_arm, deps.llm_client.model)
+                cached = _maybe_cache_lookup(
+                    req.query,
+                    resolved_arm,
+                    deps.llm_client.model,
+                    k=req.k,
+                    rewrite=req.rewrite,
+                )
                 cache_span.set_attribute("hit", cached is not None)
 
             if cached is not None:
@@ -910,7 +959,14 @@ def post_ask(
                 # otherwise poison the demo cache under a key that a good
                 # retrieve+LLM run could still fill correctly next time.
                 if not result.degraded:
-                    _maybe_cache_store(req.query, resolved_arm, deps.llm_client.model, result)
+                    _maybe_cache_store(
+                        req.query,
+                        resolved_arm,
+                        deps.llm_client.model,
+                        result,
+                        k=req.k,
+                        rewrite=req.rewrite,
+                    )
 
     # Selfhosted BatchSpanProcessor otherwise delays llm/cite (and token attrs)
     # past the AskResponse — Observatory + /v1/traces would look empty mid-flight.
@@ -929,6 +985,9 @@ def post_ask(
         # entry (that id is meaningless to this caller: feedback/tracing
         # are keyed per-request, not per-cached-answer).
         update["request_id"] = str(uuid.uuid4())
+        # Audit S02: a hit performs no generation — do not re-count the
+        # original prompt/completion as newly generated tokens.
+        update["tokens"] = TokenUsage(prompt=0, completion=0)
     result = result.model_copy(update=update)
 
     deps.log_query(

@@ -1,9 +1,13 @@
 """Demo-only answer cache — C4b (specs/monitoring.md "Demo answer cache").
 
 Read-through cache keyed by `sha256(normalised question | arm | model |
-answer-prompt hash)`, read and written ONLY when `APP_MODE=demo`
-(`apps/api/main.py`'s `_demo_cache_enabled` — never in selfhosted mode, so a
-self-hosted reader always gets a live retrieve+LLM answer).
+answer-prompt hash | k | rewrite | index_revision)`, read and written ONLY
+when `APP_MODE=demo` (`apps/api/main.py`'s `_demo_cache_enabled` — never in
+selfhosted mode, so a self-hosted reader always gets a live retrieve+LLM
+answer).
+
+`k`, `rewrite`, and `index_revision` belong in the key so a changed request
+or corpus cannot reuse an incompatible cached answer (audit S01).
 
 The prompt hash reuses `evals.judge.prompt_hash` (imported, never copied)
 against `homelib_rag.answer`'s own `_SYSTEM_PROMPT`, the same
@@ -46,8 +50,26 @@ def _normalize_question(question: str) -> str:
     return " ".join(question.strip().lower().split())
 
 
-def cache_key(question: str, *, arm: str, model: str) -> str:
-    joined = "|".join([_normalize_question(question), arm, model, _ANSWER_PROMPT_HASH])
+def cache_key(
+    question: str,
+    *,
+    arm: str,
+    model: str,
+    k: int = 5,
+    rewrite: bool = False,
+    index_revision: str = "",
+) -> str:
+    joined = "|".join(
+        [
+            _normalize_question(question),
+            arm,
+            model,
+            _ANSWER_PROMPT_HASH,
+            str(k),
+            "1" if rewrite else "0",
+            index_revision,
+        ]
+    )
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 

@@ -57,6 +57,27 @@ def test_cache_key_changes_with_model() -> None:
     assert cache_key("q", arm="hybrid", model="m1") != cache_key("q", arm="hybrid", model="m2")
 
 
+def test_cache_key_changes_with_k() -> None:
+    """Audit S01: different top-k must not share a cached answer."""
+    assert cache_key("q", arm="hybrid", model="m", k=3) != cache_key(
+        "q", arm="hybrid", model="m", k=10
+    )
+
+
+def test_cache_key_changes_with_rewrite_flag() -> None:
+    """Audit S01: rewrite on/off changes retrieval semantics."""
+    assert cache_key("q", arm="hybrid", model="m", rewrite=False) != cache_key(
+        "q", arm="hybrid", model="m", rewrite=True
+    )
+
+
+def test_cache_key_changes_with_index_revision() -> None:
+    """Audit S01: a re-seeded corpus must not reuse prior answers."""
+    assert cache_key("q", arm="hybrid", model="m", index_revision="aaa") != cache_key(
+        "q", arm="hybrid", model="m", index_revision="bbb"
+    )
+
+
 def test_lookup_miss_returns_none(tmp_path: Path) -> None:
     conn = _db(tmp_path)
     assert lookup(conn, cache_key("nothing cached", arm="hybrid", model="m")) is None

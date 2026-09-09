@@ -1029,6 +1029,97 @@ def test_cache_hit_is_logged_and_flagged(tmp_path: Any, monkeypatch: pytest.Monk
     assert logged[1].cache_hit is True
     # No new LLM spend on a cache hit, regardless of LLM_PRICE_PER_1K_*.
     assert logged[1].cost_usd == 0.0
+    # Audit S02: a hit generates nothing — do not re-log the original tokens.
+    assert logged[0].tokens_prompt > 0 or logged[0].tokens_completion > 0
+    assert logged[1].tokens_prompt == 0
+    assert logged[1].tokens_completion == 0
+
+
+def test_demo_ask_cache_misses_when_k_differs(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Audit S01: same question with different k must not reuse the cache."""
+    db_path = tmp_path / "cache_k.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    fake_llm = _CountingClient(
+        [
+            _llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}]),
+            _llm_json("It jumps again.", [{"passage": 1, "quote": "fox jumps"}]),
+        ]
+    )
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=fake_llm,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
+
+    first = client.post(
+        "/v1/ask", json={"query": "does it jump?", "arm": "hybrid", "k": 3}, headers=headers
+    )
+    second = client.post(
+        "/v1/ask", json={"query": "does it jump?", "arm": "hybrid", "k": 10}, headers=headers
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert fake_llm.calls == 2
+    assert first.json()["cache_hit"] is False
+    assert second.json()["cache_hit"] is False
+
+
+def test_demo_ask_cache_misses_when_rewrite_differs(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Audit S01: rewrite flag is part of cache identity even before rewrite runs."""
+    db_path = tmp_path / "cache_rewrite.sqlite"
+    conn = sqlite_connect(db_path)
+    sqlite_migrate(conn)
+    conn.close()
+    monkeypatch.setenv("HOMELIB_SQLITE_PATH", str(db_path))
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setattr(
+        "homelib_rag.answer._book_metadata", lambda book_ids: {"b1": ("Title", ["Author"])}
+    )
+    hit = _hit()
+    fake_llm = _CountingClient(
+        [
+            _llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps"}]),
+            _llm_json("It jumps rewritten.", [{"passage": 1, "quote": "fox jumps"}]),
+        ]
+    )
+    deps = _make_deps(
+        retrieve=lambda query, k, arm: ([hit], "hybrid", False),
+        llm_client=fake_llm,
+        rewrite_query=lambda query: query,
+    )
+    app.dependency_overrides[get_deps] = lambda: deps
+    headers = {"X-Demo-Session": client.post("/v1/demo/session").json()["demo_session_id"]}
+
+    first = client.post(
+        "/v1/ask",
+        json={"query": "does it jump?", "arm": "hybrid", "rewrite": False},
+        headers=headers,
+    )
+    second = client.post(
+        "/v1/ask",
+        json={"query": "does it jump?", "arm": "hybrid", "rewrite": True},
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert fake_llm.calls == 2
+    assert first.json()["cache_hit"] is False
+    assert second.json()["cache_hit"] is False
 
 
 # ── /v1/roadmap ──────────────────────────────────────────────────────────
