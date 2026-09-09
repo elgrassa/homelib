@@ -82,8 +82,13 @@ Mismatch count: 0 on this smoke. Key for open-the-page is **`block_id`**
 ## Eval gate
 
 `evals/gate.py` + floors in `evals/eval-baseline.json` (hit@5 0.6383, MRR 0.5718).
-Recipe: `just eval-gate` (compares **committed** winner numbers — no new bake-off).
-**Not** yet wired into Forgejo `ci` — do not claim “eval fails the PR build” until it is.
+Recipe: `just eval-gate` compares **committed** report numbers — named columns
+from `evals/results/retrieval.md` (passage hit-rate@5 + MRR@5) and the
+`production` faithfulness row in `evals/results/llm_eval.md`. It does **not**
+re-run a bake-off. A live measurement of current code is
+`python evals/llm_eval.py` / `python evals/retrieval_eval.py`, which also
+append to `evals/history.jsonl`. **Not** yet wired into Forgejo `ci` — do not
+claim “eval fails the PR build” until it is.
 
 ## Prompt-injection probes (3)
 

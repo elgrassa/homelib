@@ -219,3 +219,144 @@ def test_run_gate_missing_metric_is_reported_as_missing_not_worse(
     printed = capsys.readouterr().out
     assert "MISSING" in printed
     assert "hit_rate_at_5" in printed
+
+
+# ── committed report loaders (E01 / E02) ─────────────────────────────────────
+
+# Provenance: column layout copied from evals/results/retrieval.md (2026-09-06).
+# The old justfile regex treated `n` (235) as hit-rate and book-hit (0.906) as MRR.
+_RETRIEVAL_WINNER_TABLE = """\
+# Retrieval arm eval
+
+| arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lexical` | off | 235 | 0.064 | 0.077 | 0.055 | 0 | 67 |
+| `hybrid_rerank` **(winner)** | off | 235 | 0.638 | 0.906 | 0.572 | 0 | 149 |
+"""
+
+_LLM_EVAL_TABLE = """\
+# LLM prompt-variant eval
+
+| variant | n | faithfulness | relevance | citation_quality | suggested_score | ungrounded |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `cited_first` | 10 | 3.00 | 3.70 | 3.00 | 2.80 | 0/10 |
+| `production` | 10 | 2.60 | 2.90 | 2.30 | 2.40 | 1/10 |
+| `stepwise` | 10 | 3.40 | 3.80 | 2.70 | 3.00 | 0/10 |
+
+**Winner: `stepwise`** — highest mean suggested_score (3.00).
+"""
+
+
+def test_committed_retrieval_report_uses_passage_hit_rate_not_question_count(
+    tmp_path: Path,
+) -> None:
+    from evals.gate import load_committed_retrieval_metrics
+
+    path = tmp_path / "retrieval.md"
+    path.write_text(_RETRIEVAL_WINNER_TABLE, encoding="utf-8")
+
+    metrics = load_committed_retrieval_metrics(path)
+
+    assert metrics["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
+    assert metrics["hybrid_rerank.mrr_at_5"] == pytest.approx(0.572)
+    assert metrics["hybrid_rerank.hit_rate_at_5"] != pytest.approx(235.0)
+    assert metrics["hybrid_rerank.mrr_at_5"] != pytest.approx(0.906)
+
+
+def test_retrieval_rate_outside_unit_interval_is_rejected(tmp_path: Path) -> None:
+    from evals.gate import load_committed_retrieval_metrics
+
+    # Same corpus-shaped table, but hit-rate column wrongly holds question count.
+    bad = """\
+| arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `hybrid_rerank` **(winner)** | off | 235 | 235 | 0.906 | 0.572 | 0 | 149 |
+"""
+    path = tmp_path / "retrieval.md"
+    path.write_text(bad, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside"):
+        load_committed_retrieval_metrics(path)
+
+
+def test_eval_gate_fails_when_committed_hit_rate_regresses(tmp_path: Path) -> None:
+    from evals.gate import load_committed_retrieval_metrics, run_gate
+
+    report = tmp_path / "retrieval.md"
+    report.write_text(
+        """\
+| arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `hybrid_rerank` **(winner)** | off | 235 | 0.500 | 0.906 | 0.400 | 0 | 149 |
+""",
+        encoding="utf-8",
+    )
+    baseline_path = tmp_path / "baseline.json"
+    history_path = tmp_path / "history.jsonl"
+    baseline = Baseline(
+        metrics={
+            "hybrid_rerank.hit_rate_at_5": 0.6383,
+            "hybrid_rerank.mrr_at_5": 0.5718,
+        },
+        specs={
+            "hybrid_rerank.hit_rate_at_5": MetricSpec(
+                key="hybrid_rerank.hit_rate_at_5",
+                direction="higher_is_better",
+                margin=0.01,
+            ),
+            "hybrid_rerank.mrr_at_5": MetricSpec(
+                key="hybrid_rerank.mrr_at_5",
+                direction="higher_is_better",
+                margin=0.01,
+            ),
+        },
+        notes={
+            "hybrid_rerank.hit_rate_at_5": "test floor",
+            "hybrid_rerank.mrr_at_5": "test floor",
+        },
+    )
+    _write_baseline(baseline_path, baseline)
+
+    current = load_committed_retrieval_metrics(report)
+    assert run_gate(current, baseline_path, history_path) == 1
+
+
+def test_committed_judge_report_reads_production_faithfulness_not_winner(
+    tmp_path: Path,
+) -> None:
+    from evals.gate import load_committed_judge_metrics
+
+    path = tmp_path / "llm_eval.md"
+    path.write_text(_LLM_EVAL_TABLE, encoding="utf-8")
+
+    metrics = load_committed_judge_metrics(path)
+
+    assert metrics["judge.mean_faithfulness"] == pytest.approx(2.60)
+    assert metrics["judge.mean_faithfulness"] != pytest.approx(3.40)
+    assert metrics["judge.mean_faithfulness"] != pytest.approx(1.9)
+    assert set(metrics) == {"judge.mean_faithfulness"}
+
+
+def test_committed_judge_below_floor_fails_gate(tmp_path: Path) -> None:
+    from evals.gate import load_committed_judge_metrics, run_gate
+
+    path = tmp_path / "llm_eval.md"
+    path.write_text(
+        """\
+| variant | n | faithfulness | relevance | citation_quality | suggested_score | ungrounded |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `production` | 10 | 1.00 | 2.90 | 2.30 | 2.40 | 1/10 |
+| `stepwise` | 10 | 3.40 | 3.80 | 2.70 | 3.00 | 0/10 |
+""",
+        encoding="utf-8",
+    )
+    baseline_path = tmp_path / "baseline.json"
+    history_path = tmp_path / "history.jsonl"
+    _write_baseline(
+        baseline_path,
+        _make_baseline("judge.mean_faithfulness", 1.9, margin=0.4),
+    )
+
+    current = load_committed_judge_metrics(path)
+    assert current["judge.mean_faithfulness"] == pytest.approx(1.0)
+    assert run_gate(current, baseline_path, history_path) == 1

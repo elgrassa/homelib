@@ -620,6 +620,19 @@ def _stub_run(monkeypatch: pytest.MonkeyPatch, scores: list[VariantScore]) -> No
     monkeypatch.setattr(llm_eval, "score_variants", lambda cases, **kw: scores)
 
 
+def _variant_score_with_faithfulness(
+    variant: str, *, n: int, suggested: float, faithfulness: float
+) -> VariantScore:
+    return VariantScore(
+        variant=variant,
+        n=n,
+        mean_faithfulness=faithfulness,
+        mean_relevance=4.0,
+        mean_citation_quality=4.0,
+        mean_suggested_score=suggested,
+    )
+
+
 def test_main_writes_a_report_and_passes_the_judge_gate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -632,6 +645,9 @@ def test_main_writes_a_report_and_passes_the_judge_gate(
             _variant_score("concise", n=5, suggested=3.9),
             _variant_score("cited_first", n=5, suggested=4.4),
             _variant_score("stepwise", n=5, suggested=4.0),
+            _variant_score_with_faithfulness(
+                "production", n=5, suggested=3.5, faithfulness=4.0
+            ),
         ],
     )
     report = tmp_path / "llm_eval.md"
@@ -640,6 +656,7 @@ def test_main_writes_a_report_and_passes_the_judge_gate(
     assert "Winner: `cited_first`" in report.read_text(encoding="utf-8")
     # Exactly one history line, and only the judge.* metric — the retrieval
     # floors belong to the retrieval eval and must not be reported missing.
+    # Gate reads production faithfulness, not the bake-off winner.
     lines = history.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0])["metrics"] == {"judge.mean_faithfulness": 4.0}
@@ -658,6 +675,9 @@ def test_main_fails_the_gate_when_judge_faithfulness_regresses(
             _variant_score("concise", n=5, suggested=3.9),
             _variant_score("cited_first", n=5, suggested=4.4),
             _variant_score("stepwise", n=5, suggested=4.0),
+            _variant_score_with_faithfulness(
+                "production", n=5, suggested=3.5, faithfulness=4.0
+            ),
         ],
     )
 
@@ -666,6 +686,39 @@ def test_main_fails_the_gate_when_judge_faithfulness_regresses(
     assert json.loads(history.read_text(encoding="utf-8").strip())["regressions"] == [
         "judge.mean_faithfulness"
     ]
+
+
+def test_judge_gate_uses_production_even_when_challenger_wins(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """E03: a strong stepwise challenger must not mask a production collapse."""
+    from evals.llm_eval import main
+
+    history = _install_fake_baseline(monkeypatch, tmp_path, floor=3.8)
+    _stub_run(
+        monkeypatch,
+        [
+            _variant_score_with_faithfulness(
+                "concise", n=5, suggested=3.0, faithfulness=3.0
+            ),
+            _variant_score_with_faithfulness(
+                "cited_first", n=5, suggested=3.1, faithfulness=3.1
+            ),
+            _variant_score_with_faithfulness(
+                "stepwise", n=5, suggested=4.9, faithfulness=4.9
+            ),
+            _variant_score_with_faithfulness(
+                "production", n=5, suggested=2.0, faithfulness=2.0
+            ),
+        ],
+    )
+    report = tmp_path / "llm_eval.md"
+
+    assert main(["--report", str(report)]) == 1
+    assert "Winner: `stepwise`" in report.read_text(encoding="utf-8")
+    record = json.loads(history.read_text(encoding="utf-8").strip())
+    assert record["metrics"] == {"judge.mean_faithfulness": 2.0}
+    assert record["regressions"] == ["judge.mean_faithfulness"]
 
 
 def test_main_refuses_and_exits_nonzero_when_an_arm_scored_nothing(

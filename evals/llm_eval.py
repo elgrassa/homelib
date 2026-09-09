@@ -577,15 +577,17 @@ def load_questions(
 
 
 def _judge_metrics(scores: Sequence[VariantScore]) -> dict[str, float]:
-    """The gate-facing metrics for this run: the winning variant's means.
+    """Gate-facing metrics: the shipped `production` variant's mean faithfulness.
 
-    Empty when there is no winner — an unsound comparison must not publish a
-    number the gate would then treat as a real measurement.
+    Bake-off winners (challengers) stay in the report table; they must not
+    mask a regression in the prompt the product actually serves. Empty when
+    production did not soundly run — missing metrics fail the gate.
     """
-    winner = _winner(scores)
-    if winner is None:
+    by_variant = {score.variant: score for score in scores}
+    production = by_variant.get("production")
+    if production is None or production.n == 0:
         return {}
-    return {"judge.mean_faithfulness": winner.mean_faithfulness}
+    return {"judge.mean_faithfulness": production.mean_faithfulness}
 
 
 def _run_judge_gate(scores: Sequence[VariantScore]) -> int:

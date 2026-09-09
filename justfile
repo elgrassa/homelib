@@ -133,9 +133,10 @@ eval-llm:
 
 # Compare committed winner floors in evals/eval-baseline.json to the numbers
 # already published in evals/results/retrieval.md + llm_eval.md — no bake-off.
-# Not wired into `just ci` yet; Track E wants the recipe visible.
+# Named-column parse (not positional regex): hit-rate/MRR from retrieval.md,
+# production faithfulness from llm_eval.md. Not wired into `just ci` yet.
 eval-gate:
-    uv run python -c "from pathlib import Path; from evals.gate import run_gate; import re, json; r=(Path('evals/results/retrieval.md').read_text()); m=re.search(r'hybrid_rerank.*?\\*\\*\\(winner\\)\\*\\*.*?\\|\\s*([0-9.]+)\\s*\\|\\s*([0-9.]+)\\s*\\|\\s*([0-9.]+)', r); assert m, 'winner row missing'; cur={'hybrid_rerank.hit_rate_at_5': float(m.group(1)), 'hybrid_rerank.mrr_at_5': float(m.group(3)), 'judge.mean_faithfulness': 1.9}; raise SystemExit(run_gate(cur, Path('evals/eval-baseline.json'), Path('evals/history.jsonl')))"
+    uv run python -m evals.gate
 
 # RRF fusion-constant sweep: hybrid arm only, k in {1,10,60,100,200}, appends
 # (replaces on re-run) the "RRF k sweep" table in evals/results/retrieval.md.

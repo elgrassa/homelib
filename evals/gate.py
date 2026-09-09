@@ -34,6 +34,8 @@ __all__ = [
     "append_history",
     "compare_to_baseline",
     "load_baseline",
+    "load_committed_judge_metrics",
+    "load_committed_retrieval_metrics",
     "run_gate",
 ]
 
@@ -192,3 +194,118 @@ def run_gate(current: dict[str, float], baseline_path: Path, history_path: Path)
     for regression in regressions:
         print(_describe(regression))
     return 1 if regressions else 0
+
+
+# ── committed markdown report loaders (`just eval-gate`) ─────────────────────
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_RETRIEVAL_REPORT = _REPO_ROOT / "evals" / "results" / "retrieval.md"
+_DEFAULT_LLM_REPORT = _REPO_ROOT / "evals" / "results" / "llm_eval.md"
+_DEFAULT_BASELINE = _REPO_ROOT / "evals" / "eval-baseline.json"
+_DEFAULT_HISTORY = _REPO_ROOT / "evals" / "history.jsonl"
+
+
+def _split_md_row(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _is_separator_row(cells: Sequence[str]) -> bool:
+    return bool(cells) and all(set(cell) <= {"-", ":"} for cell in cells)
+
+
+def _parse_markdown_table(text: str) -> tuple[list[str], list[list[str]]]:
+    """Return (header, data rows) for the first pipe table in `text`."""
+    lines = [line for line in text.splitlines() if "|" in line]
+    if len(lines) < 2:
+        raise ValueError("markdown table missing from report")
+    header = _split_md_row(lines[0])
+    body_start = 1
+    if _is_separator_row(_split_md_row(lines[1])):
+        body_start = 2
+    rows = [_split_md_row(line) for line in lines[body_start:]]
+    rows = [row for row in rows if row and not _is_separator_row(row)]
+    if not rows:
+        raise ValueError("markdown table has no data rows")
+    return header, rows
+
+
+def _column_index(header: Sequence[str], *names: str) -> int:
+    lowered = [name.casefold() for name in header]
+    for name in names:
+        key = name.casefold()
+        if key in lowered:
+            return lowered.index(key)
+    raise ValueError(f"table missing required column among {names!r}; got {list(header)!r}")
+
+
+def _require_unit_interval(name: str, value: float) -> float:
+    if not (0.0 <= value <= 1.0):
+        raise ValueError(f"{name}={value} is outside the unit interval [0, 1]")
+    return value
+
+
+def load_committed_retrieval_metrics(path: Path) -> dict[str, float]:
+    """Read hybrid_rerank hit-rate@5 and MRR@5 by column name from a retrieval report.
+
+    Positional regex captures after `(winner)` are unsafe: the `n` column can be
+    mistaken for hit-rate. Named columns reject that class of false green.
+    """
+    header, rows = _parse_markdown_table(path.read_text(encoding="utf-8"))
+    arm_i = _column_index(header, "arm")
+    hit_i = _column_index(header, "hit-rate@5")
+    mrr_i = _column_index(header, "MRR@5", "mrr@5")
+
+    winner_row: list[str] | None = None
+    for row in rows:
+        if len(row) <= max(arm_i, hit_i, mrr_i):
+            continue
+        arm_cell = row[arm_i]
+        if "hybrid_rerank" in arm_cell and "winner" in arm_cell.casefold():
+            winner_row = row
+            break
+    if winner_row is None:
+        for row in rows:
+            if len(row) <= max(arm_i, hit_i, mrr_i):
+                continue
+            if "hybrid_rerank" in row[arm_i]:
+                winner_row = row
+                break
+    if winner_row is None:
+        raise ValueError("hybrid_rerank row missing from retrieval report")
+
+    hit_rate = _require_unit_interval(
+        "hybrid_rerank.hit_rate_at_5", float(winner_row[hit_i])
+    )
+    mrr = _require_unit_interval("hybrid_rerank.mrr_at_5", float(winner_row[mrr_i]))
+    return {
+        "hybrid_rerank.hit_rate_at_5": hit_rate,
+        "hybrid_rerank.mrr_at_5": mrr,
+    }
+
+
+def load_committed_judge_metrics(path: Path) -> dict[str, float]:
+    """Read `production` faithfulness from an llm_eval.md table (not the bake-off winner)."""
+    header, rows = _parse_markdown_table(path.read_text(encoding="utf-8"))
+    variant_i = _column_index(header, "variant")
+    faith_i = _column_index(header, "faithfulness")
+
+    for row in rows:
+        if len(row) <= max(variant_i, faith_i):
+            continue
+        if row[variant_i].strip("` ") == "production":
+            return {"judge.mean_faithfulness": float(row[faith_i])}
+    raise ValueError("production variant row missing from llm_eval report")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Compare committed retrieval + production-judge report numbers to the baseline."""
+    del argv  # reserved for future CLI flags; recipe takes no args today
+    current = {
+        **load_committed_retrieval_metrics(_DEFAULT_RETRIEVAL_REPORT),
+        **load_committed_judge_metrics(_DEFAULT_LLM_REPORT),
+    }
+    return run_gate(current, _DEFAULT_BASELINE, _DEFAULT_HISTORY)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
