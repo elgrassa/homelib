@@ -285,6 +285,38 @@ def test_demo_llm_daily_limit_ignores_non_integer_env(
     assert demo_llm_daily_limit() == DEFAULT_DEMO_LLM_DAILY_LIMIT
 
 
+def test_demo_llm_daily_limit_blank_env_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.api.demo_quota import DEFAULT_DEMO_LLM_DAILY_LIMIT, demo_llm_daily_limit
+
+    monkeypatch.setenv("HOMELIB_DEMO_LLM_DAILY_LIMIT", "   ")
+    assert demo_llm_daily_limit() == DEFAULT_DEMO_LLM_DAILY_LIMIT
+
+
+def test_demo_principal_skips_cap_when_sqlite_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.api.demo_quota import enforce_demo_llm_quota
+    from apps.runtime_settings import AppMode
+
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setattr("apps.api.demo_quota.read_app_mode", lambda: AppMode.DEMO)
+    monkeypatch.setattr("apps.api.sqlite_deps.sqlite_path", lambda: None)
+    enforce_demo_llm_quota("any-token")  # no-op, not 401
+
+
+def test_unknown_demo_session_is_401(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _demo_db(tmp_path, monkeypatch, mode="demo", limit="10")
+    denied = client.post(
+        "/v1/ask",
+        json={"query": "who wrote walden?", "arm": "hybrid"},
+        headers={"X-Demo-Session": "not-a-real-session"},
+    )
+    assert denied.status_code == 401
+    assert "unknown" in denied.json()["detail"].lower()
+
+
 def test_demo_mentor_intake_counts_toward_daily_limit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
