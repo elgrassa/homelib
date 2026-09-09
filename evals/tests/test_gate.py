@@ -360,3 +360,111 @@ def test_committed_judge_below_floor_fails_gate(tmp_path: Path) -> None:
     current = load_committed_judge_metrics(path)
     assert current["judge.mean_faithfulness"] == pytest.approx(1.0)
     assert run_gate(current, baseline_path, history_path) == 1
+
+
+def test_parse_markdown_table_rejects_missing_and_empty_tables() -> None:
+    from evals.gate import _parse_markdown_table
+
+    with pytest.raises(ValueError, match="missing"):
+        _parse_markdown_table("no pipes here")
+    with pytest.raises(ValueError, match="no data rows"):
+        _parse_markdown_table("| arm |\n| --- |\n")
+
+
+def test_column_index_reports_missing_names() -> None:
+    from evals.gate import _column_index
+
+    with pytest.raises(ValueError, match="missing required column"):
+        _column_index(["arm", "n"], "hit-rate@5")
+
+
+def test_retrieval_falls_back_to_hybrid_rerank_without_winner_label(
+    tmp_path: Path,
+) -> None:
+    from evals.gate import load_committed_retrieval_metrics
+
+    path = tmp_path / "retrieval.md"
+    path.write_text(
+        """\
+| arm | n | hit-rate@5 | MRR@5 |
+| --- | ---: | ---: | ---: |
+| short |
+| `lexical` | 10 | 0.1 | 0.1 |
+| `hybrid_rerank` | 10 | 0.55 | 0.44 |
+""",
+        encoding="utf-8",
+    )
+    metrics = load_committed_retrieval_metrics(path)
+    assert metrics["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.55)
+    assert metrics["hybrid_rerank.mrr_at_5"] == pytest.approx(0.44)
+
+
+def test_retrieval_missing_hybrid_rerank_row_fails(tmp_path: Path) -> None:
+    from evals.gate import load_committed_retrieval_metrics
+
+    path = tmp_path / "retrieval.md"
+    path.write_text(
+        """\
+| arm | hit-rate@5 | MRR@5 |
+| --- | ---: | ---: |
+| `lexical` | 0.1 | 0.1 |
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="hybrid_rerank"):
+        load_committed_retrieval_metrics(path)
+
+
+def test_judge_missing_production_row_fails(tmp_path: Path) -> None:
+    from evals.gate import load_committed_judge_metrics
+
+    path = tmp_path / "llm_eval.md"
+    path.write_text(
+        """\
+| variant | faithfulness |
+| --- | ---: |
+| short |
+| `stepwise` | 3.4 |
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="production"):
+        load_committed_judge_metrics(path)
+
+
+def test_current_git_sha_returns_unknown_when_git_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from evals import gate as gate_mod
+
+    def _boom(*_args: object, **_kwargs: object) -> object:
+        raise OSError("no git")
+
+    monkeypatch.setattr(gate_mod.subprocess, "run", _boom)
+    assert gate_mod._current_git_sha() == "unknown"
+
+
+def test_main_passes_against_committed_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`python -m evals.gate` must load named columns and exit 0 on tip reports."""
+    from evals import gate as gate_mod
+
+    retrieval = tmp_path / "retrieval.md"
+    llm = tmp_path / "llm_eval.md"
+    baseline = tmp_path / "baseline.json"
+    history = tmp_path / "history.jsonl"
+    retrieval.write_text(_RETRIEVAL_WINNER_TABLE, encoding="utf-8")
+    llm.write_text(_LLM_EVAL_TABLE, encoding="utf-8")
+    baseline.write_text(REAL_BASELINE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+
+    monkeypatch.setattr(gate_mod, "_DEFAULT_RETRIEVAL_REPORT", retrieval)
+    monkeypatch.setattr(gate_mod, "_DEFAULT_LLM_REPORT", llm)
+    monkeypatch.setattr(gate_mod, "_DEFAULT_BASELINE", baseline)
+    monkeypatch.setattr(gate_mod, "_DEFAULT_HISTORY", history)
+
+    assert gate_mod.main([]) == 0
+    assert history.exists()
+    record = json.loads(history.read_text(encoding="utf-8").splitlines()[0])
+    assert record["metrics"]["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
+    assert record["metrics"]["judge.mean_faithfulness"] == pytest.approx(2.60)
