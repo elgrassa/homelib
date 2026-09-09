@@ -143,6 +143,14 @@ def test_fetch_book_title_skips_non_matching_rows(monkeypatch: pytest.MonkeyPatc
 
 API_BASE = "http://api.test"
 
+# Loopback handler calls under a contended host (PrepOS CI + local pre-push)
+# otherwise hit httpx's 5s default and flake as ReadTimeout.
+_LOOPBACK_TIMEOUT = httpx.Timeout(30.0, connect=5.0)
+
+
+def _loopback_get(url: str) -> httpx.Response:
+    return httpx.get(url, timeout=_LOOPBACK_TIMEOUT)
+
 
 @pytest.fixture
 def running_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[int]:
@@ -186,7 +194,7 @@ def test_read_server_pdf_route_404_without_flag(
     running_server: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("HOMELIB_OFFICIAL_VIEWER", raising=False)
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 404
 
 
@@ -204,7 +212,7 @@ def test_pdf_allowlist_rejects_lookalike_host(
         pdf_url="https://www.pottermorepublishing.com.evil.tld/x.pdf",
     )
     monkeypatch.setattr("apps.ui.read_server.official_book_by_id", lambda book_id: fake_book)
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 403
 
 
@@ -222,7 +230,7 @@ def test_pdf_allowlist_rejects_query_string_spoof(
         pdf_url="https://evil.example/x.pdf?host=www.pottermorepublishing.com",
     )
     monkeypatch.setattr("apps.ui.read_server.official_book_by_id", lambda book_id: fake_book)
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 403
 
 
@@ -233,7 +241,7 @@ def test_pdf_fetch_refuses_redirect(running_server: int, monkeypatch: pytest.Mon
     respx.get(POTTERMORE_PDF_URL).mock(
         return_value=httpx.Response(302, headers={"location": "https://evil.example/x.pdf"})
     )
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 502
 
 
@@ -247,7 +255,7 @@ def test_pdf_over_cap_maps_to_502(running_server: int, monkeypatch: pytest.Monke
             200, content=b"x" * 1000, headers={"content-type": "application/pdf"}
         )
     )
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 502
 
 
@@ -259,7 +267,7 @@ def test_read_rejects_percent_encoded_slash_book_id(running_server: int) -> None
         route = mocked.get(url__startswith=f"{API_BASE}/v1/books/").mock(
             return_value=httpx.Response(200, json={"text": "should never be reached"})
         )
-        resp = httpx.get(f"http://127.0.0.1:{running_server}/read/wal%2Fden")
+        resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/wal%2Fden")
         assert resp.status_code == 404
         assert route.call_count == 0
 
@@ -268,12 +276,12 @@ def test_read_rejects_percent_encoded_slash_book_id(running_server: int) -> None
 def test_read_responses_have_no_cors_wildcard(running_server: int) -> None:
     _allow_localhost()
     _mock_walden_blocks()
-    health = httpx.get(f"http://127.0.0.1:{running_server}/health")
+    health = _loopback_get(f"http://127.0.0.1:{running_server}/health")
     assert "access-control-allow-origin" not in health.headers
     assert health.headers.get("cache-control") == "private, no-store"
     assert health.headers.get("x-content-type-options") == "nosniff"
 
-    read_resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
+    read_resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
     assert read_resp.status_code == 200
     assert "access-control-allow-origin" not in read_resp.headers
     assert read_resp.headers.get("cache-control") == "private, no-store"
@@ -288,23 +296,23 @@ def test_handler_routes_health_read_pdf_book(
     _mock_walden_blocks()
     base = f"http://127.0.0.1:{running_server}"
 
-    health = httpx.get(f"{base}/health")
+    health = _loopback_get(f"{base}/health")
     assert health.status_code == 200
     assert health.text == "ok"
 
-    read_resp = httpx.get(f"{base}/read/walden?ordinal=0")
+    read_resp = _loopback_get(f"{base}/read/walden?ordinal=0")
     assert read_resp.status_code == 200
     assert "I went to the woods." in read_resp.text
 
     monkeypatch.delenv("HOMELIB_OFFICIAL_VIEWER", raising=False)
-    off_resp = httpx.get(f"{base}/book/hp-uk-1")
+    off_resp = _loopback_get(f"{base}/book/hp-uk-1")
     assert off_resp.status_code == 404
 
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
-    on_resp = httpx.get(f"{base}/book/hp-uk-1")
+    on_resp = _loopback_get(f"{base}/book/hp-uk-1")
     assert on_resp.status_code == 200
 
-    unknown = httpx.get(f"{base}/nope")
+    unknown = _loopback_get(f"{base}/nope")
     assert unknown.status_code == 404
 
 
@@ -312,7 +320,7 @@ def test_handler_routes_health_read_pdf_book(
 def test_upstream_500_maps_to_502(running_server: int) -> None:
     _allow_localhost()
     respx.get(f"{API_BASE}/v1/books/walden/blocks").mock(return_value=httpx.Response(500))
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
     assert resp.status_code == 502
 
 
@@ -320,21 +328,21 @@ def test_upstream_500_maps_to_502(running_server: int) -> None:
 def test_read_upstream_404_maps_to_404(running_server: int) -> None:
     _allow_localhost()
     respx.get(f"{API_BASE}/v1/books/walden/blocks").mock(return_value=httpx.Response(404))
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
     assert resp.status_code == 404
 
 
 @respx.mock
 def test_read_bad_ordinal_maps_to_422(running_server: int) -> None:
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=not-a-number")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=not-a-number")
     assert resp.status_code == 422
 
 
 @respx.mock
 def test_read_negative_ordinal_maps_to_422(running_server: int) -> None:
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=-1")
     assert resp.status_code == 422
 
 
@@ -344,7 +352,7 @@ def test_read_connect_error_maps_to_502(running_server: int) -> None:
     respx.get(f"{API_BASE}/v1/books/walden/blocks").mock(
         side_effect=httpx.ConnectError("connection refused")
     )
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
     assert resp.status_code == 502
 
 
@@ -368,7 +376,7 @@ def test_read_next_ordinal_omitted_when_probe_fails(running_server: int) -> None
             200, json=[{"book_id": "walden", "title": "Walden", "authors": ["Thoreau"]}]
         )
     )
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/walden?ordinal=0")
     assert resp.status_code == 200
     assert 'href="/read/walden?ordinal=1"' not in resp.text
 
@@ -376,7 +384,7 @@ def test_read_next_ordinal_omitted_when_probe_fails(running_server: int) -> None
 @respx.mock
 def test_read_rejects_invalid_book_id_characters(running_server: int) -> None:
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/read/wal%20den")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/read/wal%20den")
     assert resp.status_code == 404
 
 
@@ -386,7 +394,7 @@ def test_pdf_rejects_invalid_book_id_characters(
 ) -> None:
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/wal%20den")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/wal%20den")
     assert resp.status_code == 404
 
 
@@ -394,7 +402,7 @@ def test_pdf_rejects_invalid_book_id_characters(
 def test_pdf_unknown_book_maps_to_404(running_server: int, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/no-such-book")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/no-such-book")
     assert resp.status_code == 404
 
 
@@ -405,7 +413,7 @@ def test_pdf_connect_error_maps_to_502(
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
     _allow_localhost()
     respx.get(POTTERMORE_PDF_URL).mock(side_effect=httpx.ConnectError("down"))
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 502
 
 
@@ -420,7 +428,7 @@ def test_pdf_success_streams_allowlisted_bytes(
             200, content=b"%PDF-1.4 fake", headers={"content-type": "application/pdf; charset=x"}
         )
     )
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/pdf/hp-uk-1")
     assert resp.status_code == 200
     assert resp.content == b"%PDF-1.4 fake"
     assert resp.headers["content-type"] == "application/pdf"
@@ -434,7 +442,7 @@ def test_book_rejects_invalid_book_id_characters(
 ) -> None:
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/book/wal%20den")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/book/wal%20den")
     assert resp.status_code == 404
 
 
@@ -442,7 +450,7 @@ def test_book_rejects_invalid_book_id_characters(
 def test_book_unknown_id_maps_to_404(running_server: int, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOMELIB_OFFICIAL_VIEWER", "1")
     _allow_localhost()
-    resp = httpx.get(f"http://127.0.0.1:{running_server}/book/no-such-book")
+    resp = _loopback_get(f"http://127.0.0.1:{running_server}/book/no-such-book")
     assert resp.status_code == 404
 
 
