@@ -193,7 +193,8 @@ just drill   # cold-clone reproducibility gate
 ```
 
 Specs in [`specs/`](specs/); build log in [`docs/evidence.md`](docs/evidence.md).
-Maintainer course mapping (optional): [`docs/course-map.md`](docs/course-map.md).
+Maintainer maps (optional): [`docs/course-map.md`](docs/course-map.md),
+[`docs/zoomcamp-2026-gap-report.md`](docs/zoomcamp-2026-gap-report.md).
 
 ## Rubric self-audit
 
