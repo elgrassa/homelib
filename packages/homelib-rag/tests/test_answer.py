@@ -317,6 +317,14 @@ def test_degraded_response_defaults_zero_usage_without_llm_call() -> None:
     assert result.tokens.completion == 0
 
 
+def test_unexpected_llm_error_is_not_labelled_unreachable() -> None:
+    """A client exception is not the same as the model being unreachable."""
+    result = _degraded_response("hybrid", "unexpected LLM error: ValueError boom")
+    assert result.degraded is True
+    assert result.degraded_reason != "llm_unreachable"
+    assert result.degraded_reason == "degraded"
+
+
 def test_answer_retries_without_json_format_after_json_validate_failed() -> None:
     """Groq `json_validate_failed` must not stick on the first attempt when a
     plain chat retry can still produce valid JSON (inventory / refuse cases)."""

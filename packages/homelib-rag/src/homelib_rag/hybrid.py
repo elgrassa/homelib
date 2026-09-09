@@ -30,6 +30,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Sequence
+from itertools import pairwise
 from typing import Literal
 
 from homelib_rag.models import Hit
@@ -47,6 +48,30 @@ logger = logging.getLogger(__name__)
 # The constant from the RRF paper. Not tunable via config: specs/hybrid.md
 # pins it to 60.
 _RRF_K = 60
+
+# Title tokens that are ordinary English, not a book name. A query about
+# "writing style" must not hoist Strunk; "Walden" still must. Pair this with
+# consecutive title bigrams so "civil disobedience" can name Walden's subtitle.
+_GENERIC_TITLE_WORDS = frozenset(
+    {
+        "civil",
+        "story",
+        "style",
+        "money",
+        "nature",
+        "second",
+        "woods",
+        "life",
+        "work",
+        "help",
+        "elements",
+        "wealth",
+        "nations",
+        "letters",
+        "essays",
+        "duty",
+    }
+)
 
 _CONTENT_STOPWORDS = frozenset(
     {
@@ -298,6 +323,10 @@ def merge_unique_hits(*hit_lists: Sequence[Hit], k: int) -> list[Hit]:
     return [h.model_copy(update={"rank": rank}) for rank, h in enumerate(merged, start=1)]
 
 
+def _title_token_in_query(part: str, query: str) -> bool:
+    return re.search(rf"\b{re.escape(part)}\b", query) is not None
+
+
 def boost_books_named_in_query(
     query: str,
     hits: list[Hit],
@@ -307,14 +336,28 @@ def boost_books_named_in_query(
     if not hits or not book_titles:
         return hits
     q = query.casefold()
-    named = {book_id for book_id, title in book_titles.items() if title and title.casefold() in q}
-    if not named:
-        # Also match distinctive title tokens (e.g. "Walden" in a longer title).
-        for book_id, title in book_titles.items():
-            for part in re.findall(r"[a-z0-9']+", title.casefold()):
-                if len(part) >= 5 and part in q:
-                    named.add(book_id)
-                    break
+    named: set[str] = set()
+    for book_id, title in book_titles.items():
+        if not title:
+            continue
+        folded = title.casefold()
+        if folded in q:
+            named.add(book_id)
+            continue
+        parts = [
+            part
+            for part in re.findall(r"[a-z0-9']+", folded)
+            if len(part) >= 5 and part not in _CONTENT_STOPWORDS
+        ]
+        if any(
+            _title_token_in_query(part, q) and part not in _GENERIC_TITLE_WORDS for part in parts
+        ):
+            named.add(book_id)
+            continue
+        for left, right in pairwise(parts):
+            if _title_token_in_query(left, q) and _title_token_in_query(right, q):
+                named.add(book_id)
+                break
     if not named:
         return hits
     return sorted(hits, key=lambda hit: hit.book_id not in named)

@@ -626,7 +626,7 @@ def _degraded_reason_code(reason: str) -> str:
         return "malformed_llm_output"
     if _is_rate_limit_failure(reason):
         return "rate_limited"
-    if "unreachable" in text or "llm" in text:
+    if "unreachable" in text:
         return "llm_unreachable"
     if "metadata" in text:
         return "metadata_unavailable"

@@ -128,6 +128,44 @@ def test_boost_books_named_in_query_returns_input_when_no_title_match() -> None:
     assert boost_books_named_in_query("ford factory pig iron", hits, titles) is hits
 
 
+def test_boost_books_named_in_query_ignores_generic_title_words() -> None:
+    """'style' / 'story' / 'civil' are title tokens, not book names."""
+    hits = [
+        _hit("ford", "factory", book_id="ford", rank=1),
+        _hit("strunk", "usage", book_id="strunk", rank=2),
+        _hit("keller", "childhood", book_id="keller", rank=3),
+        _hit("walden", "woods", book_id="thoreau-walden", rank=4),
+    ]
+    titles = {
+        "strunk": "The Elements of Style",
+        "keller": "The Story of My Life",
+        "thoreau-walden": "Walden, and On The Duty Of Civil Disobedience",
+        "ford": "My Life and Work",
+    }
+    original = [h.book_id for h in hits]
+    styled = boost_books_named_in_query("what makes a good writing style", hits, titles)
+    assert [h.book_id for h in styled] == original
+
+    storied = boost_books_named_in_query("tell me a story about factories", hits, titles)
+    assert [h.book_id for h in storied] == original
+
+    civic = boost_books_named_in_query("civil engineering career advice", hits, titles)
+    assert [h.book_id for h in civic] == original
+
+
+def test_boost_books_named_in_query_still_matches_subtitle_bigram() -> None:
+    hits = [
+        _hit("ford", "factory", book_id="ford", rank=1),
+        _hit("walden", "woods", book_id="thoreau-walden", rank=2),
+    ]
+    titles = {
+        "thoreau-walden": "Walden, and On The Duty Of Civil Disobedience",
+        "ford": "My Life and Work",
+    }
+    ordered = boost_books_named_in_query("civil disobedience in practice", hits, titles)
+    assert ordered[0].book_id == "thoreau-walden"
+
+
 def test_hybrid_lazy_search_wrappers_delegate(monkeypatch: pytest.MonkeyPatch) -> None:
     from homelib_rag import hybrid as hybrid_mod
 
