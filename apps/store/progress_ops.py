@@ -113,12 +113,13 @@ def upsert_progress(
 
 
 def _row_to_record(row: tuple[object, ...], *, kind: ProgressKind) -> ProgressRecord:
+    raw_offset = row[4]
     return ProgressRecord(
         principal_id=str(row[0]),
         resource_id=str(row[1]),
         book_id=str(row[2]) if row[2] is not None else None,
         block_id=str(row[3]) if row[3] is not None else None,
-        char_offset=int(row[4]) if row[4] is not None else None,
+        char_offset=None if raw_offset is None else int(str(raw_offset)),
         updated_at=str(row[5]),
         kind=kind,
     )
