@@ -21,15 +21,8 @@ local fallback. Never commit an API key.
 
 **Submission commit:** record on `main` at submit time (see [`docs/evidence.md`](docs/evidence.md)).
 
-### DO-NOT-CLAIM
-
-Safe when true: cited RAG on the demo shelf · citations that open a source block ·
-measured eval tables in [`EVAL.md`](EVAL.md) · Streamlit Crossroads · Groq on the
-public demo. See also [`TRADEOFFS.md`](TRADEOFFS.md) and [`COST-LATENCY.md`](COST-LATENCY.md).
-
-Unsafe until measured on the submission SHA: “eval fails every PR in CI”
-(`just eval-gate` exists; not yet in `just ci`) · career-planning Mentor as a
-guaranteed success · “production vector DB” (tip path is SQLite).
+Evaluation methodology: [`EVAL.md`](EVAL.md). Design choices and operating
+cost/latency: [`TRADEOFFS.md`](TRADEOFFS.md), [`COST-LATENCY.md`](COST-LATENCY.md).
 
 ## Try (≈15 minutes)
 
