@@ -8,7 +8,7 @@ Compiled from committed tables. **Do not** re-run `just eval-retrieval` /
 | Layer | Size | Source |
 |---|---:|---|
 | Retrieval Q↔chunk | 235 | LLM-generated pairs in `evals/ground_truth.jsonl` (corpus-drawn chunks) |
-| LLM judge items | 30 | Bake-off set in ADR-003 / `evals/results/llm_eval.md` |
+| LLM judge items | 30 (ADR-003 historical) / **10** (latest committed `llm_eval.md`) | ADR-003 recorded a 30-question bake-off that kept production on a null result. The **current** committed table is 10 questions × 4 variants — treat that as the live archive numbers; do not silently equate 30 and 10. |
 | Mentor miss **#M1** | 1 | Human-sourced regression: goal **"Land AI engineer job"** — modern SWE loop, **not** in the 18 Gutenberg books (`packages/homelib-rag/tests/test_mentor.py`) |
 | Ask inventory **#A1** | 1 | `"what do you have?"` — empty LLM answer must never render blank (`apps/ui/tests/test_ask_tab.py`) |
 
@@ -31,23 +31,27 @@ Rerank lifts **MRR only**. RRF `k` sweep is flat (lists barely overlap) — **k 
 **Query rewrite:** measured on 80 Q, hit-rate flat, MRR down → **OFF** (Zoomcamp rewrite point = negative result).
 
 **Chunking:** sentence-packed **1200/200** (vs 600/100 and 2000/400 in
-[`evals/results/chunking.md`](evals/results/chunking.md)). Embedder
-`all-MiniLM-L6-v2` 384-d; reranker `ms-marco-MiniLM-L-6-v2`.
+[`evals/results/chunking.md`](evals/results/chunking.md)). Sweep scored
+**6 of 18** books / **73** questions (162 excluded) — not a corpus-wide
+superiority claim. Embedder `all-MiniLM-L6-v2` 384-d; reranker
+`ms-marco-MiniLM-L-6-v2`.
 
 **Store that is actually running:** SQLite FTS5 + float32 matrix.
 Postgres+pgvector is `v1-fallback`. **Not** Qdrant. **Not** a “production vector DB.”
 
 ## Generation
 
-Four prompt arms, judge scores mostly 1–3/5
-([`evals/results/llm_eval.md`](evals/results/llm_eval.md), ADR-003):
+Four prompt arms. ADR-003’s historical bake-off used **30** questions and kept
+production on a null result; the **committed** `llm_eval.md` archive is
+**10 × 4** (judge scores mostly 1–3/5):
 
 | Finding | Claim |
 |---|---|
-| Winner on one run | `stepwise` on suggested_score |
-| Decision | **Incumbent stays** — null result |
+| Winner on one run | `stepwise` on suggested_score (10-q archive) |
+| Decision | **Incumbent stays** — ADR-003 null result on the larger historical set; do not re-read the 10-q table as overturning that without a new dated run |
 | Calibration | **Judge is uncalibrated.** Run-to-run spread up to **0.47** > between-arm **0.34**. No Cohen’s κ invented tonight. |
-| Second method | Answer-cosine vs reference chunk (`all-MiniLM-L6-v2`) exists alongside the judge |
+| Second method | Answer–reference **cosine is semantic overlap vs the ground-truth chunk**, not a curated ideal answer (`all-MiniLM-L6-v2`) |
+| Citation precision | Live smoke sample is **tiny (N=1)** below — not a calibrated precision rate |
 
 ## Error taxonomy (one example each)
 

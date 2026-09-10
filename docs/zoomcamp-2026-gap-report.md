@@ -8,6 +8,13 @@ why a technique was deliberately not adopted (`Explanation_Skipped:`).
 Companion: [`course-map.md`](course-map.md) (module-by-module status) and the
 rubric self-audit in the [README](../README.md#rubric-self-audit).
 
+**Status note (2026-09-09):** Part 2 “Missing” rows below are the **2026-09-06
+snapshot**. Item-by-item `DONE:` resolutions follow in §FIXES. For the live
+eval/evidence narrative (30 vs 10 judge samples, passage vs book hit@5,
+chunk-sweep coverage, owner R-items) see [`EVAL.md`](../EVAL.md) and the
+2026-09-09 row in [`evidence.md`](evidence.md) — do not treat this file’s
+historical “Missing” column as current product status.
+
 ## Part 1 — What the 2026 cohort teaches and where HomeLib shows it
 
 ### Table 1 — Module → techniques taught → homework asks
