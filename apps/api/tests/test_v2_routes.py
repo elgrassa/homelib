@@ -105,6 +105,52 @@ def test_progress_endpoint(sqlite_env: Path) -> None:
         assert resp.json() == {"ok": True}
 
 
+def test_get_progress_returns_latest_saved_row(sqlite_env: Path) -> None:
+    """Audit S03: GET /v1/progress restores the principal's last-read row."""
+    with TestClient(app) as client:
+        books = client.get("/v1/resources").json()["items"]
+        first_id = books[0]["id"]
+        second_id = books[1]["id"]
+        client.post(
+            "/v1/progress",
+            json={
+                "resource_id": first_id,
+                "kind": "read",
+                "char_offset": 1,
+                "block_id": "blk-a",
+            },
+        )
+        client.post(
+            "/v1/progress",
+            json={
+                "resource_id": second_id,
+                "kind": "read",
+                "char_offset": 99,
+                "block_id": "blk-b",
+            },
+        )
+        latest = client.get("/v1/progress")
+        assert latest.status_code == 200
+        body = latest.json()
+        assert body is not None
+        assert body["resource_id"] == second_id
+        assert body["char_offset"] == 99
+        assert body["block_id"] == "blk-b"
+        assert body["kind"] == "read"
+
+        by_resource = client.get("/v1/progress", params={"resource_id": first_id})
+        assert by_resource.status_code == 200
+        assert by_resource.json()["resource_id"] == first_id
+        assert by_resource.json()["char_offset"] == 1
+
+
+def test_get_progress_null_when_empty(sqlite_env: Path) -> None:
+    with TestClient(app) as client:
+        resp = client.get("/v1/progress")
+        assert resp.status_code == 200
+        assert resp.json() is None
+
+
 def test_audio_capabilities(sqlite_env: Path) -> None:
     with TestClient(app) as client:
         resp = client.get("/v1/audio/capabilities")

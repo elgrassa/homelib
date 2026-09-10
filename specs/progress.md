@@ -26,7 +26,9 @@ class ProgressEvent(BaseModel):
 
 Unknown fields → **422**.
 
-HTTP: `specs/api.md` `POST /v1/progress` → `{ok: true}`.
+HTTP: `specs/api.md` `POST /v1/progress` → `{ok: true}`;
+`GET /v1/progress` → latest (or per-`resource_id`) `ProgressRecord` / null
+for Projection resume.
 
 ## Data contracts (field-level)
 

@@ -404,6 +404,26 @@ def post_progress(
     return OkResponse(ok=True)
 
 
+@router.get("/v1/progress", response_model=prog.ProgressRecord | None)
+def get_progress_endpoint(
+    resource_id: str | None = None,
+    kind: prog.ProgressKind = prog.ProgressKind.READ,
+    x_demo_session: str | None = Header(default=None, alias="X-Demo-Session"),
+) -> prog.ProgressRecord | None:
+    """Return saved progress for resume (audit S03).
+
+    With ``resource_id``, returns that resource's row (or null). Without it,
+    returns the principal's most recently updated row of ``kind``.
+    """
+    principal = _principal(x_demo_session)
+    with sqlite_deps.open_store() as conn:
+        if resource_id:
+            return prog.get_progress(
+                conn, principal_id=principal, resource_id=resource_id, kind=kind
+            )
+        return prog.latest_progress(conn, principal_id=principal, kind=kind)
+
+
 @router.get("/v1/observatory", response_model=obs.ObservatoryResponse)
 def get_observatory() -> obs.ObservatoryResponse:
     _require_sqlite()

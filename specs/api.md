@@ -262,6 +262,12 @@ unambiguous reading. Do not delete-by-body-only without an id.)
 
 Request: `ProgressEvent` (`specs/progress.md`). Response `{ok: true}`.
 
+### `GET /v1/progress`
+
+Query: optional `resource_id`, `kind` (`read`|`listen`, default `read`).
+Response: `ProgressRecord` or `null`. Without `resource_id`, returns the
+principal's most recently updated row of that kind (Projection resume).
+
 ### `POST /v1/bookmarks`
 
 Request `BookmarkRequest {resource_id, block_id, char_start, char_end,

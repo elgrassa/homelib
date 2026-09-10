@@ -126,11 +126,13 @@ def test_demo_session_header_sent_on_playlist_and_progress_calls(
     client.get_playlist()
     client.add_playlist_item("book-1")
     client.save_progress("book-1", kind="read", char_offset=10)
-    paths = [(m, p) for m, p, _ in seen]
+    client.get_progress(kind="read")
+    paths = [(m, p.split("?", 1)[0]) for m, p, _ in seen]
     assert paths == [
         ("GET", "/v1/playlists/current"),
         ("POST", "/v1/playlists/current/items"),
         ("POST", "/v1/progress"),
+        ("GET", "/v1/progress"),
     ]
     assert all(h.get(DEMO_SESSION_HEADER.lower()) == "sess-1" for _, _, h in seen)
 

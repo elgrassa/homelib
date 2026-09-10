@@ -355,6 +355,22 @@ def format_scene_hit_label(
     return f"{book_title} · {author} · {section} · {place}"
 
 
+def projection_resume_book_index(
+    books: Sequence[BookSummary],
+    *,
+    pending_book_id: str | None,
+    saved_resource_id: str | None,
+) -> int:
+    """Choose Projection selectbox index: handoff wins, else last-read (audit S03)."""
+    target = pending_book_id or saved_resource_id
+    if not target:
+        return 0
+    for idx, book in enumerate(books):
+        if book.book_id == target:
+            return idx
+    return 0
+
+
 def format_shelf_read_markdown(read_hint: str, *, port: int) -> str:
     """Shelf hit link copy. Spaces around ``**`` are required or Streamlit
     glues 'host' onto the URL.

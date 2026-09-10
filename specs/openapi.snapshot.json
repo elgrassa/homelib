@@ -6,35 +6,38 @@
     "/v1/ask": [
       "post"
     ],
-    "/v1/audio/capabilities": [
-      "get"
-    ],
-    "/v1/blocks/{block_id}": [
-      "get"
-    ],
-    "/v1/books": [
-      "get"
-    ],
-    "/v1/books/{book_id}/blocks": [
-      "get"
-    ],
-    "/v1/demo/session": [
-      "post"
-    ],
-    "/v1/feedback": [
+    "/v1/roadmap": [
       "post"
     ],
     "/v1/ingest": [
       "post"
     ],
+    "/v1/feedback": [
+      "post"
+    ],
+    "/v1/books": [
+      "get"
+    ],
+    "/v1/blocks/{block_id}": [
+      "get"
+    ],
+    "/v1/books/{book_id}/blocks": [
+      "get"
+    ],
+    "/v1/traces/{trace_id}": [
+      "get"
+    ],
     "/v1/mentor/intake": [
       "post"
     ],
-    "/v1/observatory": [
-      "get"
-    ],
     "/v1/paths": [
       "post"
+    ],
+    "/v1/resources/{resource_id}/search": [
+      "post"
+    ],
+    "/v1/resources": [
+      "get"
     ],
     "/v1/playlists/current": [
       "get",
@@ -48,19 +51,17 @@
       "delete"
     ],
     "/v1/progress": [
+      "get",
       "post"
     ],
-    "/v1/resources": [
+    "/v1/observatory": [
       "get"
     ],
-    "/v1/resources/{resource_id}/search": [
-      "post"
-    ],
-    "/v1/roadmap": [
-      "post"
-    ],
-    "/v1/traces/{trace_id}": [
+    "/v1/audio/capabilities": [
       "get"
+    ],
+    "/v1/demo/session": [
+      "post"
     ]
   },
   "schemas": {
@@ -199,6 +200,15 @@
       "resource_id"
     ],
     "ProgressKind": [],
+    "ProgressRecord": [
+      "block_id",
+      "book_id",
+      "char_offset",
+      "kind",
+      "principal_id",
+      "resource_id",
+      "updated_at"
+    ],
     "ProposedArea": [
       "name"
     ],

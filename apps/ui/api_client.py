@@ -364,6 +364,24 @@ class ApiClient:
             },
         )
 
+    def get_progress(
+        self,
+        *,
+        resource_id: str | None = None,
+        kind: str = "read",
+    ) -> dict[str, Any] | None:
+        from urllib.parse import urlencode
+
+        params: dict[str, str] = {"kind": kind}
+        if resource_id is not None:
+            params["resource_id"] = resource_id
+        data = self._request("GET", f"/v1/progress?{urlencode(params)}")
+        if data is None:
+            return None
+        if not isinstance(data, dict):
+            raise ApiClientError("expected JSON object or null", status_code=502)
+        return data
+
     def scene_search(
         self,
         resource_id: str,
@@ -535,6 +553,14 @@ class InProcessClient:
         return self._require_delegate().save_progress(
             resource_id, kind=kind, char_offset=char_offset, block_id=block_id
         )
+
+    def get_progress(
+        self,
+        *,
+        resource_id: str | None = None,
+        kind: str = "read",
+    ) -> dict[str, Any] | None:
+        return self._require_delegate().get_progress(resource_id=resource_id, kind=kind)
 
     def scene_search(
         self,

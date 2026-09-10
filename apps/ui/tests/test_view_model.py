@@ -428,6 +428,29 @@ def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
     assert label == "Acres of Diamonds · Russell H. Conwell · — · block 5"
 
 
+def test_projection_resume_prefers_handoff_over_saved_progress() -> None:
+    """Audit S03: scene/shelf handoff overrides last-read restoration."""
+    from apps.ui.api_client import BookSummary
+    from apps.ui.view_model import projection_resume_book_index
+
+    books = [
+        BookSummary(
+            book_id="acres", title="Acres", authors=["A"], format="txt", blocks=1, chunks=1
+        ),
+        BookSummary(
+            book_id="walden", title="Walden", authors=["T"], format="txt", blocks=2, chunks=2
+        ),
+    ]
+    assert (
+        projection_resume_book_index(books, pending_book_id="walden", saved_resource_id="acres")
+        == 1
+    )
+    assert (
+        projection_resume_book_index(books, pending_book_id=None, saved_resource_id="walden") == 1
+    )
+    assert projection_resume_book_index(books, pending_book_id=None, saved_resource_id=None) == 0
+
+
 def test_format_shelf_read_markdown_keeps_space_before_bold_url() -> None:
     from apps.ui.view_model import format_shelf_read_markdown
 

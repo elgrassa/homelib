@@ -60,6 +60,7 @@ from apps.ui.view_model import (
     persist_demo_session,
     playlist_item_can_accept,
     playlist_visible_items,
+    projection_resume_book_index,
     projection_wants_chrome_hidden,
     read_port,
     record_vote,
@@ -640,13 +641,44 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
         st.write("No books on the shelf.")
         return
     # Never mix Pottermore titles into the shelf picker.
+    # Explicit handoff (scene/shelf) wins over saved progress (audit S03).
+    # Resume from GET /v1/progress once per Projection visit so a mid-visit
+    # selectbox change is not overwritten on every Streamlit rerun.
     pending_book_id = st.session_state.pop("proj_book_id", None)
     default_index = 0
+    saved_resource_id: str | None = None
+    saved_block_id: str | None = None
     if isinstance(pending_book_id, str) and pending_book_id:
-        for idx, candidate in enumerate(books):
-            if candidate.book_id == pending_book_id:
-                default_index = idx
-                break
+        default_index = projection_resume_book_index(
+            books, pending_book_id=pending_book_id, saved_resource_id=None
+        )
+        if 0 <= default_index < len(books):
+            st.session_state["proj_book"] = books[default_index]
+        st.session_state["proj_active_visit"] = True
+    elif not st.session_state.get("proj_active_visit"):
+        try:
+            saved = client.get_progress(kind="read")
+        except (ApiClientError, ApiUnavailableError):
+            saved = None
+        if isinstance(saved, dict) and saved.get("resource_id"):
+            saved_resource_id = str(saved["resource_id"])
+            if saved.get("block_id"):
+                saved_block_id = str(saved["block_id"])
+            default_index = projection_resume_book_index(
+                books, pending_book_id=None, saved_resource_id=saved_resource_id
+            )
+            if 0 <= default_index < len(books):
+                st.session_state["proj_book"] = books[default_index]
+            resume_id = books[default_index].book_id if books else ""
+            ordinal_key = f"proj_ordinal:{resume_id}"
+            if resume_id and ordinal_key not in st.session_state and saved_block_id:
+                try:
+                    saved_block = client.get_block(saved_block_id)
+                except (ApiClientError, ApiUnavailableError):
+                    pass
+                else:
+                    st.session_state[ordinal_key] = int(saved_block.ordinal)
+        st.session_state["proj_active_visit"] = True
     book = st.selectbox(
         "Book",
         options=books,
@@ -817,6 +849,9 @@ def main() -> None:
         del st.query_params["projection"]
 
     door = normalize_door(st.session_state["door"])
+    if door != "Projection":
+        # Next Projection enter may resume from saved progress (audit S03).
+        st.session_state.pop("proj_active_visit", None)
     projector_active = bool(st.session_state.get("projector_mode")) and door == "Projection"
     hide_nav = projection_wants_chrome_hidden(
         projector_mode=projector_active,

@@ -161,8 +161,8 @@ def test_independent_read_listen_progress(tmp_path: Path) -> None:
             resource_id=book_id,
             kind=prog.ProgressKind.LISTEN,
         )
-        assert read is not None and read["char_offset"] == 10
-        assert listen is not None and listen["char_offset"] == 99
+        assert read is not None and read.char_offset == 10
+        assert listen is not None and listen.char_offset == 99
     finally:
         conn.close()
 
@@ -195,6 +195,6 @@ def test_restart_persists_playlist_and_progress(tmp_path: Path) -> None:
         read = prog.get_progress(
             again, principal_id="local-user", resource_id=book_id, kind=prog.ProgressKind.READ
         )
-        assert read is not None and read["char_offset"] == 42
+        assert read is not None and read.char_offset == 42
     finally:
         again.close()
