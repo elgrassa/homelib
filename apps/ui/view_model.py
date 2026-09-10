@@ -279,7 +279,7 @@ def mentor_preset_by_id(preset_id: str) -> MentorPreset | None:
 
 
 def apply_mentor_preset(
-    session_state: MutableMapping[str, Any],
+    session_state: MutableMapping[str, Any] | SessionStateProxy,
     preset_id: str,
 ) -> bool:
     """Fill Mentor form keys and seed ``last_mentor`` from a curated preset."""
