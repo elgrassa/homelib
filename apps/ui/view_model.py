@@ -371,6 +371,57 @@ def projection_resume_book_index(
     return 0
 
 
+def resolve_shelf_resource_ids(
+    shelf_items: Sequence[Mapping[str, Any]],
+    *,
+    titles: Sequence[str] = (),
+    book_ids: Sequence[str] = (),
+) -> tuple[list[str], list[str]]:
+    """Map plan step titles/book_ids to shelf resource ids (audit W03).
+
+    Returns ``(resolved_ids, unresolved_labels)``. Prefer exact ``book_id``
+    matches; otherwise casefold title equality against shelf rows. Does not
+    invent resources for metadata-only catalog hits.
+    """
+    by_id = {
+        str(item["id"]): item
+        for item in shelf_items
+        if isinstance(item, Mapping) and item.get("id")
+    }
+    title_to_id: dict[str, str] = {}
+    for item_id, item in by_id.items():
+        title = str(item.get("title") or "").strip().casefold()
+        if title and title not in title_to_id:
+            title_to_id[title] = item_id
+
+    resolved: list[str] = []
+    seen: set[str] = set()
+    unresolved: list[str] = []
+
+    for book_id in book_ids:
+        rid = str(book_id).strip()
+        if not rid:
+            continue
+        if rid in by_id and rid not in seen:
+            resolved.append(rid)
+            seen.add(rid)
+        elif rid not in by_id:
+            unresolved.append(rid)
+
+    for title in titles:
+        label = str(title).strip()
+        if not label:
+            continue
+        match = title_to_id.get(label.casefold())
+        if match is None:
+            unresolved.append(label)
+        elif match not in seen:
+            resolved.append(match)
+            seen.add(match)
+
+    return resolved, unresolved
+
+
 def format_shelf_read_markdown(read_hint: str, *, port: int) -> str:
     """Shelf hit link copy. Spaces around ``**`` are required or Streamlit
     glues 'host' onto the URL.

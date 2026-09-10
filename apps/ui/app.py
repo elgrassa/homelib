@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 import os
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
 import streamlit as st
 from pydantic import ValidationError
@@ -65,6 +65,7 @@ from apps.ui.view_model import (
     read_port,
     record_vote,
     resolve_prerequisite_titles,
+    resolve_shelf_resource_ids,
     steps_in_order,
 )
 
@@ -256,6 +257,8 @@ def render_mentor_tab(client: Client) -> None:
             if not isinstance(step, dict):
                 continue
             st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+        if st.button("Accept path to Coffee Table", key="mentor_accept_path"):
+            _enqueue_mentor_path(client, path)
     elif last.get("degraded"):
         _render_mentor_catalog_links(client)
     parsed_citations: list[Citation] = []
@@ -267,6 +270,44 @@ def render_mentor_tab(client: Client) -> None:
         except ValidationError:
             continue
     _render_citation_expanders(client, parsed_citations)
+
+
+def _enqueue_mentor_path(client: Client, path: dict[str, Any]) -> None:
+    """Resolve Mentor step titles onto the shelf and propose them (audit W03)."""
+    titles = [
+        str(step.get("title") or "").strip()
+        for step in (path.get("steps") or [])
+        if isinstance(step, dict) and str(step.get("title") or "").strip()
+    ]
+    try:
+        shelf = client.list_resources()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+    resolved, unresolved = resolve_shelf_resource_ids(shelf.get("items") or [], titles=titles)
+    if not resolved:
+        st.warning(
+            "None of those path steps match a full-text shelf book yet. "
+            "Try Discover for catalog titles, or pick books on Coffee Table."
+        )
+        if unresolved:
+            st.caption("Unresolved: " + ", ".join(unresolved[:8]))
+        return
+    try:
+        for resource_id in resolved:
+            client.add_playlist_item(resource_id, origin="mentor_proposal")
+        client.accept_playlist()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+    if unresolved:
+        st.info(
+            f"Queued {len(resolved)} shelf book(s). Unresolved steps: " + ", ".join(unresolved[:8])
+        )
+    else:
+        st.success(f"Queued {len(resolved)} book(s) on Coffee Table.")
+    st.session_state["door"] = "Coffee Table"
+    st.rerun()
 
 
 def _render_mentor_catalog_links(client: Client) -> None:
@@ -305,7 +346,7 @@ def render_coffee_table_tab(client: Client) -> None:
     }
     if items:
         for item in items:
-            cols = st.columns([4, 1, 1])
+            cols = st.columns([4, 1, 1, 1])
             cols[0].write(format_playlist_item_line(item, title_by_resource_id))
             if playlist_item_can_accept(item) and cols[1].button("Accept", key=f"acc_{item['id']}"):
                 try:
@@ -313,7 +354,19 @@ def render_coffee_table_tab(client: Client) -> None:
                     st.rerun()
                 except (ApiClientError, ApiUnavailableError) as exc:
                     st.error(format_api_error_message(exc))
-            if cols[2].button("Remove", key=f"rm_{item['id']}"):
+            resource_id = str(item.get("resource_id") or item.get("book_id") or "")
+            if (
+                resource_id
+                and resource_id in title_by_resource_id
+                and cols[2].button("Open", key=f"open_{item['id']}")
+            ):
+                st.session_state["door"] = "Projection"
+                st.session_state["projection_source"] = "shelf"
+                st.session_state["projection_source_radio"] = "shelf"
+                st.session_state["proj_book_id"] = resource_id
+                st.session_state.pop("proj_active_visit", None)
+                st.rerun()
+            if cols[3].button("Remove", key=f"rm_{item['id']}"):
                 try:
                     client.remove_playlist_item(item["id"])
                     st.rerun()
@@ -788,6 +841,53 @@ def render_roadmap_tab(client: Client) -> None:
             prereqs = prereq_titles.get(step.order, [])
             st.write(f"Prerequisites: {', '.join(prereqs) if prereqs else 'none'}")
             st.write(f"Estimated effort: {step.est_effort}")
+            if step.book_id:
+                st.caption(f"Shelf id: `{step.book_id}`")
+            elif step.ol_key:
+                key = step.ol_key if step.ol_key.startswith("/") else f"/{step.ol_key}"
+                st.markdown(f"[Open Library](https://openlibrary.org{key})")
+    if last_roadmap.steps and st.button(
+        "Accept roadmap to Coffee Table", key="roadmap_accept_path"
+    ):
+        _enqueue_roadmap_path(client, last_roadmap.steps)
+
+
+def _enqueue_roadmap_path(client: Client, steps: list[Any]) -> None:
+    """Enqueue Roadmap shelf book_ids / titles onto Coffee Table (audit W03/W04)."""
+    book_ids = [str(step.book_id).strip() for step in steps if getattr(step, "book_id", None)]
+    titles = [
+        str(step.title).strip()
+        for step in steps
+        if not getattr(step, "book_id", None) and str(getattr(step, "title", "") or "").strip()
+    ]
+    try:
+        shelf = client.list_resources()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+    resolved, unresolved = resolve_shelf_resource_ids(
+        shelf.get("items") or [], titles=titles, book_ids=book_ids
+    )
+    if not resolved:
+        st.warning(
+            "No roadmap steps matched a full-text shelf book. "
+            "Use the Open Library links on steps, or add from Coffee Table."
+        )
+        if unresolved:
+            st.caption("Unresolved: " + ", ".join(unresolved[:8]))
+        return
+    try:
+        for resource_id in resolved:
+            client.add_playlist_item(resource_id, origin="roadmap")
+        client.accept_playlist()
+    except (ApiClientError, ApiUnavailableError) as exc:
+        st.error(format_api_error_message(exc))
+        return
+    st.success(f"Queued {len(resolved)} book(s) on Coffee Table.")
+    if unresolved:
+        st.caption("Not on this shelf: " + ", ".join(unresolved[:8]))
+    st.session_state["door"] = "Coffee Table"
+    st.rerun()
 
 
 # One entry per Crossroads door, in grid order. `CROSSROADS_DOORS` is the

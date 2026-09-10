@@ -451,6 +451,31 @@ def test_projection_resume_prefers_handoff_over_saved_progress() -> None:
     assert projection_resume_book_index(books, pending_book_id=None, saved_resource_id=None) == 0
 
 
+def test_resolve_shelf_resource_ids_prefers_book_id_and_title_match() -> None:
+    """Audit W03: plan accept resolves shelf ids without inventing resources."""
+    from apps.ui.view_model import resolve_shelf_resource_ids
+
+    shelf = [
+        {"id": "walden", "title": "Walden"},
+        {"id": "meditations", "title": "Meditations"},
+    ]
+    resolved, unresolved = resolve_shelf_resource_ids(
+        shelf, book_ids=["walden"], titles=["Meditations", "Missing Book"]
+    )
+    assert resolved == ["walden", "meditations"]
+    assert unresolved == ["Missing Book"]
+
+
+def test_resolve_shelf_resource_ids_skips_unknown_book_ids() -> None:
+    from apps.ui.view_model import resolve_shelf_resource_ids
+
+    resolved, unresolved = resolve_shelf_resource_ids(
+        [{"id": "walden", "title": "Walden"}], book_ids=["not-on-shelf"]
+    )
+    assert resolved == []
+    assert unresolved == ["not-on-shelf"]
+
+
 def test_format_shelf_read_markdown_keeps_space_before_bold_url() -> None:
     from apps.ui.view_model import format_shelf_read_markdown
 
