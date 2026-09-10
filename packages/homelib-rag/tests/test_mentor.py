@@ -378,6 +378,7 @@ def test_mentor_intake_degrades_when_llm_down() -> None:
     assert response.tool_calls == []
     assert response.rounds_used == 0
     assert response.rationale == "The mentor service is temporarily unavailable."
+    assert response.failure_category == "unavailable"
 
 
 def test_mentor_invalid_structured_output_abstains() -> None:
@@ -398,6 +399,8 @@ def test_mentor_invalid_structured_output_abstains() -> None:
     assert response.degraded is True
     assert response.proposed_path is None
     assert response.citations == []
+    assert response.failure_category == "could_not_ground"
+    assert "importing relevant books" not in response.rationale.lower()
 
 
 def test_mentor_invalid_citation_clears_proposal_and_abstains() -> None:
@@ -420,6 +423,8 @@ def test_mentor_invalid_citation_clears_proposal_and_abstains() -> None:
     assert response.proposed_area is None
     assert response.proposed_wing is None
     assert response.citations == []
+    assert response.failure_category == "could_not_ground"
+    assert "importing relevant books" not in response.rationale.lower()
 
 
 def test_abstention_on_no_evidence() -> None:
@@ -435,6 +440,7 @@ def test_abstention_on_no_evidence() -> None:
     assert response.degraded is True
     assert response.citations == []
     assert response.proposed_path is None
+    assert response.failure_category == "insufficient_sources"
     assert "enough indexed sources" in response.rationale.lower()
 
 
@@ -454,6 +460,7 @@ def test_mentor_miss_m1_modern_swe_job_is_out_of_corpus() -> None:
     assert response.proposed_path is None
     assert response.proposed_area is None
     assert response.citations == []
+    assert response.failure_category == "insufficient_sources"
     assert "enough indexed sources" in response.rationale.lower()
     assert client._responses  # LLM never consumed — early abstention
 
@@ -519,6 +526,7 @@ def test_mentor_miss_m1_abstains_on_off_topic_industrial_shelf_hits() -> None:
     assert response.proposed_area is None
     assert response.proposed_wing is None
     assert response.citations == []
+    assert response.failure_category == "insufficient_sources"
     assert "enough indexed sources" in response.rationale.lower()
     assert client._responses  # early abstention — invented path never accepted
 
@@ -645,7 +653,8 @@ def test_mentor_degraded_json_without_proposal_abstains(
     assert response.degraded is True
     assert response.proposed_path is None
     assert response.proposed_area is None
-    assert "enough indexed sources" in response.rationale.lower()
+    assert response.failure_category == "could_not_ground"
+    assert "importing relevant books" not in response.rationale.lower()
 
 
 def test_mentor_stops_at_two_rounds_and_abstains_on_empty_json() -> None:
@@ -664,7 +673,8 @@ def test_mentor_stops_at_two_rounds_and_abstains_on_empty_json() -> None:
     assert response.degraded is True
     assert response.proposed_path is None
     assert response.rounds_used == 1
-    assert "enough indexed sources" in response.rationale.lower()
+    assert response.failure_category == "could_not_ground"
+    assert "importing relevant books" not in response.rationale.lower()
 
 
 def test_mentor_unknown_tool_twice_stops_within_two_rounds() -> None:
@@ -701,7 +711,8 @@ def test_mentor_unknown_tool_twice_stops_within_two_rounds() -> None:
     assert response.degraded is True
     assert response.proposed_path is None
     assert response.rounds_used <= 2
-    assert "enough indexed sources" in response.rationale.lower()
+    assert response.failure_category == "could_not_ground"
+    assert "importing relevant books" not in response.rationale.lower()
     assert len(client._responses) == 1  # third scripted reply unused
 
 

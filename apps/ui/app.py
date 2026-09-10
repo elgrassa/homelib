@@ -234,6 +234,16 @@ def render_mentor_tab(client: Client) -> None:
         return
     if last.get("degraded"):
         st.warning("Mentor returned a degraded proposal.")
+        category = last.get("failure_category")
+        if category == "insufficient_sources":
+            st.caption("Failure category: insufficient sources (corpus gap).")
+        elif category == "could_not_ground":
+            st.caption(
+                "Failure category: could not ground — rephrase or retry; "
+                "not necessarily a missing book."
+            )
+        elif category == "unavailable":
+            st.caption("Failure category: mentor temporarily unavailable.")
     if last.get("high_stakes_notice"):
         st.info(last["high_stakes_notice"])
     tool_calls = last.get("tool_calls") or []

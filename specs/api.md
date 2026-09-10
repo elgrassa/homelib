@@ -152,6 +152,10 @@ rationale: str
 citations: list[Citation]
 degraded: bool
 high_stakes_notice: str | None      # informational; never auto-executes
+failure_category: "insufficient_sources"|"could_not_ground"|"unavailable"|None
+                                  # set when degraded with no proposal
+tool_calls: list[str]               # default []
+rounds_used: int                    # default 0
 ```
 
 None of the proposed rows are persisted as active Areas/Wings/playlist items

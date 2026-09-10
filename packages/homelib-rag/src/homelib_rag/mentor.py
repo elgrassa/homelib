@@ -42,6 +42,7 @@ _MENTOR_TOOL_SCHEMAS = [
 
 __all__ = [
     "CreatePathRequest",
+    "MentorFailureCategory",
     "MentorIntakeRequest",
     "MentorIntakeResponse",
     "PathResponse",
@@ -62,10 +63,27 @@ _HIGH_STAKES_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-_ABSTENTION_RATIONALE = (
+MentorFailureCategory = Literal["insufficient_sources", "could_not_ground", "unavailable"]
+
+_RATIONALE_INSUFFICIENT_SOURCES = (
     "I do not have enough indexed sources to propose a grounded path for that "
     "goal yet. Try narrowing the topic or importing relevant books to My Shelf."
 )
+_RATIONALE_COULD_NOT_GROUND = (
+    "I found some shelf or catalog material, but could not ground a reliable "
+    "path from it. Try rephrasing the goal or asking again — this is not "
+    "necessarily a missing book."
+)
+_RATIONALE_UNAVAILABLE = "The mentor service is temporarily unavailable."
+
+# Back-compat alias for older tests / imports that named the corpus-gap copy.
+_ABSTENTION_RATIONALE = _RATIONALE_INSUFFICIENT_SOURCES
+
+_RATIONALE_BY_CATEGORY: dict[MentorFailureCategory, str] = {
+    "insufficient_sources": _RATIONALE_INSUFFICIENT_SOURCES,
+    "could_not_ground": _RATIONALE_COULD_NOT_GROUND,
+    "unavailable": _RATIONALE_UNAVAILABLE,
+}
 
 # Goal-phrasing / function words that must not count as topical evidence.
 # "land"/"job"/"career" alone would let historical shelf noise (Ford farm
@@ -194,6 +212,10 @@ class MentorIntakeResponse(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     degraded: bool = False
     high_stakes_notice: str | None = None
+    #: Safe user-facing failure bucket when ``degraded`` and no proposal —
+    #: corpus gap vs grounding/parse failure vs service outage. ``None`` on
+    #: successful (or salvage) proposals.
+    failure_category: MentorFailureCategory | None = None
     #: Tool names in call order, from the `run_agent` loop this intake now
     #: drives (specs/agent-tools.md). Empty when the LLM never got to call a
     #: tool (abstention on no evidence, or the endpoint was unreachable) —
@@ -356,16 +378,18 @@ def _search_tool_results_on_goal(
 
 def _abstention_response(
     *,
+    category: MentorFailureCategory,
     notice: str | None,
     tool_calls: list[str] | None = None,
     rounds_used: int = 0,
 ) -> MentorIntakeResponse:
     return MentorIntakeResponse(
         request_id=str(uuid.uuid4()),
-        rationale=_ABSTENTION_RATIONALE,
+        rationale=_RATIONALE_BY_CATEGORY[category],
         citations=[],
         degraded=True,
         high_stakes_notice=notice,
+        failure_category=category,
         tool_calls=list(tool_calls or []),
         rounds_used=rounds_used,
     )
@@ -492,9 +516,9 @@ def mentor_intake(
     # farm-tractor passages for "Land AI engineer job") → abstain; do not ask
     # the LLM to invent a modern labour-market / SWE path from weak noise.
     if not hits and not candidates:
-        return _abstention_response(notice=notice)
+        return _abstention_response(category="insufficient_sources", notice=notice)
     if not _has_on_goal_evidence(goal, interests, hits, candidates):
-        return _abstention_response(notice=notice)
+        return _abstention_response(category="insufficient_sources", notice=notice)
 
     prompt = _build_intake_prompt(goal, interests, level, hits, candidates)
     schema_hint = (
@@ -529,25 +553,29 @@ def mentor_intake(
             tool_schemas=mentor_schemas,
         )
     except LLMUnreachableError:
-        return MentorIntakeResponse(
-            request_id=str(uuid.uuid4()),
-            rationale="The mentor service is temporarily unavailable.",
-            citations=[],
-            degraded=True,
-            high_stakes_notice=notice,
-        )
+        return _abstention_response(category="unavailable", notice=notice)
 
     tool_calls = [record.tool_name for record in agent_result.tool_calls]
     rounds_used = agent_result.rounds_used
 
     raw_message = (agent_result.final_message or "").strip()
     if not raw_message:
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="could_not_ground",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     # Search tools ran but returned only off-topic summaries → abstain.
     search_on_goal = _search_tool_results_on_goal(goal, interests, agent_result.tool_calls)
     if search_on_goal is False:
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="insufficient_sources",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     try:
         payload = json.loads(raw_message)
@@ -555,10 +583,18 @@ def mentor_intake(
     except (json.JSONDecodeError, ValidationError) as exc:
         if agent_result.degraded:
             return _abstention_response(
-                notice=notice, tool_calls=tool_calls, rounds_used=rounds_used
+                category="could_not_ground",
+                notice=notice,
+                tool_calls=tool_calls,
+                rounds_used=rounds_used,
             )
         logger.warning("mentor intake parse failed: %s", exc)
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="could_not_ground",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     has_proposal = (
         parsed.proposed_path is not None
@@ -569,15 +605,30 @@ def mentor_intake(
     # Tool calls are optional because the initial on-goal shelf/catalog
     # evidence is already present in the prompt.
     if has_proposal and not _proposal_aligns_with_goal(goal, interests, parsed):
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="could_not_ground",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     if not has_proposal and agent_result.degraded:
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="could_not_ground",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     try:
         citations = _passage_citations(parsed.citations, hits) if hits else []
     except CitationValidationError:
-        return _abstention_response(notice=notice, tool_calls=tool_calls, rounds_used=rounds_used)
+        return _abstention_response(
+            category="could_not_ground",
+            notice=notice,
+            tool_calls=tool_calls,
+            rounds_used=rounds_used,
+        )
 
     return MentorIntakeResponse(
         request_id=str(uuid.uuid4()),
