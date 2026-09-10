@@ -301,6 +301,24 @@ def get_api_url() -> str:
     return os.environ.get("API_URL", DEFAULT_API_URL)
 
 
+def _read_committed_build_revision() -> str:
+    """Fallback for hosts without ``.git`` or inject env (Streamlit Cloud).
+
+    ``apps/ui/BUILD_REVISION`` is a one-line short SHA committed on main so the
+    Crossroads caption still proves which tip the bundle was built from.
+    """
+    path = Path(__file__).with_name("BUILD_REVISION")
+    if not path.is_file():
+        return ""
+    line = path.read_text(encoding="utf-8").strip().splitlines()
+    if not line:
+        return ""
+    token = line[0].strip().split()[0]
+    if len(token) < 7:
+        return ""
+    return token[:12]
+
+
 def resolve_build_sha(
     *,
     environ: Mapping[str, str] | None = None,
@@ -311,8 +329,8 @@ def resolve_build_sha(
     Prefer an explicit ``HOMELIB_BUILD_SHA`` (Streamlit secrets / CI inject),
     then ``SOURCE_VERSION`` / ``GIT_COMMIT`` when a host provides them, then
     a filesystem read of ``.git/HEAD`` for local and Compose checkouts.
-    Returns ``unknown`` when none are available (e.g. an unpacked Cloud
-    bundle without git metadata).
+    Then ``apps/ui/BUILD_REVISION`` (committed short SHA for Cloud bundles
+    without git metadata). Returns ``unknown`` when none are available.
     """
     env = os.environ if environ is None else environ
     for key in ("HOMELIB_BUILD_SHA", "SOURCE_VERSION", "GIT_COMMIT"):
@@ -323,8 +341,11 @@ def resolve_build_sha(
     try:
         sha = probe().strip()
     except Exception:
-        return "unknown"
-    return sha or "unknown"
+        sha = ""
+    if sha:
+        return sha
+    committed = _read_committed_build_revision()
+    return committed or "unknown"
 
 
 def _read_git_short_sha() -> str:

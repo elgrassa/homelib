@@ -578,13 +578,49 @@ def test_resolve_build_sha_prefers_homelib_build_sha_env() -> None:
     assert sha == "abcdef123456"
 
 
-def test_resolve_build_sha_falls_back_to_unknown_when_git_unavailable() -> None:
-    from apps.ui.view_model import resolve_build_sha
+def test_resolve_build_sha_falls_back_to_unknown_when_git_unavailable(
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    from apps.ui import view_model as vm
+
+    monkeypatch.setattr(vm, "_read_committed_build_revision", lambda: "")
 
     def boom() -> str:
         raise OSError("no git")
 
-    assert resolve_build_sha(environ={}, git_short_sha=boom) == "unknown"
+    assert vm.resolve_build_sha(environ={}, git_short_sha=boom) == "unknown"
+
+
+def test_resolve_build_sha_uses_committed_build_revision_when_git_missing(
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    """Cloud bundles without .git still show a committed tip SHA on Crossroads."""
+    from apps.ui import view_model as vm
+
+    monkeypatch.setattr(vm, "_read_committed_build_revision", lambda: "c0ffee12dead")
+
+    def boom() -> str:
+        raise FileNotFoundError("no .git HEAD")
+
+    assert vm.resolve_build_sha(environ={}, git_short_sha=boom) == "c0ffee12dead"
+
+
+def test_read_committed_build_revision_parses_first_token(
+    tmp_path: Path,
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    from apps.ui import view_model as vm
+
+    rev = tmp_path / "BUILD_REVISION"
+    rev.write_text("c0ffee12dead optional note\n", encoding="utf-8")
+
+    class _FakeModulePath:
+        def with_name(self, name: str) -> Path:
+            assert name == "BUILD_REVISION"
+            return rev
+
+    monkeypatch.setattr(vm, "Path", lambda *_a, **_k: _FakeModulePath())
+    assert vm._read_committed_build_revision() == "c0ffee12dead"
 
 
 def test_mentor_presets_include_ai_engineer_and_sdet_with_ordered_steps() -> None:
