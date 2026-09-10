@@ -36,6 +36,7 @@ __all__ = [
     "load_baseline",
     "load_committed_judge_metrics",
     "load_committed_retrieval_metrics",
+    "load_run_metrics",
     "run_gate",
 ]
 
@@ -295,14 +296,73 @@ def load_committed_judge_metrics(path: Path) -> dict[str, float]:
     raise ValueError("production variant row missing from llm_eval report")
 
 
+def load_run_metrics(path: Path) -> dict[str, float]:
+    """Load fresh measured metrics from a JSON run artifact (audit E02).
+
+    Expected shape::
+
+        {"metrics": {"hybrid_rerank.hit_rate_at_5": 0.9, ...}, "run_id": "..."}
+
+    or a bare metrics object ``{"hybrid_rerank.hit_rate_at_5": 0.9, ...}``.
+    ``run_id`` / ``git_sha`` / other provenance keys are ignored for comparison
+    but a missing/empty metrics map is rejected.
+    """
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"run metrics file must be a JSON object: {path}")
+    raw = data.get("metrics", data)
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(f"run metrics file has no metrics map: {path}")
+    metrics: dict[str, float] = {}
+    for key, value in raw.items():
+        if key in {"run_id", "git_sha", "ts", "notes"}:
+            continue
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"metric {key!r} must be numeric, got {type(value).__name__}")
+        metrics[str(key)] = float(value)
+    if not metrics:
+        raise ValueError(f"run metrics file has no numeric metrics: {path}")
+    return metrics
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Compare committed retrieval + production-judge report numbers to the baseline."""
-    del argv  # reserved for future CLI flags; recipe takes no args today
-    current = {
-        **load_committed_retrieval_metrics(_DEFAULT_RETRIEVAL_REPORT),
-        **load_committed_judge_metrics(_DEFAULT_LLM_REPORT),
-    }
-    return run_gate(current, _DEFAULT_BASELINE, _DEFAULT_HISTORY)
+    """Compare metrics to the baseline.
+
+    Default mode reads **committed** markdown reports (archive regression —
+    not a live bake-off). Pass ``--from-run metrics.json`` to gate a fresh
+    measured run without invoking ``eval-llm`` / ``eval-retrieval``.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="evals.gate")
+    parser.add_argument(
+        "--from-run",
+        type=Path,
+        metavar="METRICS_JSON",
+        help="Gate fresh measured metrics from a JSON run artifact (E02).",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=_DEFAULT_BASELINE,
+        help="Path to eval-baseline.json (default: committed baseline).",
+    )
+    parser.add_argument(
+        "--history",
+        type=Path,
+        default=_DEFAULT_HISTORY,
+        help="Append-only history.jsonl path.",
+    )
+    args = parser.parse_args(argv)
+
+    if args.from_run is not None:
+        current = load_run_metrics(args.from_run)
+    else:
+        current = {
+            **load_committed_retrieval_metrics(_DEFAULT_RETRIEVAL_REPORT),
+            **load_committed_judge_metrics(_DEFAULT_LLM_REPORT),
+        }
+    return run_gate(current, args.baseline, args.history)
 
 
 if __name__ == "__main__":

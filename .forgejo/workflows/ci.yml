@@ -114,6 +114,13 @@ jobs:
           uv run pytest -q --no-cov -m "not integration and not slow and not llm" \
             --basetemp="$TMPDIR/basetemp"
 
+      # Archive regression only: compares committed evals/results/*.md to
+      # evals/eval-baseline.json. Not a live bake-off (no eval-llm / embeddings).
+      - name: Eval gate (committed reports)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run python -m evals.gate
+
       # `always()` so a red or timed-out test step still leaves no scratch behind.
       - name: Teardown pytest scratch
         if: always()

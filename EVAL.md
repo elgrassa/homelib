@@ -85,10 +85,11 @@ Mismatch count: 0 on this smoke. Key for open-the-page is **`block_id`**
 Recipe: `just eval-gate` compares **committed** report numbers — named columns
 from `evals/results/retrieval.md` (passage hit-rate@5 + MRR@5) and the
 `production` faithfulness row in `evals/results/llm_eval.md`. It does **not**
-re-run a bake-off. A live measurement of current code is
-`python evals/llm_eval.py` / `python evals/retrieval_eval.py`, which also
-append to `evals/history.jsonl`. **Not** yet wired into Forgejo `ci` — do not
-claim “eval fails the PR build” until it is.
+re-run a bake-off. Forgejo CI runs this archive check on the quick lane; that
+is **not** a live bake-off. For fresh measured numbers without re-running
+`eval-llm` in CI, use `just eval-gate --from-run metrics.json` (JSON with a
+`metrics` map matching baseline keys). A full live measurement is still
+`python evals/llm_eval.py` / `python evals/retrieval_eval.py`.
 
 ## Prompt-injection probes (3)
 

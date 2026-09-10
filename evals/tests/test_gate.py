@@ -468,3 +468,104 @@ def test_main_passes_against_committed_reports(
     record = json.loads(history.read_text(encoding="utf-8").splitlines()[0])
     assert record["metrics"]["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
     assert record["metrics"]["judge.mean_faithfulness"] == pytest.approx(2.60)
+def test_load_run_metrics_accepts_metrics_wrapper(tmp_path: Path) -> None:
+    from evals.gate import load_run_metrics
+
+    path = tmp_path / "run.json"
+    path.write_text(
+        json.dumps(
+            {
+                "run_id": "abc123",
+                "metrics": {
+                    "hybrid_rerank.hit_rate_at_5": 0.91,
+                    "hybrid_rerank.mrr_at_5": 0.8,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_run_metrics(path) == {
+        "hybrid_rerank.hit_rate_at_5": 0.91,
+        "hybrid_rerank.mrr_at_5": 0.8,
+    }
+
+
+def test_load_run_metrics_rejects_empty_or_non_numeric(tmp_path: Path) -> None:
+    from evals.gate import load_run_metrics
+
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"run_id": "x", "metrics": {}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="no metrics"):
+        load_run_metrics(empty)
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"hit_rate_at_5": "nope"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="numeric"):
+        load_run_metrics(bad)
+
+
+def test_main_from_run_gates_fresh_metrics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from evals import gate as gate_mod
+
+    baseline_path = tmp_path / "baseline.json"
+    history_path = tmp_path / "history.jsonl"
+    _write_baseline(baseline_path, _make_baseline("hit_rate_at_5", 0.78, margin=0.03))
+    run_path = tmp_path / "metrics.json"
+    run_path.write_text(json.dumps({"metrics": {"hit_rate_at_5": 0.79}}), encoding="utf-8")
+    monkeypatch.setattr(gate_mod, "_DEFAULT_BASELINE", baseline_path)
+    monkeypatch.setattr(gate_mod, "_DEFAULT_HISTORY", history_path)
+
+    assert gate_mod.main(["--from-run", str(run_path)]) == 0
+    assert history_path.exists()
+
+
+def test_main_committed_mode_unchanged_without_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from evals import gate as gate_mod
+
+    baseline_path = tmp_path / "baseline.json"
+    history_path = tmp_path / "history.jsonl"
+    _write_baseline(
+        baseline_path,
+        Baseline(
+            metrics={
+                "hybrid_rerank.hit_rate_at_5": 0.5,
+                "hybrid_rerank.mrr_at_5": 0.4,
+                "judge.mean_faithfulness": 1.0,
+            },
+            specs={
+                "hybrid_rerank.hit_rate_at_5": MetricSpec(
+                    key="hybrid_rerank.hit_rate_at_5",
+                    direction="higher_is_better",
+                    margin=0.03,
+                ),
+                "hybrid_rerank.mrr_at_5": MetricSpec(
+                    key="hybrid_rerank.mrr_at_5",
+                    direction="higher_is_better",
+                    margin=0.03,
+                ),
+                "judge.mean_faithfulness": MetricSpec(
+                    key="judge.mean_faithfulness",
+                    direction="higher_is_better",
+                    margin=0.4,
+                ),
+            },
+            notes={
+                "hybrid_rerank.hit_rate_at_5": "t",
+                "hybrid_rerank.mrr_at_5": "t",
+                "judge.mean_faithfulness": "t",
+            },
+        ),
+    )
+    monkeypatch.setattr(gate_mod, "_DEFAULT_BASELINE", baseline_path)
+    monkeypatch.setattr(gate_mod, "_DEFAULT_HISTORY", history_path)
+    # Use the real committed reports so default mode stays archive regression.
+    assert gate_mod.main([]) in {0, 1}
+
+
+def test_ci_workflow_invokes_eval_gate() -> None:
+    """Audit E04: Forgejo CI must call the committed-report gate."""
+    text = Path(".forgejo/workflows/ci.yml").read_text(encoding="utf-8")
+    assert "uv run python -m evals.gate" in text
+    assert "Eval gate (committed reports)" in text

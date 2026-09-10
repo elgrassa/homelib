@@ -134,9 +134,11 @@ eval-llm:
 # Compare committed winner floors in evals/eval-baseline.json to the numbers
 # already published in evals/results/retrieval.md + llm_eval.md — no bake-off.
 # Named-column parse (not positional regex): hit-rate/MRR from retrieval.md,
-# production faithfulness from llm_eval.md. Not wired into `just ci` yet.
-eval-gate:
-    uv run python -m evals.gate
+# production faithfulness from llm_eval.md. Wired into Forgejo CI as an
+# archive-regression step (not a live bake-off). Optional fresh metrics:
+# `just eval-gate --from-run path/to/metrics.json`.
+eval-gate *ARGS:
+    uv run python -m evals.gate {{ARGS}}
 
 # RRF fusion-constant sweep: hybrid arm only, k in {1,10,60,100,200}, appends
 # (replaces on re-run) the "RRF k sweep" table in evals/results/retrieval.md.
