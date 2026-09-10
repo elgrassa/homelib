@@ -141,3 +141,18 @@ def test_mentor_tab_renders_area_wing_path_and_citations() -> None:
     buttons = at.button
     button_labels = [getattr(item, "label", None) or getattr(item, "value", "") for item in buttons]
     assert any("Show full source block" in str(label) for label in button_labels)
+
+
+def test_mentor_preset_button_loads_curated_ai_path_without_api() -> None:
+    """Preset chips seed a path locally — no mentor_intake call required."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Mentor"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    at.button(key="mentor_preset_ai-engineer").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    last = at.session_state["last_mentor"]
+    assert last["preset_id"] == "ai-engineer"
+    assert last["proposed_path"]["title"]
+    assert any("AI engineer" in s.value for s in at.subheader)
+    assert "production LLM" in str(at.session_state["mentor_goal"])

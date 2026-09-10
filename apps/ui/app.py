@@ -29,6 +29,7 @@ from apps.ui.view_model import (
     DEFAULT_OFFICIAL_LANGUAGE,
     DEFAULT_PROJECTION_SOURCE,
     LEVELS,
+    apply_mentor_preset,
     apply_streamlit_secrets_to_environ,
     ask_metric_captions,
     block_id_for_citation,
@@ -49,6 +50,7 @@ from apps.ui.view_model import (
     has_voted,
     library_summary,
     load_official_preview_books,
+    mentor_presets,
     needs_ask_shelf_fallback,
     normalize_door,
     normalize_level,
@@ -192,6 +194,13 @@ def _cast_vote(client: Client, request_id: str, feedback: Literal["up", "down"])
 
 def render_mentor_tab(client: Client) -> None:
     st.header("Mentor")
+    presets = mentor_presets()
+    st.caption("Curated starters (public study order — not shelf-grounded RAG):")
+    preset_cols = st.columns(len(presets))
+    for col, preset in zip(preset_cols, presets, strict=True):
+        if col.button(preset.button_label, key=f"mentor_preset_{preset.preset_id}"):
+            apply_mentor_preset(st.session_state, preset.preset_id)
+            st.rerun()
     with st.form("mentor_form"):
         goal = st.text_input("Goal", key="mentor_goal")
         interests_raw = st.text_input("Interests (comma-separated)", key="mentor_interests")
@@ -199,7 +208,8 @@ def render_mentor_tab(client: Client) -> None:
         submitted = st.form_submit_button("Propose path", key="mentor_propose")
     st.caption(
         "Mentor tools search the full-text shelf and the Open Library catalog "
-        "snapshot (metadata). Full text is only on the shelf."
+        "snapshot (metadata). Full text is only on the shelf. "
+        "Curated starters skip the LLM and load a fixed public curriculum outline."
     )
 
     # Two-phase submit: clear the previous error banner on this rerun, then call
@@ -235,6 +245,11 @@ def render_mentor_tab(client: Client) -> None:
     last = st.session_state.get("last_mentor")
     if last is None:
         return
+    if last.get("preset_id"):
+        st.info(
+            "Showing a curated public study path (not generated from shelf citations). "
+            "Propose path still runs live Mentor when you want shelf+catalog evidence."
+        )
     if last.get("degraded"):
         st.warning("Mentor returned a degraded proposal.")
         category = last.get("failure_category")
@@ -269,10 +284,15 @@ def render_mentor_tab(client: Client) -> None:
         for step in path.get("steps") or []:
             if not isinstance(step, dict):
                 continue
-            st.write(
+            line = (
                 f"{display_step_order(step.get('order'))}. "
                 f"{step.get('title', '')} — {step.get('why', '')}"
             )
+            url = step.get("url")
+            if isinstance(url, str) and url.strip():
+                st.markdown(f"{line}  \n[{url.strip()}]({url.strip()})")
+            else:
+                st.write(line)
         if st.button("Accept path to Coffee Table", key="mentor_accept_path"):
             _enqueue_mentor_path(client, path)
     elif last.get("degraded"):

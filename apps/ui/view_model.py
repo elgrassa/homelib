@@ -64,6 +64,238 @@ Level = Literal["beginner", "intermediate", "advanced"]
 LEVELS: tuple[Level, ...] = ("beginner", "intermediate", "advanced")
 
 
+@dataclass(frozen=True)
+class MentorPreset:
+    """Curated Mentor starter (public curriculum shape — not shelf-grounded RAG)."""
+
+    preset_id: str
+    button_label: str
+    goal: str
+    interests: str
+    level: Level
+    response: Mapping[str, Any]
+
+
+def _mentor_path_steps(rows: Sequence[tuple[str, str, str | None]]) -> list[dict[str, Any]]:
+    steps: list[dict[str, Any]] = []
+    for order, (title, why, url) in enumerate(rows):
+        step: dict[str, Any] = {"order": order, "title": title, "why": why}
+        if url:
+            step["url"] = url
+        steps.append(step)
+    return steps
+
+
+def mentor_presets() -> tuple[MentorPreset, ...]:
+    """Starter chips for Mentor. Public study order only — no private PrepOS vault.
+
+    These load a curated proposal without calling the LLM: the demo shelf is
+    public-domain literature, so an evidence-grounded Mentor run cannot ship a
+    modern AI-engineer curriculum from full text. Callers must label the path
+    as curated. Do not reuse the golden abstention goal "Land AI engineer job".
+    """
+    ai_steps = _mentor_path_steps(
+        (
+            (
+                "Neural networks visual intuition",
+                "3Blue1Brown neural-network playlist — geometric intuition before code.",
+                "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi",
+            ),
+            (
+                "How modern LLMs are trained and used",
+                "Karpathy Deep Dive lecture — training loop and inference shape.",
+                "https://youtu.be/7xTGNNLPyMI",
+            ),
+            (
+                "Building a transformer from scratch",
+                "Karpathy Zero to Hero + GPT-2 reproduce — mechanism-level depth.",
+                "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ",
+            ),
+            (
+                "Prompting and structured outputs",
+                "Anthropic Academy / Claude API + MCP — tools and structured replies.",
+                "https://www.anthropic.com/learn",
+            ),
+            (
+                "RAG pipelines and hybrid retrieval",
+                "LLM Zoomcamp RAG modules — retrieve, rerank, cite; matches this app's Ask path.",
+                "https://www.youtube.com/playlist?list=PL3MmuxUbc_hIoBpuc900htYF4uhEAbaT-",
+            ),
+            (
+                "Agents, tools, and Model Context Protocol",
+                "Tool-using agents and MCP contracts — Mentor's own tool loop is a tiny cousin.",
+                None,
+            ),
+            (
+                "Evaluating RAG and agents",
+                "Evals as the differentiator — faithfulness, citation validity, harnesses.",
+                None,
+            ),
+            (
+                "Tracing, cost, and LLM observability",
+                "Langfuse/OTel-style traces and cost/latency judgment (Observatory door).",
+                None,
+            ),
+            (
+                "Serving, batching, and inference efficiency",
+                "vLLM / batching literacy — production cost and latency trade-offs.",
+                None,
+            ),
+            (
+                "Guardrails and prompt-injection defenses",
+                "OWASP LLM Top 10 topics — treat untrusted text as untrusted input.",
+                None,
+            ),
+        )
+    )
+    sdet_steps = _mentor_path_steps(
+        (
+            (
+                "Kafka fundamentals for testers",
+                "Topics, consumer groups, offsets — enough to design stream tests.",
+                None,
+            ),
+            (
+                "Testing Kafka and async boundaries",
+                "Contract the producer/consumer seam; avoid flaky sleeps.",
+                None,
+            ),
+            (
+                "Exactly-once, outbox, and idempotency",
+                "Failure modes that only show under retry and duplicate delivery.",
+                None,
+            ),
+            (
+                "Schema evolution and compatibility",
+                "Schema Registry / Avro-Protobuf compatibility rules as test oracles.",
+                None,
+            ),
+            (
+                "Consumer-driven contracts (Pact / SCC)",
+                "Break the monolith of end-to-end for service pairs.",
+                None,
+            ),
+            (
+                "Deterministic simulation and chaos",
+                "Jepsen-style thinking and controlled fault injection.",
+                None,
+            ),
+            (
+                "Load (k6) and resilience",
+                "SLOs, soak, and what to assert when the system bends.",
+                None,
+            ),
+            (
+                "Distributed tracing (OpenTelemetry)",
+                "Trace-based debugging across services — pair with load and Kafka labs.",
+                None,
+            ),
+        )
+    )
+    return (
+        MentorPreset(
+            preset_id="ai-engineer",
+            button_label="AI engineer study path",
+            goal=(
+                "Build production LLM systems with citation-grade RAG, tool-using "
+                "agents, evaluation harnesses, and cost/latency observability"
+            ),
+            interests="transformers, RAG, agents, MCP, evals, LLMOps, AI security",
+            level="intermediate",
+            response={
+                "request_id": "preset-ai-engineer",
+                "proposed_area": {
+                    "name": "AI Engineering",
+                    "copy": "Production LLM systems — mechanism depth, not framework tourism.",
+                },
+                "proposed_wing": {
+                    "name": "Applied GenAI",
+                    "copy": "RAG → agents → evals → ops, in that dependency order.",
+                },
+                "proposed_path": {
+                    "title": "AI engineer — curated public study path",
+                    "steps": ai_steps,
+                },
+                "rationale": (
+                    "Curated public curriculum (Track E shape). The demo shelf is "
+                    "public-domain literature, so this path is not shelf-grounded RAG — "
+                    "use Discover / external links for modern sources. Accept to Coffee "
+                    "Table only queues steps that already match a full-text shelf title."
+                ),
+                "citations": [],
+                "degraded": False,
+                "high_stakes_notice": None,
+                "tool_calls": [],
+                "rounds_used": 0,
+                "failure_category": None,
+                "preset_id": "ai-engineer",
+            },
+        ),
+        MentorPreset(
+            preset_id="sdet",
+            button_label="SDET / distributed testing path",
+            goal=(
+                "Senior distributed-systems testing: contracts, Kafka/async, "
+                "schema evolution, load, and trace-based debugging"
+            ),
+            interests="Kafka, contract testing, schema registry, OpenTelemetry, k6, chaos",
+            level="intermediate",
+            response={
+                "request_id": "preset-sdet",
+                "proposed_area": {
+                    "name": "Software quality engineering",
+                    "copy": "Distributed systems testing for production services.",
+                },
+                "proposed_wing": {
+                    "name": "SDET / test automation",
+                    "copy": "Contracts and observability before brittle UI e2e.",
+                },
+                "proposed_path": {
+                    "title": "SDET — curated public study path",
+                    "steps": sdet_steps,
+                },
+                "rationale": (
+                    "Curated public SDET spine (Kafka → contracts → load → OTel). "
+                    "Not shelf-grounded on the demo corpus — treat as a study outline; "
+                    "pair with labs outside this shelf."
+                ),
+                "citations": [],
+                "degraded": False,
+                "high_stakes_notice": None,
+                "tool_calls": [],
+                "rounds_used": 0,
+                "failure_category": None,
+                "preset_id": "sdet",
+            },
+        ),
+    )
+
+
+def mentor_preset_by_id(preset_id: str) -> MentorPreset | None:
+    for preset in mentor_presets():
+        if preset.preset_id == preset_id:
+            return preset
+    return None
+
+
+def apply_mentor_preset(
+    session_state: MutableMapping[str, Any],
+    preset_id: str,
+) -> bool:
+    """Fill Mentor form keys and seed ``last_mentor`` from a curated preset."""
+    preset = mentor_preset_by_id(preset_id)
+    if preset is None:
+        return False
+    session_state["mentor_goal"] = preset.goal
+    session_state["mentor_interests"] = preset.interests
+    session_state["mentor_level"] = preset.level
+    session_state["last_mentor"] = dict(preset.response)
+    session_state["last_mentor_goal"] = preset.goal
+    session_state.pop("last_mentor_catalog", None)
+    session_state.pop("mentor_pending", None)
+    return True
+
+
 def get_api_url() -> str:
     """Read ``API_URL`` from the environment, defaulting to localhost:8000."""
     return os.environ.get("API_URL", DEFAULT_API_URL)

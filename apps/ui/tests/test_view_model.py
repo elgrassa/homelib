@@ -587,6 +587,25 @@ def test_resolve_build_sha_falls_back_to_unknown_when_git_unavailable() -> None:
     assert resolve_build_sha(environ={}, git_short_sha=boom) == "unknown"
 
 
+def test_mentor_presets_include_ai_engineer_and_sdet_with_ordered_steps() -> None:
+    from apps.ui.view_model import apply_mentor_preset, mentor_presets
+
+    presets = mentor_presets()
+    ids = {p.preset_id for p in presets}
+    assert ids == {"ai-engineer", "sdet"}
+    ai = next(p for p in presets if p.preset_id == "ai-engineer")
+    assert "Land AI engineer job" not in ai.goal
+    steps = (ai.response.get("proposed_path") or {}).get("steps") or []
+    assert len(steps) >= 8
+    assert steps[0]["order"] == 0
+    assert "youtube.com" in (steps[0].get("url") or "")
+    state: dict[str, object] = {}
+    assert apply_mentor_preset(state, "ai-engineer") is True
+    assert state["mentor_level"] == "intermediate"
+    assert state["last_mentor"]["preset_id"] == "ai-engineer"
+    assert apply_mentor_preset(state, "missing") is False
+
+
 def test_normalize_door_accepts_crossroads_labels() -> None:
     for door in CROSSROADS_DOORS:
         assert normalize_door(door) == door
