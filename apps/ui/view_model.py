@@ -348,11 +348,21 @@ def format_scene_hit_label(
     page: int | None,
     ordinal: int,
 ) -> str:
-    """Shelf scene-search line: book · author · section · page (or block N for txt)."""
+    """Shelf scene-search line: book · author · section · page (or passage N for txt)."""
     author = ", ".join(authors) if authors else "—"
     section = " / ".join(section_path) if section_path else "—"
-    place = f"page {page}" if page is not None else f"block {ordinal + 1}"
+    place = f"page {page}" if page is not None else f"passage {ordinal + 1}"
     return f"{book_title} · {author} · {section} · {place}"
+
+
+def display_step_order(order: object) -> str:
+    """Render plan/roadmap step order as 1-based for visitors (audit W07)."""
+    if isinstance(order, bool) or not isinstance(order, int):
+        try:
+            order = int(str(order))
+        except (TypeError, ValueError):
+            return "?" if order is None else str(order)
+    return str(order + 1)
 
 
 def projection_resume_book_index(
@@ -595,6 +605,24 @@ def official_viewer_enabled(environ: Mapping[str, str] | None = None) -> bool:
     """True only when ``HOMELIB_OFFICIAL_VIEWER`` is explicitly on."""
     env = os.environ if environ is None else environ
     return (env.get(OFFICIAL_VIEWER_ENV) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def official_preview_caption(*, projector: bool, viewer_enabled: bool) -> str:
+    """User-facing caption under the official preview stage (audit W08)."""
+    if projector:
+        return (
+            "Tap Reading / Listen for Ukrainian text (Safari Speak Screen / Listen to Page). "
+            "Prev/Next turns the open book on this stage."
+        )
+    if viewer_enabled:
+        return (
+            "Enter projector mode for the internal two-page book and Reading / Listen. "
+            "Or open the Pottermore PDF / HTML reader above."
+        )
+    return (
+        "Open the Pottermore PDF or HTML reader above. "
+        "Reading / Listen appear when the internal viewer is enabled."
+    )
 
 
 def read_port(environ: Mapping[str, str] | None = None) -> int:

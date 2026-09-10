@@ -419,3 +419,50 @@ def test_chapter_filter_excludes_other_chapters(scene_db: sqlite3.Connection) ->
         k=5,
     )
     assert response.hits == []
+
+
+def test_scene_hits_unique_by_block_id() -> None:
+    """Audit S06: duplicate block_id collapses to one scene card."""
+    from homelib_rag.scene_search import SceneHit, _dedupe_hits_by_block_id
+
+    hits = [
+        SceneHit(
+            resource_id="book-a",
+            chapter_id=None,
+            block_id="blk-1",
+            chunk_id="c1",
+            char_start=0,
+            char_end=10,
+            quote="first",
+            prev_context="",
+            next_context="",
+            open_anchor="blk-1",
+        ),
+        SceneHit(
+            resource_id="book-a",
+            chapter_id=None,
+            block_id="blk-1",
+            chunk_id="c2",
+            char_start=10,
+            char_end=20,
+            quote="dup",
+            prev_context="",
+            next_context="",
+            open_anchor="blk-1",
+        ),
+        SceneHit(
+            resource_id="book-a",
+            chapter_id=None,
+            block_id="blk-2",
+            chunk_id="c3",
+            char_start=20,
+            char_end=30,
+            quote="other",
+            prev_context="",
+            next_context="",
+            open_anchor="blk-2",
+        ),
+    ]
+    unique = _dedupe_hits_by_block_id(hits, k=5)
+    assert [h.block_id for h in unique] == ["blk-1", "blk-2"]
+    assert unique[0].chunk_id == "c1"

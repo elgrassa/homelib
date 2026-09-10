@@ -251,6 +251,20 @@ def _hits_to_scene(
     return scene_hits
 
 
+def _dedupe_hits_by_block_id(hits: list[SceneHit], *, k: int) -> list[SceneHit]:
+    """Keep the first hit per block_id, then truncate to k (audit S06)."""
+    seen: set[str] = set()
+    unique: list[SceneHit] = []
+    for hit in hits:
+        if hit.block_id in seen:
+            continue
+        seen.add(hit.block_id)
+        unique.append(hit)
+        if len(unique) >= k:
+            break
+    return unique
+
+
 def _sqlite_lexical(q: str, k: int, *, book_id: str, conn: sqlite3.Connection) -> list[Hit]:
     from homelib_rag.sqlite_index import search_lexical
 
@@ -398,6 +412,8 @@ def scene_search(
                 mode_used = "smart"
     else:
         raise ValueError(f"unknown scene mode: {mode!r}")
+
+    hits = _dedupe_hits_by_block_id(hits, k=k)
 
     latency_ms = int((time.perf_counter() - started) * 1000)
     return SceneSearchResponse(

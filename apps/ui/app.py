@@ -35,6 +35,7 @@ from apps.ui.view_model import (
     build_homelib_client,
     build_official_preview_stage_html,
     clean_read_url,
+    display_step_order,
     ensure_demo_session,
     format_api_error_message,
     format_ask_answer_body,
@@ -55,6 +56,7 @@ from apps.ui.view_model import (
     normalize_projection_source,
     observatory_bar_chart,
     observatory_chart_titles,
+    official_preview_caption,
     official_viewer_enabled,
     parse_interests,
     persist_demo_session,
@@ -266,7 +268,10 @@ def render_mentor_tab(client: Client) -> None:
         for step in path.get("steps") or []:
             if not isinstance(step, dict):
                 continue
-            st.write(f"{step.get('order', '?')}. {step.get('title', '')} — {step.get('why', '')}")
+            st.write(
+                f"{display_step_order(step.get('order'))}. "
+                f"{step.get('title', '')} — {step.get('why', '')}"
+            )
         if st.button("Accept path to Coffee Table", key="mentor_accept_path"):
             _enqueue_mentor_path(client, path)
     elif last.get("degraded"):
@@ -681,16 +686,9 @@ def _render_official_preview(projector: bool) -> None:
         build_official_preview_stage_html(book, projector=projector, read_port=read_port()),
         unsafe_allow_javascript=True,
     )
-    if projector:
-        st.caption(
-            "Tap Reading / Listen for Ukrainian text (Safari Speak Screen / Listen to Page). "
-            "Prev/Next turns the open book on this stage."
-        )
-    else:
-        st.caption(
-            "Enter projector mode for the internal two-page book and Reading / Listen. "
-            "Or open the Pottermore PDF / HTML reader above."
-        )
+    st.caption(
+        official_preview_caption(projector=projector, viewer_enabled=official_viewer_enabled())
+    )
 
 
 def _render_shelf_projection(client: Client, projector: bool) -> None:
@@ -796,7 +794,7 @@ def _render_shelf_projection(client: Client, projector: bool) -> None:
         f"<p><strong>{book.title}</strong>"
         f"{(' — ' + section) if section else ''}</p>"
         f"<p>{block.text}</p>"
-        f"<p style='font-size:0.85rem;color:#756758'>Page {block.ordinal + 1}</p>"
+        f"<p style='font-size:0.85rem;color:#756758'>Passage {block.ordinal + 1}</p>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -845,7 +843,7 @@ def render_roadmap_tab(client: Client) -> None:
     st.write(last_roadmap.rationale)
     prereq_titles = resolve_prerequisite_titles(last_roadmap.steps)
     for step in steps_in_order(last_roadmap.steps):
-        with st.expander(f"{step.order}. {step.title}"):
+        with st.expander(f"{display_step_order(step.order)}. {step.title}"):
             st.write(f"Authors: {', '.join(step.authors) or '—'}")
             st.write(step.why)
             prereqs = prereq_titles.get(step.order, [])

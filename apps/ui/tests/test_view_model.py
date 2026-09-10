@@ -415,7 +415,7 @@ def test_format_scene_hit_label_includes_book_author_section_and_page() -> None:
 
 
 def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
-    """Gutenberg txt blocks have no Provenance.page — show block ordinal instead."""
+    """Gutenberg txt blocks have no Provenance.page — show passage ordinal instead."""
     from apps.ui.view_model import format_scene_hit_label
 
     label = format_scene_hit_label(
@@ -425,7 +425,25 @@ def test_format_scene_hit_label_falls_back_to_block_when_page_missing() -> None:
         page=None,
         ordinal=4,
     )
-    assert label == "Acres of Diamonds · Russell H. Conwell · — · block 5"
+    assert label == "Acres of Diamonds · Russell H. Conwell · — · passage 5"
+
+
+def test_display_step_order_is_one_based() -> None:
+    from apps.ui.view_model import display_step_order
+
+    assert display_step_order(0) == "1"
+    assert display_step_order(2) == "3"
+    assert display_step_order("1") == "2"
+    assert display_step_order(None) == "?"
+
+
+def test_official_preview_caption_omits_two_page_promise_when_viewer_off() -> None:
+    from apps.ui.view_model import official_preview_caption
+
+    caption = official_preview_caption(projector=False, viewer_enabled=False)
+    assert "two-page" not in caption
+    assert "Pottermore" in caption
+    assert "two-page" in official_preview_caption(projector=False, viewer_enabled=True)
 
 
 def test_projection_resume_prefers_handoff_over_saved_progress() -> None:
