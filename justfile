@@ -212,10 +212,25 @@ publish:
       echo "✗ no 'homelib' repository in the Forgejo DB"; exit 1
     fi
     status=$(sqlite3 "$DB" "SELECT status FROM action_run WHERE repo_id=$repo_id AND commit_sha='$sha' ORDER BY id DESC LIMIT 1")
+    # graph-refresh commits touch only graphify-out/ and often have no action_run;
+    # allow the first-parent's green CI when this tip is graph-only.
+    if [[ -z "$status" ]]; then
+      parent=$(git rev-parse "${sha}^" 2>/dev/null || true)
+      if [[ -n "$parent" ]]; then
+        only_graph=$(git diff --name-only "$parent" "$sha" | awk '!/^graphify-out\//{n++} END{print n+0}')
+        if [[ "$only_graph" -eq 0 ]]; then
+          status=$(sqlite3 "$DB" "SELECT status FROM action_run WHERE repo_id=$repo_id AND commit_sha='$parent' ORDER BY id DESC LIMIT 1")
+          if [[ -n "$status" ]]; then
+            echo "ℹ tip $sha has no CI run (graph-refresh only); using parent ${parent:0:8}"
+            sha_for_msg="$parent"
+          fi
+        fi
+      fi
+    fi
     case "$status" in
-      1) echo "✓ Forgejo CI green for $sha" ;;
+      1) echo "✓ Forgejo CI green for ${sha_for_msg:-$sha}" ;;
       5|6|7) echo "⏳ Forgejo CI still in progress (status=$status)"; exit 1 ;;
-      2) echo "✗ Forgejo CI FAILED for $sha"; exit 1 ;;
+      2) echo "✗ Forgejo CI FAILED for ${sha_for_msg:-$sha}"; exit 1 ;;
       "") echo "✗ no CI run recorded for $sha — has it been pushed to forgejo?"; exit 1 ;;
       *) echo "✗ Forgejo CI not green (status=$status)"; exit 1 ;;
     esac
