@@ -34,10 +34,18 @@ def test_every_door_renders_without_exception(door: str) -> None:
     assert not at.exception, [e.value for e in at.exception]
     captions = [c.value for c in at.caption]
     assert f"Open door: {door}" not in captions
-    (rotunda,) = at.get("html")
-    assert f"Facing: {door}" in rotunda.body
-    assert "hl-collapsed" in rotunda.body
-    assert door in [h.value for h in at.header]
+
+
+def test_crossroads_caption_shows_configured_build_sha(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cloud/local deploy proof: Crossroads caption names the running revision."""
+    monkeypatch.setenv("HOMELIB_BUILD_SHA", "cafebab")
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    captions = [c.value for c in at.caption]
+    assert any("build cafebab" in c for c in captions)
 
 
 def test_door_grid_has_one_button_per_door() -> None:

@@ -66,6 +66,7 @@ from apps.ui.view_model import (
     projection_wants_chrome_hidden,
     read_port,
     record_vote,
+    resolve_build_sha,
     resolve_prerequisite_titles,
     resolve_shelf_resource_ids,
     steps_in_order,
@@ -981,7 +982,7 @@ def main() -> None:
         st.title("MagicLib")
         st.caption(
             "HomeLib — a private academic shelf you can ask, with citations that open the page. "
-            f"{len(CROSSROADS_DOORS)} Crossroads doors."
+            f"{len(CROSSROADS_DOORS)} Crossroads doors. · build {resolve_build_sha()}"
         )
         st.markdown(
             """

@@ -568,6 +568,25 @@ def test_get_api_url_honours_the_environment(monkeypatch) -> None:  # type: igno
     assert get_api_url() == "http://api:8000"
 
 
+def test_resolve_build_sha_prefers_homelib_build_sha_env() -> None:
+    from apps.ui.view_model import resolve_build_sha
+
+    sha = resolve_build_sha(
+        environ={"HOMELIB_BUILD_SHA": "abcdef1234567890"},
+        git_short_sha=lambda: "deadbee",
+    )
+    assert sha == "abcdef123456"
+
+
+def test_resolve_build_sha_falls_back_to_unknown_when_git_unavailable() -> None:
+    from apps.ui.view_model import resolve_build_sha
+
+    def boom() -> str:
+        raise OSError("no git")
+
+    assert resolve_build_sha(environ={}, git_short_sha=boom) == "unknown"
+
+
 def test_normalize_door_accepts_crossroads_labels() -> None:
     for door in CROSSROADS_DOORS:
         assert normalize_door(door) == door

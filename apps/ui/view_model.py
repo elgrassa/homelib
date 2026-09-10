@@ -17,7 +17,7 @@ from __future__ import annotations
 import html
 import json
 import os
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -46,6 +46,7 @@ DEMO_ENV_KEYS: frozenset[str] = frozenset(
         "APP_MODE",
         "API_URL",
         "HOMELIB_SQLITE_PATH",
+        "HOMELIB_BUILD_SHA",
         "LLM_BASE_URL",
         "LLM_API_KEY",
         "LLM_MODEL",
@@ -66,6 +67,58 @@ LEVELS: tuple[Level, ...] = ("beginner", "intermediate", "advanced")
 def get_api_url() -> str:
     """Read ``API_URL`` from the environment, defaulting to localhost:8000."""
     return os.environ.get("API_URL", DEFAULT_API_URL)
+
+
+def resolve_build_sha(
+    *,
+    environ: Mapping[str, str] | None = None,
+    git_short_sha: Callable[[], str] | None = None,
+) -> str:
+    """Short revision for the Crossroads caption (Cloud deploy verification).
+
+    Prefer an explicit ``HOMELIB_BUILD_SHA`` (Streamlit secrets / CI inject),
+    then ``SOURCE_VERSION`` / ``GIT_COMMIT`` when a host provides them, then
+    a filesystem read of ``.git/HEAD`` for local and Compose checkouts.
+    Returns ``unknown`` when none are available (e.g. an unpacked Cloud
+    bundle without git metadata).
+    """
+    env = os.environ if environ is None else environ
+    for key in ("HOMELIB_BUILD_SHA", "SOURCE_VERSION", "GIT_COMMIT"):
+        raw = (env.get(key) or "").strip()
+        if raw:
+            return raw[:12] if len(raw) > 12 else raw
+    probe = git_short_sha if git_short_sha is not None else _read_git_short_sha
+    try:
+        sha = probe().strip()
+    except Exception:
+        return "unknown"
+    return sha or "unknown"
+
+
+def _read_git_short_sha() -> str:
+    """Read HEAD SHA from ``.git`` without spawning a process (ruff S603/S607)."""
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        git_dir = parent / ".git"
+        if not git_dir.exists():
+            continue
+        if git_dir.is_file():
+            # worktree: `.git` is a file pointing at the real gitdir
+            raw = git_dir.read_text(encoding="utf-8").strip()
+            if raw.startswith("gitdir:"):
+                git_dir = (parent / raw.split(":", 1)[1].strip()).resolve()
+            else:
+                continue
+        head_path = git_dir / "HEAD"
+        head = head_path.read_text(encoding="utf-8").strip()
+        if head.startswith("ref:"):
+            ref = head.split(":", 1)[1].strip()
+            sha = (git_dir / ref).read_text(encoding="utf-8").strip()
+        else:
+            sha = head
+        if len(sha) >= 7:
+            return sha[:7]
+    raise FileNotFoundError("no .git HEAD")
 
 
 def apply_streamlit_secrets_to_environ(secrets: Mapping[str, Any]) -> None:
