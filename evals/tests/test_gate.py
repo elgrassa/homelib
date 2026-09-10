@@ -468,6 +468,8 @@ def test_main_passes_against_committed_reports(
     record = json.loads(history.read_text(encoding="utf-8").splitlines()[0])
     assert record["metrics"]["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
     assert record["metrics"]["judge.mean_faithfulness"] == pytest.approx(2.60)
+
+
 def test_load_run_metrics_accepts_metrics_wrapper(tmp_path: Path) -> None:
     from evals.gate import load_run_metrics
 
