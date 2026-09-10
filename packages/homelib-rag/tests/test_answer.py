@@ -505,6 +505,7 @@ def test_llm_timeout_seconds_env_var_overrides_default_timeout() -> None:
     already imported at collection time, silently breaking its
     `except LLMUnreachableError` handlers for the rest of the test run.
     """
+    clean_env = {k: v for k, v in os.environ.items() if k != "LLM_TIMEOUT_SECONDS"}
     default_run = subprocess.run(
         [
             sys.executable,
@@ -514,6 +515,7 @@ def test_llm_timeout_seconds_env_var_overrides_default_timeout() -> None:
         capture_output=True,
         text=True,
         check=True,
+        env=clean_env,
     )
     assert default_run.stdout.strip() == "300.0"
 
