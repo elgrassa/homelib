@@ -480,13 +480,14 @@ def render_library_tab(client: Client) -> None:
             st.session_state["proj_book_id"] = book.book_id
             st.rerun()
 
-    st.subheader("Discover (Open Library catalog snapshot)")
+    st.subheader("Discover (Open Library + Project Gutenberg, live)")
     st.caption(
-        "Committed data/catalog.jsonl snapshot (metadata only — not Ask full text). "
-        "Live federation is optional via HOMELIB_CONNECTOR_MODE=live (see issue #46)."
+        "Live metadata from Open Library and Gutendex (not Ask full text). "
+        "Empty browse and live outages fall back to the committed catalog snapshot. "
+        "Override with HOMELIB_CONNECTOR_MODE=snapshot|fixture."
     )
-    discover_q = st.text_input("Filter catalog", key="discover_q")
-    if st.button("Show catalog", key="discover_go"):
+    discover_q = st.text_input("Search catalogs", key="discover_q")
+    if st.button("Search", key="discover_go"):
         try:
             needle = discover_q.strip() if discover_q else None
             discovered = client.list_resources(q=needle, source="discover")
@@ -496,13 +497,21 @@ def render_library_tab(client: Client) -> None:
             st.session_state["last_discover"] = discovered
     last_discover = st.session_state.get("last_discover")
     if isinstance(last_discover, dict):
-        if last_discover.get("degraded"):
-            st.warning("One or more catalog providers timed out; showing partial results.")
         counts = last_discover.get("approximate_provider_counts") or {}
+        if last_discover.get("degraded") and counts.get("live_fallback"):
+            st.warning("Showing catalog snapshot; live Open Library / Gutendex unavailable.")
+        elif last_discover.get("degraded"):
+            st.warning("One or more catalog providers timed out; showing partial results.")
         snap = counts.get("open_library_snapshot")
+        provider_bits = [
+            f"{name} {n}"
+            for name, n in sorted(counts.items())
+            if name != "live_fallback" and isinstance(n, int)
+        ]
         st.caption(
-            f"{last_discover.get('unique_count', 0)} matching · "
-            f"snapshot size {snap if snap is not None else '—'}"
+            f"{last_discover.get('unique_count', 0)} matching"
+            + (f" · {' · '.join(provider_bits)}" if provider_bits else "")
+            + (f" · snapshot size {snap}" if snap is not None and not provider_bits else "")
         )
         for hit in last_discover.get("items") or []:
             if not isinstance(hit, dict):
@@ -512,7 +521,7 @@ def render_library_tab(client: Client) -> None:
             line = f"**{title}** — {authors}" if authors else f"**{title}**"
             url = hit.get("provider_url")
             if url:
-                st.markdown(f"{line} · [Open Library]({url})")
+                st.markdown(f"{line} · [provider]({url})")
             else:
                 st.markdown(line)
             st.caption("metadata only · not full text on this shelf")

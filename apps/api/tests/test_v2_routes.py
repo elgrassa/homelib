@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
@@ -347,7 +349,7 @@ def test_discover_returns_seeded_catalog_not_empty(
     sqlite_env: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Discover default is the committed Open Library snapshot."""
+    """Explicit snapshot mode serves the committed Open Library catalog."""
     monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "snapshot")
     with TestClient(app) as client:
         shelf = client.get("/v1/resources").json()
@@ -374,3 +376,86 @@ def test_discover_empty_query_browses_and_q_filters(
         filtered = client.get("/v1/resources", params={"source": "discover", "q": needle}).json()
         assert filtered["items"]
         assert all(needle.lower() in item["title"].lower() for item in filtered["items"])
+
+
+def test_discover_mode_defaults_to_live_outside_ci(
+    sqlite_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.api.v2_routes import _resolve_discover_mode
+
+    monkeypatch.delenv("HOMELIB_CONNECTOR_MODE", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    assert _resolve_discover_mode() == "live"
+
+    monkeypatch.setenv("CI", "true")
+    assert _resolve_discover_mode() == "fixture"
+
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "snapshot")
+    assert _resolve_discover_mode() == "snapshot"
+
+
+def test_discover_falls_back_to_snapshot_when_all_connectors_time_out(
+    sqlite_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "snapshot")
+    with TestClient(app) as client:
+        snap = client.get("/v1/resources", params={"source": "discover"}).json()
+        assert snap["items"]
+        needle = snap["items"][0]["title"].split()[0]
+
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "live")
+    from homelib_rag.connectors import SlowConnector
+
+    monkeypatch.setattr(
+        "homelib_rag.connectors.build_discover_connectors",
+        lambda **_kwargs: [SlowConnector(), SlowConnector()],
+    )
+    with TestClient(app) as client:
+        resp = client.get("/v1/resources", params={"source": "discover", "q": needle})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["degraded"] is True
+        assert body["approximate_provider_counts"].get("live_fallback") == 1
+        assert body["approximate_provider_counts"].get("open_library_snapshot", 0) >= 1
+        assert body["items"], "snapshot must replace a total live outage"
+        assert any(needle.lower() in item["title"].lower() for item in body["items"])
+
+
+@respx.mock
+def test_discover_live_hit_includes_provider_url(
+    sqlite_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from homelib_rag.connectors import GUTENDEX_BOOKS_URL, OPEN_LIBRARY_SEARCH_URL
+
+    monkeypatch.setenv("HOMELIB_CONNECTOR_MODE", "live")
+    monkeypatch.delenv("GOOGLE_BOOKS_API_KEY", raising=False)
+    monkeypatch.delenv("HARDCOVER_API_TOKEN", raising=False)
+    monkeypatch.delenv("HARDCOVER_API_KEY", raising=False)
+    respx.get(OPEN_LIBRARY_SEARCH_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "docs": [
+                    {
+                        "key": "/works/OL123W",
+                        "title": "Live Meditations",
+                        "author_name": ["Marcus Aurelius"],
+                    }
+                ]
+            },
+        )
+    )
+    respx.get(GUTENDEX_BOOKS_URL).mock(return_value=httpx.Response(200, json={"results": []}))
+    with TestClient(app) as client:
+        resp = client.get("/v1/resources", params={"source": "discover", "q": "meditations"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["degraded"] is False
+        assert body["items"]
+        hit = body["items"][0]
+        assert hit["title"] == "Live Meditations"
+        assert hit["provider_url"]
+        assert "openlibrary.org" in hit["provider_url"]

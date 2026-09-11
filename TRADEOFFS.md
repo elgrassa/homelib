@@ -53,7 +53,9 @@ Postgres+pgvector remains compose for Grafana / `v1-fallback`. Do not claim
 ## Dual corpus — shelf full-text vs catalog metadata
 
 **Shipped surface:** Ask passages + inventory/romance use the **18** ingested
-full-text shelf books. Mentor/Roadmap/`GET /v1/resources?source=discover`
-default to the committed **Open Library catalog snapshot**
-(`data/catalog.jsonl` → `catalog` table, ~3061 works, metadata only). Live
-connector federation stays opt-in (`HOMELIB_CONNECTOR_MODE=live`, issue #46).
+full-text shelf books. Discover defaults to **live** Open Library + Gutendex
+federation (metadata only; optional Google Books / Hardcover behind keys).
+Empty browse and total live outage fall back to the committed Open Library
+catalog snapshot (`data/catalog.jsonl` → `catalog` table). Override with
+`HOMELIB_CONNECTOR_MODE=snapshot` or `fixture` (CI). Mentor/Roadmap still use
+the snapshot catalog for offline path planning.

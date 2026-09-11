@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException
+
+if TYPE_CHECKING:
+    from homelib_rag.connectors import DiscoverResult
 from homelib_rag.mentor import (
     CreatePathRequest,
     MentorIntakeRequest,
@@ -230,23 +233,21 @@ def _discover_from_catalog(q: str | None, *, limit: int = 50, offset: int = 0) -
     )
 
 
-def _discover_resources(q: str | None) -> ResourceList:
-    """Discover: snapshot by default; live federation when HOMELIB_CONNECTOR_MODE=live."""
-    import hashlib
+def _resolve_discover_mode() -> str:
+    """Unset → live (Open Library + Gutendex); CI → fixture; explicit env wins."""
     import os
 
-    mode = os.environ.get("HOMELIB_CONNECTOR_MODE", "snapshot").strip().lower()
-    if mode not in {"live", "federate", "fixture"}:
-        return _discover_from_catalog(q)
+    explicit = os.environ.get("HOMELIB_CONNECTOR_MODE", "").strip().lower()
+    if explicit:
+        return explicit
+    if os.environ.get("CI", "").strip().lower() in {"1", "true", "yes"}:
+        return "fixture"
+    return "live"
 
-    from homelib_rag.connectors import build_discover_connectors, federate_connectors
 
-    needle = (q or "").strip()
-    if not needle and mode != "fixture":
-        # Live connectors need a query; fall back to snapshot browse for empty q.
-        return _discover_from_catalog(q)
+def _discover_items_from_federation(result: DiscoverResult) -> list[ResourceSummary]:
+    import hashlib
 
-    result = federate_connectors(build_discover_connectors(mode=mode), needle)
     items: list[ResourceSummary] = []
     for item in result.items:
         primary = item.attributions[0]
@@ -270,8 +271,51 @@ def _discover_resources(q: str | None) -> ResourceList:
                 provider_url=primary.provider_url,
             )
         )
+    return items
+
+
+def _snapshot_fallback(
+    q: str | None, *, prior_counts: dict[str, int] | None = None
+) -> ResourceList:
+    """Committed catalog when live providers are unavailable."""
+    snap = _discover_from_catalog(q)
+    counts = dict(prior_counts or {})
+    counts.update(snap.approximate_provider_counts)
+    counts["live_fallback"] = 1
     return ResourceList(
-        items=items,
+        items=snap.items,
+        unique_count=snap.unique_count,
+        approximate_provider_counts=counts,
+        degraded=True,
+    )
+
+
+def _discover_resources(q: str | None) -> ResourceList:
+    """Discover: live federation by default; snapshot when offline or empty query."""
+    mode = _resolve_discover_mode()
+    if mode not in {"live", "federate", "fixture"}:
+        return _discover_from_catalog(q)
+
+    from homelib_rag.connectors import (
+        build_discover_connectors,
+        federate_connectors,
+    )
+
+    needle = (q or "").strip()
+    if not needle and mode != "fixture":
+        # Live connectors need a query; fall back to snapshot browse for empty q.
+        return _discover_from_catalog(q)
+
+    try:
+        result: DiscoverResult = federate_connectors(build_discover_connectors(mode=mode), needle)
+    except Exception:
+        return _snapshot_fallback(q)
+
+    if result.degraded and not result.items:
+        return _snapshot_fallback(q, prior_counts=result.approximate_provider_counts)
+
+    return ResourceList(
+        items=_discover_items_from_federation(result),
         unique_count=result.unique_count,
         approximate_provider_counts=result.approximate_provider_counts,
         degraded=result.degraded,
