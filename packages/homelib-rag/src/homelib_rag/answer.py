@@ -538,9 +538,7 @@ def _source_span_for_quote(quote: str, passage: str) -> str | None:
     return None
 
 
-def _resolve_quote(
-    raw_citation: _RawCitation, context_hits: list[Hit]
-) -> tuple[Hit, str] | None:
+def _resolve_quote(raw_citation: _RawCitation, context_hits: list[Hit]) -> tuple[Hit, str] | None:
     """The passage a quote came from and the exact source span, or ``None``.
 
     The model's `passage` number is treated as a hint, not as truth. It is
@@ -641,9 +639,10 @@ def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
         # Prefer exact bytes; allow whitespace/typography locate only when the
         # stored quote still maps to a source span (post-recovery citations
         # are exact slices and pass the first check).
-        if citation.quote not in hit.text and _source_span_for_quote(
-            citation.quote, hit.text
-        ) is None:
+        if (
+            citation.quote not in hit.text
+            and _source_span_for_quote(citation.quote, hit.text) is None
+        ):
             raise CitationValidationError(
                 f"citation quote for chunk_id {citation.chunk_id!r} is not a verbatim "
                 "substring of that chunk's text"
