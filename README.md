@@ -51,20 +51,78 @@ stack: `just up && just seed && just seed-sqlite` (see below).
 ## What it looks like
 
 Seven doors on one page: Ask, Mentor, Roadmap, Coffee Table, Shelf, Observatory,
-Projection. Captures below are from a local Streamlit run against the seeded
-shelf (not Cloud).
+Projection. These are real localhost captures from the SQLite demo, taken on
+2026-09-11 at build `7c07138`. Click an image to inspect it at full size.
+Generated answers and plans vary between runs; catalog records are metadata,
+not full-text books.
 
-![Crossroads — seven doors](docs/screenshots/reviewer-01-crossroads.png)
+**Ask:** a Walden question, its answer, and the supporting passage. Repeated
+questions can use the answer cache; the example reports zero new tokens.
 
-![Ask — cited Walden answer](docs/screenshots/reviewer-02-ask-cited.png)
+[![Ask — Walden answer with expanded source quotation](docs/screenshots/reviewer-02-ask-cited.jpg)](docs/screenshots/reviewer-02-ask-cited.jpg)
 
-![Shelf — corpus inventory](docs/screenshots/reviewer-03-shelf.png)
+**Mentor:** a beginner path for “Learn how Adam Smith explains division of
+labour in The Wealth of Nations”, with interests “economics, division of labour”.
+The complete two-step proposal and an expanded Smith citation are shown below.
+Path acceptance depends
+on whether its steps resolve to full-text shelf books.
 
-![Observatory — monitoring charts](docs/screenshots/reviewer-04-observatory.png)
+[![Mentor — complete Smith study path and supporting citation](docs/screenshots/reviewer-07-mentor.jpg)](docs/screenshots/reviewer-07-mentor.jpg)
 
-![Projection — shelf reader](docs/screenshots/reviewer-05-projection.png)
+**Roadmap:** an ordered book list with authors, rationale, prerequisites and
+source provenance. For “Understand Adam Smith and the division of labour”, this
+run combines a catalog book
+with the full-text *Wealth of Nations*; accepting it adds the shelf book to
+Coffee Table.
 
-![Discover — catalog metadata hits](docs/screenshots/reviewer-06-discover.png)
+[![Roadmap — two books with catalog and shelf provenance](docs/screenshots/reviewer-09-roadmap.jpg)](docs/screenshots/reviewer-09-roadmap.jpg)
+
+**Coffee Table:** add a full-text book from the shelf, then open it in Projection
+or remove it from the queue.
+
+[![Coffee Table — Smith and Walden queued with Open and Remove controls](docs/screenshots/reviewer-08-coffee-table.jpg)](docs/screenshots/reviewer-08-coffee-table.jpg)
+
+**Shelf:** the seeded full-text corpus, with per-book ingestion counts. This
+capture shows the first inventory rows; the demo contains 18 books.
+
+[![Shelf — current corpus counts and first inventory rows](docs/screenshots/reviewer-03-shelf.jpg)](docs/screenshots/reviewer-03-shelf.jpg)
+
+**Discover:** search the committed Open Library catalog snapshot. Results link
+to Open Library and explicitly identify records that are metadata only.
+
+[![Discover — economics results with Open Library links and metadata labels](docs/screenshots/reviewer-06-discover.jpg)](docs/screenshots/reviewer-06-discover.jpg)
+
+**Scene search:** choose a shelf book and describe a passage. Smart retrieval
+can return related excerpts rather than an exact phrase match; use **Open this
+passage** to inspect the full source, then continue in Projection.
+
+[![Scene search — Walden query, related excerpt and source-opening control](docs/screenshots/reviewer-10-scene-search.jpg)](docs/screenshots/reviewer-10-scene-search.jpg)
+
+**Projection:** continue from a cited source or scene into the shelf reader.
+The example shows a readable Walden chapter with Previous, Next and Save progress.
+
+[![Projection — Walden chapter and reading controls](docs/screenshots/reviewer-05-projection.jpg)](docs/screenshots/reviewer-05-projection.jpg)
+
+**Observatory:** query volume, latency, retrieval mode, feedback and degraded
+responses are shown in five separate captures so labels remain readable.
+These charts include historical seed traffic and local test requests; they are
+not a quality score for the current Cloud deployment. The optional judged
+relevance chart needs a separate evaluation run.
+
+<details>
+<summary>Open the five monitoring charts</summary>
+
+[![Observatory — queries over time](docs/screenshots/reviewer-04-observatory-queries.jpg)](docs/screenshots/reviewer-04-observatory-queries.jpg)
+
+[![Observatory — latency p50 and p95 with distinct series](docs/screenshots/reviewer-04-observatory-latency.jpg)](docs/screenshots/reviewer-04-observatory-latency.jpg)
+
+[![Observatory — retrieval mode usage](docs/screenshots/reviewer-04-observatory-modes.jpg)](docs/screenshots/reviewer-04-observatory-modes.jpg)
+
+[![Observatory — feedback counts](docs/screenshots/reviewer-04-observatory-feedback.jpg)](docs/screenshots/reviewer-04-observatory-feedback.jpg)
+
+[![Observatory — degraded and successful responses](docs/screenshots/reviewer-04-observatory-degraded.jpg)](docs/screenshots/reviewer-04-observatory-degraded.jpg)
+
+</details>
 
 ## System architecture
 
