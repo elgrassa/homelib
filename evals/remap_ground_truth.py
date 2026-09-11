@@ -56,9 +56,7 @@ class RemapRecord:
 
 def inflate_seed(gz_path: Path = SEED_GZ) -> Path:
     """Gunzip the committed demo seed into a temp SQLite file."""
-    tmp = tempfile.NamedTemporaryFile(prefix="homelib-remap-", suffix=".sqlite", delete=False)
-    tmp_path = Path(tmp.name)
-    tmp.close()
+    tmp_path = Path(tempfile.mkstemp(prefix="homelib-remap-", suffix=".sqlite")[1])
     with gzip_open(gz_path, "rb") as src, tmp_path.open("wb") as dst:
         dst.write(src.read())
     return tmp_path
@@ -73,9 +71,7 @@ def load_tip_chunks(sqlite_path: Path) -> dict[str, TipChunk]:
         conn.close()
     expected = CANONICAL_COUNTS["chunks"]
     if len(rows) != expected:
-        raise SystemExit(
-            f"tip seed has {len(rows)} chunks; expected CANONICAL_COUNTS={expected}"
-        )
+        raise SystemExit(f"tip seed has {len(rows)} chunks; expected CANONICAL_COUNTS={expected}")
     return {
         str(chunk_id): TipChunk(chunk_id=str(chunk_id), book_id=str(book_id), text=str(text))
         for chunk_id, book_id, text in rows
@@ -309,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.out is not None:
             write_jsonl(args.out, new_rows)
             print(f"wrote remapped ground truth {args.out} ({len(new_rows)} rows)")
-        return 0 if not unmapped else 0
+        return 0
     finally:
         if cleanup is not None:
             cleanup.unlink(missing_ok=True)

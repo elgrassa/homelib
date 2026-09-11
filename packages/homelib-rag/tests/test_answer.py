@@ -776,20 +776,14 @@ def test_typography_only_quote_recovers_exact_source_span() -> None:
     Locate folds NB hyphen → ASCII hyphen, but the citation quote must be the
     exact bytes from the passage — never the model's typography variant.
     """
-    source = (
-        "The pin-factory division of labour makes each worker "
-        "complete one small operation."
-    )
+    source = "The pin-factory division of labour makes each worker complete one small operation."
     model_quote = (
-        "The pin\u2011factory division of labour makes each worker "
-        "complete one small operation."
+        "The pin\u2011factory division of labour makes each worker complete one small operation."
     )
     assert "\u2011" in model_quote
     assert model_quote not in source
     hits = [_hit(text=source)]
-    client = _ScriptedClient(
-        [_llm_json("Pin factory.", [{"passage": 1, "quote": model_quote}])]
-    )
+    client = _ScriptedClient([_llm_json("Pin factory.", [{"passage": 1, "quote": model_quote}])])
 
     response = answer("q", hits, client=client, arm_used="hybrid")
 

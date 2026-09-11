@@ -482,4 +482,3 @@ def test_context_window_snaps_to_word_boundaries() -> None:
         assert prev_at == 0 or text[prev_at - 1].isspace()
     if nxt:
         assert nxt.startswith(" ") or nxt[0].isalnum()
-
