@@ -25,8 +25,11 @@ zero per-query embed cost for DACH / local-first demos.
 
 ## Hybrid vs hybrid_rerank
 
-On SQLite (235 Q): hit@5 tied at **0.638**; MRR **0.483 → 0.572** with rerank.
-**Shipped:** `hybrid_rerank`. Rerank cannot fix a miss; it reorders fusion’s set.
+On the **2026-09-11 remapped** set (234 Q): passage hit@5 tied at **0.684** for
+`hybrid` and `hybrid_rerank`; MRR **0.570 → 0.567** (flat). Book hit stays
+**0.897** for both vs lexical **0.833**. **Shipped:** `hybrid_rerank` (ADR-001) —
+rerank cannot fix a miss; on the pre-drift 235-Q archive it lifted MRR
+**0.483 → 0.572** with hit flat at 0.638.
 
 ## Query rewrite — OFF
 

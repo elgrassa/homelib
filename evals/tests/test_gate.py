@@ -223,15 +223,14 @@ def test_run_gate_missing_metric_is_reported_as_missing_not_worse(
 
 # ── committed report loaders (E01 / E02) ─────────────────────────────────────
 
-# Provenance: column layout copied from evals/results/retrieval.md (2026-09-06).
-# The old justfile regex treated `n` (235) as hit-rate and book-hit (0.906) as MRR.
+# Provenance: column layout matches retrieval reports (named hit-rate@5 / MRR@5).
 _RETRIEVAL_WINNER_TABLE = """\
 # Retrieval arm eval
 
 | arm | rewrite | n | hit-rate@5 | hit@k (book) | MRR@5 | degraded | mean latency (ms) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `lexical` | off | 235 | 0.064 | 0.077 | 0.055 | 0 | 67 |
-| `hybrid_rerank` **(winner)** | off | 235 | 0.638 | 0.906 | 0.572 | 0 | 149 |
+| `lexical` | off | 234 | 0.701 | 0.833 | 0.569 | 0 | 283 |
+| `hybrid_rerank` **(winner)** | off | 234 | 0.684 | 0.897 | 0.567 | 0 | 464 |
 """
 
 _LLM_EVAL_TABLE = """\
@@ -257,9 +256,9 @@ def test_committed_retrieval_report_uses_passage_hit_rate_not_question_count(
 
     metrics = load_committed_retrieval_metrics(path)
 
-    assert metrics["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
-    assert metrics["hybrid_rerank.mrr_at_5"] == pytest.approx(0.572)
-    assert metrics["hybrid_rerank.hit_rate_at_5"] != pytest.approx(235.0)
+    assert metrics["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.684)
+    assert metrics["hybrid_rerank.mrr_at_5"] == pytest.approx(0.567)
+    assert metrics["hybrid_rerank.hit_rate_at_5"] != pytest.approx(234.0)
     assert metrics["hybrid_rerank.mrr_at_5"] != pytest.approx(0.906)
 
 
@@ -466,7 +465,7 @@ def test_main_passes_against_committed_reports(
     assert gate_mod.main([]) == 0
     assert history.exists()
     record = json.loads(history.read_text(encoding="utf-8").splitlines()[0])
-    assert record["metrics"]["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.638)
+    assert record["metrics"]["hybrid_rerank.hit_rate_at_5"] == pytest.approx(0.684)
     assert record["metrics"]["judge.mean_faithfulness"] == pytest.approx(2.60)
 
 

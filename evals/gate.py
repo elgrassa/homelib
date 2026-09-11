@@ -200,7 +200,7 @@ def run_gate(current: dict[str, float], baseline_path: Path, history_path: Path)
 # ── committed markdown report loaders (`just eval-gate`) ─────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_RETRIEVAL_REPORT = _REPO_ROOT / "evals" / "results" / "retrieval.md"
+_DEFAULT_RETRIEVAL_REPORT = _REPO_ROOT / "evals" / "results" / "retrieval-2026-09-11-remapped.md"
 _DEFAULT_LLM_REPORT = _REPO_ROOT / "evals" / "results" / "llm_eval.md"
 _DEFAULT_BASELINE = _REPO_ROOT / "evals" / "eval-baseline.json"
 _DEFAULT_HISTORY = _REPO_ROOT / "evals" / "history.jsonl"

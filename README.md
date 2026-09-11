@@ -131,9 +131,27 @@ POST /v1/ask {"query": "Who wrote Walden?", "k": 5}
 
 ## Evaluation results
 
-**Retrieval (SQLite tip, 2026-09-06).** 4 arms × 235 questions, k=5, 0 degraded.
+**Retrieval (SQLite tip, 2026-09-11 remapped).** 4 arms × **234** questions, k=5,
+0 degraded. Labels were remapped after the September seed rebuild (161 of 235
+moved; one dropped) — see
+[`evals/results/retrieval-2026-09-11-remapped.md`](evals/results/retrieval-2026-09-11-remapped.md).
 **Passage** hit-rate@5 and **book** hit-rate@5 are different metrics — book hit
 is not answer accuracy.
+
+| arm | passage hit-rate@5 | book hit@5 | MRR@5 |
+|---|---:|---:|---:|
+| `lexical` | 0.701 | 0.833 | 0.569 |
+| `vector` | 0.474 | 0.915 | 0.364 |
+| `hybrid` | 0.684 | 0.897 | 0.570 |
+| **`hybrid_rerank` (app)** | **0.684** | **0.897** | **0.567** |
+
+`lexical` leads passage hit on this label set because remapping scores shared
+question terms (BM25-adjacent). Production stays on **`hybrid_rerank`**: better
+book hit than lexical (0.897 vs 0.833), and `hybrid` matches the same chunk hit
+at roughly a quarter of the latency. Rerank is flat vs hybrid here.
+
+**Pre-drift archive (2026-09-06, 235 Q)** —
+[`evals/results/retrieval.md`](evals/results/retrieval.md):
 
 | arm | passage hit-rate@5 | book hit@5 | MRR@5 |
 |---|---:|---:|---:|
@@ -142,8 +160,8 @@ is not answer accuracy.
 | `hybrid` | 0.638 | 0.906 | 0.483 |
 | **`hybrid_rerank` (app)** | **0.638** | **0.906** | **0.572** |
 
-Rerank lifts MRR with hit-rate flat. Query rewrite was measured and left **off**.
-Floors: [`evals/eval-baseline.json`](evals/eval-baseline.json). Archived check:
+Query rewrite was measured and left **off**. Floors:
+[`evals/eval-baseline.json`](evals/eval-baseline.json). Archived check:
 `just eval-gate`. Live bake-off: `python evals/retrieval_eval.py` /
 `python evals/llm_eval.py`. Methodology: [`EVAL.md`](EVAL.md),
 [ADR-001](docs/adrs/ADR-001-retrieval-arm.md), [ADR-003](docs/adrs/ADR-003-answer-prompt.md).

@@ -1,7 +1,7 @@
 {
   "metrics": {
-    "hybrid_rerank.hit_rate_at_5": 0.6383,
-    "hybrid_rerank.mrr_at_5": 0.5718,
+    "hybrid_rerank.hit_rate_at_5": 0.684,
+    "hybrid_rerank.mrr_at_5": 0.567,
     "judge.mean_faithfulness": 1.9
   },
   "specs": {
@@ -22,8 +22,8 @@
     }
   },
   "notes": {
-    "hybrid_rerank.hit_rate_at_5": "MEASURED 2026-09-03 on SQLite FTS5 + float32 BLOB matrix (HOMELIB_SQLITE_PATH), all 235 ground-truth rows, k=5, zero degraded across 940 arm-runs (evals/results/retrieval.md, ADR-001 \u00a7v2). Winner hybrid_rerank hit-rate@5=0.638. Supersedes the 2026-08-30 Postgres/pgvector floor (0.174) for the v2 gate \u2014 store change, not a silent raise. Margin 0.01 (deterministic, no LLM). RE-MEASURE if corpus, chunker, ground_truth, FTS tokenizer, or embedding blob encoding changes.",
-    "hybrid_rerank.mrr_at_5": "MEASURED 2026-09-03 same SQLite run as hit_rate. hybrid MRR 0.483 \u2192 hybrid_rerank 0.572 with hit-rate flat \u2014 classic reranker signature. Margin 0.01.",
+    "hybrid_rerank.hit_rate_at_5": "RE-MEASURED 2026-09-11 after ground_truth remap (evals/remap_ground_truth.py; map in evals/ground_truth_remap.jsonl; report evals/results/retrieval-2026-09-11-remapped.md). SQLite FTS5 + float32, 234 coherent rows (one unmapped dropped), k=5, rewrite off, hybrid_rerank hit-rate@5=0.684. Not a silent floor lower — labels changed after the September seed rebuild; pre-remap tip scored ~0.409 on the same code. Margin 0.01. RE-MEASURE if corpus, chunker, ground_truth, FTS tokenizer, or embedding blob encoding changes.",
+    "hybrid_rerank.mrr_at_5": "RE-MEASURED 2026-09-11 same remapped run as hit_rate. hybrid MRR 0.570 → hybrid_rerank 0.567 (flat on this label set). Pre-drift archive had 0.483 → 0.572. Margin 0.01.",
     "judge.mean_faithfulness": "MEASURED 2026-08-30 across four bake-off runs (ADR-003). Set as a LOOSE floor on purpose. The winning arm's faithfulness ranged 1.60-2.37 across runs of the same code on the same corpus, and the winner itself changed from `concise` to `stepwise` between two runs \u2014 run-to-run variance (up to 0.47) exceeds the entire between-arm spread within a run (0.34). Two causes, both measured: the judge puts nearly every case on 1, 2 or 3 out of 5, so it has almost no dynamic range at this answer quality; and n=30 is too small to resolve differences of a few hundredths, while a larger n costs ~45 min per run at ~13s per grounded answer. Margin 0.40 is derived from that observed spread rather than guessed: a tight margin here would fire on noise, and a gate that cries wolf gets ignored, which is worse than no gate. This floor catches a real collapse, not a regression. RE-DERIVE from a fresh run if the answer model, the judge model, or the judge prompt changes \u2014 the prompt hash in the report pins the last one."
   }
 }

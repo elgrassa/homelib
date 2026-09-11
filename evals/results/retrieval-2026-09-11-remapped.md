@@ -8,7 +8,9 @@ no plausible target and was dropped; every move is in
 `evals/ground_truth_remap.jsonl`). Rows now carry `passage_sha256` /
 `corpus_revision=seed-627-9119`. Before re-labelling, the same tip scored
 hybrid_rerank 0.409 / 0.358 — the retriever had not changed, the labels had.
-Gate floors in `evals/eval-baseline.json` were not lowered.
+Gate floors in `evals/eval-baseline.json` were re-pinned 2026-09-11 to this
+run (hit@5 0.684 / MRR@5 0.567, margin 0.01) — a re-measure on new labels, not
+a silent lower of the old 0.638 / 0.572 floors.
 
 Read the `lexical` line with care: the remap picks the chunk sharing the most
 question terms, which is close to what BM25 ranks by, so lexical gains most
