@@ -403,6 +403,52 @@ def test_mentor_invalid_structured_output_abstains() -> None:
     assert "importing relevant books" not in response.rationale.lower()
 
 
+def test_mentor_retries_once_when_json_is_cut_off_at_max_tokens() -> None:
+    """Groq cut a long Smith plan mid-string; the retry asks for a shorter one."""
+    cut_off = LLMResponse(
+        content='{"rationale": "Grounded in shelf evi',
+        finish_reason="length",
+        usage=LLMUsage(prompt_tokens=1, completion_tokens=1200),
+    )
+    client = _ScriptedClient([cut_off, _intake_json()])
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+
+    assert response.degraded is False
+    assert response.proposed_path is not None
+    assert response.rounds_used == 2
+    assert client._responses == []
+
+
+def test_mentor_cut_off_json_abstains_when_the_retry_is_also_cut_off() -> None:
+    cut_off = LLMResponse(
+        content='{"rationale": "Grounded in shelf evi',
+        finish_reason="length",
+        usage=LLMUsage(prompt_tokens=1, completion_tokens=800),
+    )
+    client = _ScriptedClient([cut_off, cut_off])
+
+    response = mentor_intake(
+        "learn stoicism",
+        ["philosophy"],
+        "beginner",
+        client=client,
+        catalog=lambda _goal, _subjects: [_catalog_entry()],
+        shelf_search=lambda _query, _k: [_hit()],
+    )
+
+    assert response.degraded is True
+    assert response.failure_category == "could_not_ground"
+    assert client._responses == []
+
+
 def test_mentor_invalid_citation_clears_proposal_and_abstains() -> None:
     """A fabricated passage quote must not leave an ungrounded path on screen."""
     client = _ScriptedClient(

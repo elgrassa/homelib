@@ -1,9 +1,22 @@
-# Retrieval arm eval (wave3 post-remap)
+# Retrieval arm eval — 2026-09-11, re-labelled ground truth
 
-> **Alongside** archived [`evals/results/retrieval.md`](retrieval.md) (2026-09-06,
-> hybrid_rerank 0.638 / 0.572). This run uses remapped `evals/ground_truth.jsonl`
-> (234 rows, `corpus_revision=seed-627-9119`). Gate floors were **not** lowered.
-> Pre-remap tip drift scored hybrid_rerank ~0.409 / 0.358.
+Same four arms as [`retrieval.md`](retrieval.md) (2026-09-06, hybrid_rerank
+0.638 / 0.572), scored against `evals/ground_truth.jsonl` after
+`evals/remap_ground_truth.py` re-pointed 161 of 235 questions whose `chunk_id`
+survived the September seed rebuild but whose text did not (one question had
+no plausible target and was dropped; every move is in
+`evals/ground_truth_remap.jsonl`). Rows now carry `passage_sha256` /
+`corpus_revision=seed-627-9119`. Before re-labelling, the same tip scored
+hybrid_rerank 0.409 / 0.358 — the retriever had not changed, the labels had.
+Gate floors in `evals/eval-baseline.json` were not lowered.
+
+Read the `lexical` line with care: the remap picks the chunk sharing the most
+question terms, which is close to what BM25 ranks by, so lexical gains most
+from the re-labelling. Production stays on `hybrid_rerank`
+([ADR-001](../../docs/adrs/ADR-001-retrieval-arm.md)): it finds the right
+*book* for 0.897 of questions against lexical's 0.833, and `hybrid` reaches the
+same chunk hit rate in a quarter of the latency. This is the current number to
+compare future runs against; the 2026-09-06 file stays as the pre-drift record.
 
 Generated: 2026-09-11T14:44:08+00:00
 Ground truth: `evals/ground_truth.jsonl` — 234 row(s) loaded, 234 scored, 0 skipped because the labelled `chunk_id` is not in the current index (corpus drift; excluded rather than counted as a miss).

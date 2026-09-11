@@ -468,17 +468,21 @@ def test_scene_hits_unique_by_block_id() -> None:
     assert unique[0].chunk_id == "c1"
 
 
-def test_context_window_snaps_to_word_boundaries() -> None:
-    """Scene previews must not start mid-word (retest P2)."""
-    from homelib_rag.scene_search import _context_window
+def test_context_window_widens_to_whole_words() -> None:
+    """A fixed character budget must not cut a word into "…ller" / "fil…"."""
+    from homelib_rag.scene_search import _CONTEXT_CHARS, _context_window
 
-    text = "abcdefghij living deliberately in the woods and more words here"
-    start = text.index("deliberately")
-    end = start + len("deliberately")
+    text = "filler " * 20 + "QUOTE" + " filler" * 20
+    start = text.index("QUOTE")
+    end = start + len("QUOTE")
+    # The raw budget lands inside a "filler" on both sides.
+    assert text[start - _CONTEXT_CHARS - 1 : start - _CONTEXT_CHARS + 1].isalpha()
+    assert text[end + _CONTEXT_CHARS - 1 : end + _CONTEXT_CHARS + 1].isalpha()
+
     quote, prev, nxt = _context_window(text, start, end)
-    assert quote == "deliberately"
-    if prev:
-        prev_at = text.index(prev)
-        assert prev_at == 0 or text[prev_at - 1].isspace()
-    if nxt:
-        assert nxt.startswith(" ") or nxt[0].isalnum()
+
+    assert quote == "QUOTE"
+    prev_start = start - len(prev)
+    assert text[prev_start - 1] == " " and prev.startswith("filler")
+    next_end = end + len(nxt)
+    assert text[next_end] == " " and nxt.endswith("filler")

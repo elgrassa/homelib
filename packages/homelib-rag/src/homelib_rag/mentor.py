@@ -260,6 +260,15 @@ class _LLMIntakeOutput(BaseModel):
     citations: list[_RawPassageCitation] = Field(default_factory=list)
 
 
+def _parse_intake(raw_message: str) -> _LLMIntakeOutput:
+    return _LLMIntakeOutput.model_validate(json.loads(raw_message))
+
+
+_RETRY_SHORTER_PROMPT = (
+    "Your previous JSON was cut off before it ended. Reply with a complete, "
+    "shorter JSON object only: at most two steps, each grounded in a cited passage."
+)
+
 _INTAKE_SYSTEM = (
     "You propose a library learning structure from retrieved shelf passages and "
     "catalog candidates only. Respond with ONLY JSON matching the requested "
@@ -578,56 +587,13 @@ def mentor_intake(
         )
 
     try:
-        payload = json.loads(raw_message)
-        parsed = _LLMIntakeOutput.model_validate(payload)
+        parsed = _parse_intake(raw_message)
     except (json.JSONDecodeError, ValidationError) as exc:
-        # Truncated JSON (finish_reason=length / Unterminated string) gets one
-        # bounded retry with a smaller completion budget and an explicit
-        # brevity instruction — then fail closed.
-        truncated = agent_result.finish_reason == "length" or "Unterminated string" in str(exc)
-        if truncated and not agent_result.degraded:
-            logger.warning("mentor intake truncated/invalid JSON; retrying once: %s", exc)
-            retry_messages = [
-                *messages,
-                ChatMessage(
-                    role="user",
-                    content=(
-                        "Your previous JSON was truncated or invalid. "
-                        "Reply with a COMPLETE shorter JSON object only "
-                        "(at most two grounded steps)."
-                    ),
-                ),
-            ]
-            try:
-                retry = run_agent(
-                    retry_messages,
-                    client=client,
-                    max_rounds=1,
-                    max_tokens=800,
-                    tools=mentor_tools,
-                    tool_schemas=mentor_schemas,
-                )
-                raw_message = (retry.final_message or "").strip()
-                payload = json.loads(raw_message)
-                parsed = _LLMIntakeOutput.model_validate(payload)
-                tool_calls = [record.tool_name for record in retry.tool_calls] or tool_calls
-                rounds_used = rounds_used + retry.rounds_used
-            except (LLMUnreachableError, json.JSONDecodeError, ValidationError) as retry_exc:
-                logger.warning("mentor intake retry failed: %s", retry_exc)
-                return _abstention_response(
-                    category="could_not_ground",
-                    notice=notice,
-                    tool_calls=tool_calls,
-                    rounds_used=rounds_used,
-                )
-        elif agent_result.degraded:
-            return _abstention_response(
-                category="could_not_ground",
-                notice=notice,
-                tool_calls=tool_calls,
-                rounds_used=rounds_used,
-            )
-        else:
+        # A 1,200-token budget is occasionally too small for a full plan and
+        # the provider cuts the JSON mid-string (`finish_reason == "length"`).
+        # That is not a bad model, just a long answer, so it gets one retry
+        # asking for a shorter plan. Any other parse failure abstains at once.
+        if agent_result.finish_reason != "length" or agent_result.degraded:
             logger.warning("mentor intake parse failed: %s", exc)
             return _abstention_response(
                 category="could_not_ground",
@@ -635,6 +601,27 @@ def mentor_intake(
                 tool_calls=tool_calls,
                 rounds_used=rounds_used,
             )
+        logger.warning("mentor intake JSON truncated at max_tokens; retrying shorter")
+        try:
+            retry = run_agent(
+                [*messages, ChatMessage(role="user", content=_RETRY_SHORTER_PROMPT)],
+                client=client,
+                max_rounds=1,
+                max_tokens=800,
+                tools=mentor_tools,
+                tool_schemas=mentor_schemas,
+            )
+            parsed = _parse_intake((retry.final_message or "").strip())
+        except (LLMUnreachableError, json.JSONDecodeError, ValidationError) as retry_exc:
+            logger.warning("mentor intake retry failed: %s", retry_exc)
+            return _abstention_response(
+                category="could_not_ground",
+                notice=notice,
+                tool_calls=tool_calls,
+                rounds_used=rounds_used,
+            )
+        tool_calls += [record.tool_name for record in retry.tool_calls]
+        rounds_used += retry.rounds_used
 
     has_proposal = (
         parsed.proposed_path is not None

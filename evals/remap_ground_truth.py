@@ -1,14 +1,22 @@
-"""Remap retrieval ground truth onto tip-seed passage text.
+"""Re-label retrieval ground truth after a reseed moved text under stable ids.
 
-ID presence alone misses reseeds that keep ``chunk_id`` while changing text
-(observed 115/235 drift). This module:
+The 2026-09 seed rebuild kept `chunk_id`s but re-chunked several books, so
+161 of 235 questions pointed at a passage that no longer contained their
+answer. `retrieval_eval.py` only checks that an id exists, so it scored those
+rows as misses and hybrid_rerank fell from 0.638 to ~0.41 hit@5 without the
+retriever changing at all.
 
-1. Loads tip SQLite chunks and asserts ``CANONICAL_COUNTS["chunks"]``.
-2. Flags rows whose labelled passage no longer coheres with the question.
-3. Remaps drifted rows to the best same-book (then global) tip chunk.
-4. Writes an auditable old→new map and optionally the remapped JSONL.
+For each row: keep it if the passage at its id still fits the question
+(`row_passage_coherent`), otherwise pick the tip chunk sharing the most
+question terms (same book first, whole corpus as fallback), and pin the result
+with `passage_sha256` so the next drift is caught by the eval itself. Every
+move is recorded in `evals/ground_truth_remap.jsonl`; rows with no plausible
+target are dropped and listed there as `unmapped`.
 
-Not run from CI. Offline: ``uv run python -m evals.remap_ground_truth``.
+Scoring is term overlap, which is what the lexical arm does too — read the
+post-remap lexical numbers with that in mind. Run offline, not from CI:
+
+    uv run python -m evals.remap_ground_truth --out evals/ground_truth.jsonl
 """
 
 from __future__ import annotations
@@ -29,12 +37,22 @@ from evals.ground_truth import (
     distinctive_terms,
     passage_content_hash,
     row_passage_coherent,
+    write_ground_truth,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEED_GZ = REPO_ROOT / "data" / "seed" / "homelib.sqlite.gz"
 DEFAULT_MAP_PATH = REPO_ROOT / "evals" / "ground_truth_remap.jsonl"
 CORPUS_REVISION = "seed-627-9119"
+
+# Below this share of question terms a chunk is not a plausible target.
+MIN_MATCH_SCORE = 0.35
+# Tie-break towards the book the question was written about.
+SAME_BOOK_BONUS = 0.15
+# Cap the global candidate set; rarest terms are unioned first.
+MAX_GLOBAL_CANDIDATES = 400
+# Refuse to overwrite the eval set if remapping would gut it.
+MIN_ROWS_TO_WRITE = 150
 
 
 @dataclass(frozen=True)
@@ -118,64 +136,45 @@ def load_ground_truth(path: Path = GROUND_TRUTH_PATH) -> list[GroundTruthRow]:
     return rows
 
 
-def _score_terms(chunk_terms: frozenset[str], terms: list[str], *, book_bonus: bool) -> float:
-    if not terms:
-        return 0.0
+def _score_terms(chunk_terms: frozenset[str], terms: list[str], *, same_book: bool) -> float:
     hits = sum(1 for term in terms if term in chunk_terms)
-    score = hits / len(terms)
-    if book_bonus:
-        score += 0.15
-    return score
+    return hits / len(terms) + (SAME_BOOK_BONUS if same_book else 0.0)
 
 
 def find_best_chunk(
     row: GroundTruthRow,
     index: TipIndex,
     *,
-    min_score: float = 0.35,
     prefer_book: bool = True,
 ) -> tuple[TipChunk, float] | None:
     terms = distinctive_terms(row.question)
     if not terms:
         return None
 
+    same_book_only = prefer_book and row.book_id in index.ids_by_book
     candidate_ids: set[str] = set()
-    if prefer_book and row.book_id and row.book_id in index.ids_by_book:
+    if same_book_only:
         candidate_ids.update(index.ids_by_book[row.book_id])
-        used_same_book = True
     else:
-        # Union postings for question terms; rare terms keep the set small.
         for term in sorted(terms, key=lambda t: len(index.ids_by_term.get(t, ()))):
-            posting = index.ids_by_term.get(term)
-            if not posting:
-                continue
-            if not candidate_ids:
-                candidate_ids = set(posting)
-            else:
-                candidate_ids |= posting
-            if len(candidate_ids) > 400:
+            candidate_ids |= index.ids_by_term.get(term, set())
+            if len(candidate_ids) > MAX_GLOBAL_CANDIDATES:
                 break
-        used_same_book = False
 
     best: tuple[float, TipChunk] | None = None
-    for chunk_id in candidate_ids:
+    for chunk_id in sorted(candidate_ids):  # ties resolve the same way every run
         chunk = index.by_id[chunk_id]
         score = _score_terms(
-            index.terms_by_id[chunk_id],
-            terms,
-            book_bonus=chunk.book_id == row.book_id,
+            index.terms_by_id[chunk_id], terms, same_book=chunk.book_id == row.book_id
         )
         if best is None or score > best[0]:
             best = (score, chunk)
 
-    if best is None:
+    if best is None or best[0] < MIN_MATCH_SCORE:
+        if same_book_only:
+            return find_best_chunk(row, index, prefer_book=False)
         return None
-    score, chunk = best
-    if score < min_score and used_same_book:
-        return find_best_chunk(row, index, min_score=min_score, prefer_book=False)
-    if score < min_score:
-        return None
-    return chunk, score
+    return best[1], best[0]
 
 
 def remap_rows(
@@ -227,13 +226,6 @@ def remap_rows(
             )
         )
     return new_rows, records, unmapped
-
-
-def write_jsonl(path: Path, rows: list[GroundTruthRow]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(row.model_dump_json(exclude_none=True) + "\n")
 
 
 def write_remap_map(path: Path, records: list[RemapRecord]) -> None:
@@ -296,14 +288,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"  unmapped: {row.chunk_id} {row.question[:80]!r}")
 
-        if len(new_rows) < 150:
-            print(f"refusing to write: only {len(new_rows)} rows (need >= 150)")
+        if len(new_rows) < MIN_ROWS_TO_WRITE:
+            print(f"refusing to write: only {len(new_rows)} rows (need >= {MIN_ROWS_TO_WRITE})")
             return 2
 
         write_remap_map(args.map, records)
         print(f"wrote remap map {args.map} ({len(records)} rows)")
         if args.out is not None:
-            write_jsonl(args.out, new_rows)
+            write_ground_truth(new_rows, args.out)
             print(f"wrote remapped ground truth {args.out} ({len(new_rows)} rows)")
         return 0
     finally:

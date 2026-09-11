@@ -87,9 +87,11 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 class GroundTruthRow(BaseModel):
     """One `question -> chunk_id` ground-truth pair.
 
-    ``passage_sha256`` / ``corpus_revision`` bind a row to tip corpus content
-    so ID-stable reseeds that change chunk *text* are caught (the 115/235
-    drift class). Older committed rows may omit them until remapped.
+    `passage_sha256` / `corpus_revision` pin the row to the passage *text* it
+    was written against. A reseed can keep every `chunk_id` while moving the
+    text underneath (the 2026-09 seed did — see `evals/remap_ground_truth.py`),
+    and an id-only check cannot see that. Rows written before the pin exist
+    leave both `None`.
     """
 
     question: str
@@ -148,12 +150,12 @@ def distinctive_terms(text: str, *, min_len: int = 4) -> list[str]:
 
 
 def row_passage_coherent(row: GroundTruthRow, tip_text: str | None) -> bool:
-    """True when the labelled tip passage still supports the question.
+    """True when the passage now stored under the row's `chunk_id` still fits.
 
-    Prefer an explicit ``passage_sha256`` bind when present. Otherwise require
-    that a majority of the question's distinctive terms appear in tip text —
-    the failure mode for ID-stable reseeds that swapped farming↔science style
-    passages under the same ``chunk_id``.
+    With a `passage_sha256` pin this is exact. Without one, fall back to
+    asking whether at least half of the question's content words occur in the
+    passage — coarse, but it separates "same passage, reflowed" from "an
+    unrelated passage now lives at this id".
     """
     if tip_text is None:
         return False
@@ -438,7 +440,7 @@ def write_ground_truth(rows: list[GroundTruthRow], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as out:
         for row in rows:
-            out.write(json.dumps(row.model_dump(), ensure_ascii=False) + "\n")
+            out.write(json.dumps(row.model_dump(exclude_none=True), ensure_ascii=False) + "\n")
 
 
 def main() -> int:

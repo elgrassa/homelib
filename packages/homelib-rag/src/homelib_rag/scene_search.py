@@ -142,41 +142,22 @@ def _canonical_text(conn: sqlite3.Connection, book_id: str) -> str:
     return "".join(str(row[0]) for row in rows)
 
 
-def _snap_left_word_boundary(text: str, index: int) -> int:
-    """Move ``index`` left to the previous whitespace (or stay at 0)."""
-    if index <= 0:
-        return 0
-    if index >= len(text):
-        return len(text)
-    if text[index].isspace() or text[index - 1].isspace():
-        return index
-    while index > 0 and not text[index - 1].isspace():
-        index -= 1
-    return index
-
-
-def _snap_right_word_boundary(text: str, index: int) -> int:
-    """Move ``index`` right to the next whitespace (or stay at len)."""
-    if index <= 0:
-        return 0
-    if index >= len(text):
-        return len(text)
-    if text[index - 1].isspace() or (index < len(text) and text[index].isspace()):
-        return index
-    while index < len(text) and not text[index].isspace():
-        index += 1
-    return index
-
-
 def _context_window(canonical: str, start: int, end: int) -> tuple[str, str, str]:
-    quote = canonical[start:end]
-    raw_prev_start = max(0, start - _CONTEXT_CHARS)
-    raw_next_end = min(len(canonical), end + _CONTEXT_CHARS)
-    prev_start = _snap_left_word_boundary(canonical, raw_prev_start) if raw_prev_start else 0
-    next_end = _snap_right_word_boundary(canonical, raw_next_end)
-    prev_context = canonical[prev_start:start]
-    next_context = canonical[end:next_end]
-    return quote, prev_context, next_context
+    """The quote plus ~`_CONTEXT_CHARS` either side, widened to whole words.
+
+    A fixed character budget lands mid-word ("…ing deliberately"), which reads
+    as a typo in the Scene preview. Walk each cut outward to the nearest
+    whitespace instead; at most one word longer than the budget.
+    """
+    prev_start = max(0, start - _CONTEXT_CHARS)
+    if 0 < prev_start < start and not canonical[prev_start].isspace():
+        while prev_start > 0 and not canonical[prev_start - 1].isspace():
+            prev_start -= 1
+    next_end = min(len(canonical), end + _CONTEXT_CHARS)
+    if end < next_end < len(canonical) and not canonical[next_end - 1].isspace():
+        while next_end < len(canonical) and not canonical[next_end].isspace():
+            next_end += 1
+    return canonical[start:end], canonical[prev_start:start], canonical[end:next_end]
 
 
 def _exact_hits(

@@ -499,6 +499,27 @@ def test_ground_truth_rows_reference_real_chunks() -> None:
     assert not missing, f"{len(missing)} ground-truth rows reference nonexistent chunk ids"
 
 
+def test_ground_truth_rows_still_point_at_the_text_they_were_written_for() -> None:
+    """The September reseed kept chunk ids but moved text under them, and the
+    id check above stayed green while 161 labels silently went stale. Every
+    row is now pinned to its passage text; a rebuild that shifts text must
+    fail here, not show up as a retrieval regression."""
+    from evals.ground_truth import passage_content_hash
+
+    rows = _load_committed_rows()
+    text_by_id = {c.chunk_id: c.text for c in load_corpus_chunks(SNAPSHOT_PATH)}
+
+    unpinned = [r["question"] for r in rows if not r.get("passage_sha256")]
+    assert not unpinned, f"{len(unpinned)} rows lack passage_sha256; run remap_ground_truth"
+
+    stale = [
+        r["chunk_id"]
+        for r in rows
+        if passage_content_hash(text_by_id[r["chunk_id"]]) != r["passage_sha256"]
+    ]
+    assert not stale, f"{len(stale)} rows point at chunks whose text changed since labelling"
+
+
 def test_ground_truth_questions_are_specific() -> None:
     rows = _load_committed_rows()
     assert rows
