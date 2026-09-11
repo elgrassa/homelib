@@ -426,6 +426,58 @@ def test_main_uses_stubbed_pipeline(
     assert "wrote 1 ground-truth pairs" in capsys.readouterr().out
 
 
+def test_passage_content_hash_stable() -> None:
+    from evals.ground_truth import passage_content_hash
+
+    assert passage_content_hash("Hello, World!") == passage_content_hash("hello world")
+    assert passage_content_hash("alpha") != passage_content_hash("beta")
+
+
+def test_coherence_fails_when_labelled_chunk_loses_question_terms() -> None:
+    from evals.ground_truth import GroundTruthRow, row_passage_coherent
+
+    row = GroundTruthRow(
+        question="What does Thoreau say about living deliberately in the woods?",
+        chunk_id="c1",
+        book_id="thoreau-walden",
+    )
+    farming = "Crop rotation and manure improve the yield of winter wheat."
+    assert row_passage_coherent(row, farming) is False
+
+
+def test_coherence_passes_when_evidence_present() -> None:
+    from evals.ground_truth import GroundTruthRow, row_passage_coherent
+
+    row = GroundTruthRow(
+        question="What does Thoreau say about living deliberately in the woods?",
+        chunk_id="c1",
+        book_id="thoreau-walden",
+    )
+    woods = (
+        "I went to the woods because I wished to live deliberately, "
+        "to front only the essential facts of life."
+    )
+    assert row_passage_coherent(row, woods) is True
+
+
+def test_coherence_honours_passage_sha256_bind() -> None:
+    from evals.ground_truth import (
+        GroundTruthRow,
+        passage_content_hash,
+        row_passage_coherent,
+    )
+
+    text = "Division of labour in the pin factory."
+    row = GroundTruthRow(
+        question="What example does Smith use?",
+        chunk_id="c1",
+        book_id="smith-wealth-of-nations",
+        passage_sha256=passage_content_hash(text),
+    )
+    assert row_passage_coherent(row, text) is True
+    assert row_passage_coherent(row, "Unrelated astronomy passage about stars.") is False
+
+
 # ── the committed evals/ground_truth.jsonl itself ───────────────────────
 
 

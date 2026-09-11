@@ -17,6 +17,7 @@ with a warning; it never aborts the run.
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -37,8 +38,11 @@ __all__ = [
     "SAMPLE_SIZE",
     "GroundTruthRow",
     "build_ground_truth",
+    "distinctive_terms",
     "generate_questions",
     "load_corpus_chunks",
+    "passage_content_hash",
+    "row_passage_coherent",
     "sample_chunks",
     "write_ground_truth",
 ]
@@ -81,11 +85,18 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 class GroundTruthRow(BaseModel):
-    """One `question -> chunk_id` ground-truth pair."""
+    """One `question -> chunk_id` ground-truth pair.
+
+    ``passage_sha256`` / ``corpus_revision`` bind a row to tip corpus content
+    so ID-stable reseeds that change chunk *text* are caught (the 115/235
+    drift class). Older committed rows may omit them until remapped.
+    """
 
     question: str
     chunk_id: str
     book_id: str
+    passage_sha256: str | None = None
+    corpus_revision: str | None = None
 
 
 class _QuestionsResult(BaseModel):
@@ -94,6 +105,66 @@ class _QuestionsResult(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     questions: list[str]
+
+
+def passage_content_hash(text: str) -> str:
+    """Stable short hash of normalised passage text for corpus binding."""
+    normalised = " ".join(_normalize_words(text))
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()[:16]
+
+
+_STOPWORDS = frozenset(
+    {
+        "about",
+        "according",
+        "after",
+        "does",
+        "from",
+        "have",
+        "into",
+        "that",
+        "the",
+        "this",
+        "what",
+        "when",
+        "where",
+        "which",
+        "with",
+        "would",
+    }
+)
+
+
+def distinctive_terms(text: str, *, min_len: int = 4) -> list[str]:
+    """Content words used for passage-coherence and remap scoring."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for word in _normalize_words(text):
+        if len(word) < min_len or word in _STOPWORDS or word in seen:
+            continue
+        seen.add(word)
+        out.append(word)
+    return out
+
+
+def row_passage_coherent(row: GroundTruthRow, tip_text: str | None) -> bool:
+    """True when the labelled tip passage still supports the question.
+
+    Prefer an explicit ``passage_sha256`` bind when present. Otherwise require
+    that a majority of the question's distinctive terms appear in tip text —
+    the failure mode for ID-stable reseeds that swapped farming↔science style
+    passages under the same ``chunk_id``.
+    """
+    if tip_text is None:
+        return False
+    if row.passage_sha256:
+        return passage_content_hash(tip_text) == row.passage_sha256
+    terms = distinctive_terms(row.question)
+    if not terms:
+        return bool(tip_text.strip())
+    tip_words = set(_normalize_words(tip_text))
+    hits = sum(1 for term in terms if term in tip_words)
+    return hits / len(terms) >= 0.5
 
 
 def load_corpus_chunks(path: Path = SNAPSHOT_PATH) -> list[Chunk]:
