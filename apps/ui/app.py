@@ -164,11 +164,11 @@ def _render_ask_catalog_links(client: Client) -> None:
 
 def _render_citation_expanders(client: Client, citations: list[Citation]) -> None:
     """Ask and Mentor both resolve a citation to GET /v1/blocks/{id}."""
-    for citation in citations:
+    for index, citation in enumerate(citations):
         with st.expander(format_citation_label(citation)):
             st.write(citation.quote)
             block_key = f"block_{citation.chunk_id}"
-            if st.button("Show full source block", key=f"load_{block_key}"):
+            if st.button("Show full source block", key=f"load_{block_key}_{index}"):
                 try:
                     block = client.get_block(block_id_for_citation(citation))
                 except (ApiClientError, ApiUnavailableError) as exc:
@@ -277,6 +277,14 @@ def render_mentor_tab(client: Client) -> None:
         wing_copy = wing.get("copy") or wing.get("wing_copy") or ""
         st.write(f"**Wing:** {wing['name']}" + (f" — {wing_copy}" if wing_copy else ""))
     st.write(last.get("rationale") or "")
+    parsed_citations: list[Citation] = []
+    for raw in last.get("citations") or []:
+        try:
+            parsed_citations.append(
+                raw if isinstance(raw, Citation) else Citation.model_validate(raw)
+            )
+        except ValidationError:
+            continue
     path = last.get("proposed_path")
     has_path = isinstance(path, dict) and (path.get("title") or path.get("steps"))
     if has_path:
@@ -293,22 +301,24 @@ def render_mentor_tab(client: Client) -> None:
                 st.markdown(f"{line}  \n[{url.strip()}]({url.strip()})")
             else:
                 st.write(line)
-        if st.button("Accept path to Coffee Table", key="mentor_accept_path"):
-            _enqueue_mentor_path(client, path)
+        cited_book_ids = list(dict.fromkeys(c.book_id for c in parsed_citations))
+        accept_label = (
+            "Queue cited shelf books on Coffee Table"
+            if cited_book_ids
+            else "Accept path to Coffee Table"
+        )
+        if cited_book_ids:
+            st.caption("Queues the cited source books; learning activities remain in this plan.")
+        if st.button(accept_label, key="mentor_accept_path"):
+            _enqueue_mentor_path(client, path, book_ids=cited_book_ids)
     elif last.get("degraded"):
         _render_mentor_catalog_links(client)
-    parsed_citations: list[Citation] = []
-    for raw in last.get("citations") or []:
-        try:
-            parsed_citations.append(
-                raw if isinstance(raw, Citation) else Citation.model_validate(raw)
-            )
-        except ValidationError:
-            continue
     _render_citation_expanders(client, parsed_citations)
 
 
-def _enqueue_mentor_path(client: Client, path: dict[str, Any]) -> None:
+def _enqueue_mentor_path(
+    client: Client, path: dict[str, Any], *, book_ids: list[str] | None = None
+) -> None:
     """Resolve Mentor step titles onto the shelf and propose them (audit W03)."""
     titles = [
         str(step.get("title") or "").strip()
@@ -320,7 +330,9 @@ def _enqueue_mentor_path(client: Client, path: dict[str, Any]) -> None:
     except (ApiClientError, ApiUnavailableError) as exc:
         st.error(format_api_error_message(exc))
         return
-    resolved, unresolved = resolve_shelf_resource_ids(shelf.get("items") or [], titles=titles)
+    resolved, unresolved = resolve_shelf_resource_ids(
+        shelf.get("items") or [], titles=[] if book_ids else titles, book_ids=book_ids or []
+    )
     if not resolved:
         st.warning(
             "None of those path steps match a full-text shelf book yet. "
@@ -551,8 +563,21 @@ def render_library_tab(client: Client) -> None:
         if not anchor:
             st.write(quote)
             continue
-        # Prefer hit metadata for the expander label so we do not N+1 fetch
-        # every block on each Streamlit rerun (open only when expanded).
+        # SceneHit contains anchors, not chapter/page/ordinal metadata. Resolve
+        # each unique source once per search and retain it across UI reruns.
+        metadata = last_scene.setdefault("block_metadata", {})
+        if anchor not in metadata:
+            try:
+                source = client.get_block(anchor)
+            except (ApiClientError, ApiUnavailableError):
+                metadata[anchor] = {}
+            else:
+                metadata[anchor] = {
+                    "section_path": list(source.section_path),
+                    "ordinal": source.ordinal,
+                    "page": source.provenance.page,
+                }
+        hit = {**hit, **metadata[anchor]}
         raw_section = hit.get("section_path")
         hit_section: list[str] = (
             [str(s) for s in raw_section] if isinstance(raw_section, list) else []
@@ -566,7 +591,7 @@ def render_library_tab(client: Client) -> None:
             authors=list(selected.authors) if selected is not None else [],
             section_path=hit_section,
             page=int(hit_page) if isinstance(hit_page, int) else None,
-            ordinal=int(hit_ordinal) if isinstance(hit_ordinal, int) else 0,
+            ordinal=int(hit_ordinal) if isinstance(hit_ordinal, int) else None,
         )
         with st.expander(label, expanded=False):
             st.write(quote)

@@ -652,12 +652,16 @@ def format_scene_hit_label(
     authors: list[str],
     section_path: list[str],
     page: int | None,
-    ordinal: int,
+    ordinal: int | None,
 ) -> str:
     """Shelf scene-search line: book · author · section · page (or passage N for txt)."""
     author = ", ".join(authors) if authors else "—"
     section = " / ".join(section_path) if section_path else "—"
-    place = f"page {page}" if page is not None else f"passage {ordinal + 1}"
+    place = (
+        f"page {page}"
+        if page is not None
+        else (f"passage {ordinal + 1}" if ordinal is not None else "passage")
+    )
     return f"{book_title} · {author} · {section} · {place}"
 
 

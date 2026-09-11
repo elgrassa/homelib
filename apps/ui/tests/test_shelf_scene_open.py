@@ -140,3 +140,22 @@ def test_shelf_scene_duplicate_open_anchor_uses_distinct_widget_keys() -> None:
         f"open_scene_passage_1_{shared_anchor}",
     ]
     assert len(set(open_keys)) == 2
+
+
+@respx.mock
+def test_scene_labels_resolve_real_metadata_once_per_source() -> None:
+    block = _walden_block()
+    block["ordinal"] = 7
+    _stub_shelf_apis(block)
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Shelf"
+    at.session_state["last_scene"] = {
+        "book_id": "thoreau-walden",
+        "hits": [{"open_anchor": block["block_id"], "quote": "woods"}] * 2,
+    }
+    at.run()
+    assert not at.exception
+    assert sum("Economy · passage 8" in e.label for e in at.expander) == 2
+    at.run()
+    calls = [c for c in respx.calls if str(c.request.url).endswith(f"/blocks/{block['block_id']}")]
+    assert len(calls) == 1

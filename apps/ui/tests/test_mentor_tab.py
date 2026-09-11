@@ -16,6 +16,49 @@ APP_PATH = Path(__file__).resolve().parent.parent / "app.py"
 CLOSED_PORT_API = "http://127.0.0.1:9"
 
 
+def test_learning_path_queues_cited_book_instead_of_matching_activity_title() -> None:
+    at = AppTest.from_string(
+        """
+import streamlit as st
+from apps.ui.app import render_mentor_tab
+class Client:
+    def list_resources(self):
+        return {"items": [{"id": "smith", "title": "The Wealth of Nations"}]}
+    def add_playlist_item(self, resource_id, origin):
+        st.session_state["queued"] = resource_id
+    def accept_playlist(self):
+        st.session_state["accepted"] = True
+render_mentor_tab(Client())
+""",
+        default_timeout=30,
+    )
+    at.session_state["last_mentor"] = _seeded_mentor_response(
+        proposed_path={
+            "title": "Learn economics",
+            "kind": "learning",
+            "steps": [
+                {"order": 0, "title": "Read the key passage", "why": "Understand specialization"}
+            ],
+        },
+        citations=[
+            {
+                "chunk_id": "c1",
+                "book_id": "smith",
+                "book_title": "The Wealth of Nations",
+                "section_path": [],
+                "quote": "Division of labour",
+            }
+        ],
+    )
+    at.run()
+    assert "Queue cited shelf books" in at.button(key="mentor_accept_path").label
+    at.button(key="mentor_accept_path").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["queued"] == "smith"
+    assert at.session_state["accepted"] is True
+    assert at.session_state["door"] == "Coffee Table"
+
+
 @pytest.fixture(autouse=True)
 def _selfhosted_against_closed_port(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_MODE", "selfhosted")

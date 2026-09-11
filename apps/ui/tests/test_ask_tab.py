@@ -13,6 +13,29 @@ APP_PATH = Path(__file__).resolve().parent.parent / "app.py"
 CLOSED_PORT_API = "http://127.0.0.1:9"
 
 
+def test_repeated_citation_source_keeps_both_quotes_and_opens_either_button() -> None:
+    at = AppTest.from_string(
+        """
+from types import SimpleNamespace
+from apps.ui.app import _render_citation_expanders
+from apps.ui.api_client import Citation
+c = Citation(chunk_id="same-chunk", book_id="test-book", book_title="Test book",
+             section_path=["Chapter"], quote="First quote")
+client = SimpleNamespace(get_block=lambda _: SimpleNamespace(text="Full source text"))
+_render_citation_expanders(client, [c, c.model_copy(update={"quote": "Second quote"})])
+""",
+        default_timeout=30,
+    ).run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert {m.value for m in at.markdown} >= {"First quote", "Second quote"}
+    keys = [b.key for b in at.button]
+    assert len(keys) == len(set(keys)) == 2
+    for key in keys:
+        at.button(key=key).click().run()
+        assert not at.exception, [e.value for e in at.exception]
+        assert any(t.value == "Full source text" for t in at.text)
+
+
 @pytest.fixture(autouse=True)
 def _selfhosted_against_closed_port(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_MODE", "selfhosted")
