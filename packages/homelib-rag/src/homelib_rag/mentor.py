@@ -584,11 +584,7 @@ def mentor_intake(
         # Truncated JSON (finish_reason=length / Unterminated string) gets one
         # bounded retry with a smaller completion budget and an explicit
         # brevity instruction — then fail closed.
-        truncated = (
-            agent_result.finish_reason == "length"
-            or "Unterminated string" in str(exc)
-            or "Expecting" in str(exc)
-        )
+        truncated = agent_result.finish_reason == "length" or "Unterminated string" in str(exc)
         if truncated and not agent_result.degraded:
             logger.warning("mentor intake truncated/invalid JSON; retrying once: %s", exc)
             retry_messages = [

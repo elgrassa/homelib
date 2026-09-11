@@ -20,7 +20,7 @@ Source: `README.md` ("Data", "Architecture", "Which LLM answers" sections); `spe
 | `cross-encoder/ms-marco-MiniLM-L-6-v2` | model | (query, chunk) relevance re-scoring | Open model weights | loaded lazily in `api` process | pinned model name in code | `homelib_rag.rerank` |
 | Ollama (local LLM) | provider | Chat completions, `qwen2.5:7b-instruct` default | Local, no data leaves the host | `docker/docker-compose.yml` service | `LLM_*` env vars | `homelib_rag.answer.OpenAIClient`, `rewrite.py`, `evals/ground_truth.py` |
 | Groq (cloud LLM) | provider | Chat completions, `openai/gpt-oss-20b` default | Owner's Streamlit secret only | Streamlit Community Cloud | `GROQ_API_KEY` (owner-only secret) | `homelib_rag.answer.OpenAIClient` (public demo only) |
-| Ground-truth questions | derived | 235 `question -> chunk_id` pairs for retrieval eval | Generated, not scraped | `evals/ground_truth.py` (LLM-generated from the committed corpus) | `evals/ground_truth.jsonl` | `evals/retrieval_eval.py` |
+| Ground-truth questions | derived | 234 `question -> chunk_id` pairs for retrieval eval | Generated, not scraped | `evals/ground_truth.py` (LLM-generated from the committed corpus) | `evals/ground_truth.jsonl` | `evals/retrieval_eval.py` |
 | SQLite seed | derived | Books/blocks/chunks/embeddings/catalog, pre-built | Same rights as source rows | `just seed-gz` (gzips a migrated+seeded `homelib.sqlite`) | `data/seed/homelib.sqlite.gz` (28.7 MB / ~27.4 MiB) | Streamlit demo, cold-clone drill |
 | Corpus snapshot | derived | Parsed `BookDoc`s, one per book | Same rights as source rows | `apps/ingest/build_snapshot.py` | `data/corpus_snapshot.jsonl.gz` (6.0 MB) | `apps/ingest/pipeline.py`, `apps/ingest/sqlite_pipeline.py`, `evals/ground_truth.py` |
 | Eval history | derived | Append-only run history + baseline margins | n/a | `evals/gate.py` | `evals/eval-baseline.json`, `evals/history.jsonl` | `just eval-gate` (recipe exists; **not** wired into `just ci` yet) |
@@ -307,7 +307,7 @@ Source: `specs/rights.md`; `docs/adrs/ADR-008-rights-gate.md`; `apps/store/sqlit
 | Chunks | 9,119 | `curl localhost:8010/health` (`chunks` field) or `just seed-sqlite` output |
 | Chunk embeddings | 9,119 | same seed output; one row per chunk, 1:1 |
 | Catalog works | 3,061 | `wc -l data/catalog.jsonl` → 3,062 lines, minus 1 provenance header line |
-| Eval questions | 235 | `wc -l evals/ground_truth.jsonl` |
+| Eval questions | 234 | `wc -l evals/ground_truth.jsonl` |
 | Corpus snapshot size | 6.0 MB (6,300,484 bytes) | `ls -la data/corpus_snapshot.jsonl.gz` |
 | SQLite seed size | 28.1 MB / 26.8 MiB (28,147,923 bytes) | `ls -la data/seed/homelib.sqlite.gz` |
 | Embedding dimension | 384 | `packages/homelib-rag/src/homelib_rag/index.py` (`_DEFAULT_EMBED_MODEL`), `docker/initdb/01-schema.sql` (`vector(384)`) |
