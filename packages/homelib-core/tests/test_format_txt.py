@@ -89,6 +89,24 @@ def test_parse_txt_plaintext_heading_heuristic(tmp_path: Path) -> None:
     _assert_offsets_dense_and_stable(doc, "mybook")
 
 
+def test_parse_txt_rejects_malformed_state_bracket_heading(tmp_path: Path) -> None:
+    """Art of War debris like ``State.]`` must not become a section_path."""
+    path = tmp_path / "art.txt"
+    path.write_text(
+        "III. Attack by Stratagem\n\n"
+        "Sun Tzu said: In the practical art of war.\n\n"
+        "State.]\n\n"
+        "More body that must stay in the same chapter block.\n",
+        encoding="utf-8",
+    )
+
+    doc, _result = parse_txt(path, book_id="suntzu")
+
+    assert not any(b.section_path == ["State.]"] for b in doc.blocks)
+    assert any("More body" in b.text for b in doc.blocks)
+    assert any("State.]" in b.text for b in doc.blocks)
+
+
 def test_parse_txt_recognizes_walden_where_i_lived_heading(tmp_path: Path) -> None:
     """The committed Gutenberg text uses lowercase ``and`` in this heading."""
     path = tmp_path / "walden.txt"

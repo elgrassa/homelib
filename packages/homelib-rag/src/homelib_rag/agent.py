@@ -333,6 +333,7 @@ class AgentResult(BaseModel):
     tool_calls: list[ToolCallRecord]
     rounds_used: int
     degraded: bool
+    finish_reason: str | None = None
 
 
 def _summarize(result: Any) -> str:
@@ -394,6 +395,7 @@ def run_agent(
                 tool_calls=tool_call_log,
                 rounds_used=round_index + 1,
                 degraded=False,
+                finish_reason=response.finish_reason,
             )
 
         history.append(

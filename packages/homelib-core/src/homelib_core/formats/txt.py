@@ -79,6 +79,9 @@ def _plaintext_heading(line: str, next_line: str | None) -> str | None:
         return None
     if _is_poem_byline(stripped):
         return None
+    # Fragments like "State.]" (Art of War OCR/Gutenberg debris) are not headings.
+    if stripped.endswith(".]") or (stripped.endswith("]") and "[" not in stripped):
+        return None
     if stripped.upper() == stripped or stripped.istitle() or stripped in _KNOWN_PLAINTEXT_HEADINGS:
         return stripped
     return None

@@ -581,20 +581,64 @@ def mentor_intake(
         payload = json.loads(raw_message)
         parsed = _LLMIntakeOutput.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
-        if agent_result.degraded:
+        # Truncated JSON (finish_reason=length / Unterminated string) gets one
+        # bounded retry with a smaller completion budget and an explicit
+        # brevity instruction — then fail closed.
+        truncated = (
+            agent_result.finish_reason == "length"
+            or "Unterminated string" in str(exc)
+            or "Expecting" in str(exc)
+        )
+        if truncated and not agent_result.degraded:
+            logger.warning("mentor intake truncated/invalid JSON; retrying once: %s", exc)
+            retry_messages = [
+                *messages,
+                ChatMessage(
+                    role="user",
+                    content=(
+                        "Your previous JSON was truncated or invalid. "
+                        "Reply with a COMPLETE shorter JSON object only "
+                        "(at most two grounded steps)."
+                    ),
+                ),
+            ]
+            try:
+                retry = run_agent(
+                    retry_messages,
+                    client=client,
+                    max_rounds=1,
+                    max_tokens=800,
+                    tools=mentor_tools,
+                    tool_schemas=mentor_schemas,
+                )
+                raw_message = (retry.final_message or "").strip()
+                payload = json.loads(raw_message)
+                parsed = _LLMIntakeOutput.model_validate(payload)
+                tool_calls = [record.tool_name for record in retry.tool_calls] or tool_calls
+                rounds_used = rounds_used + retry.rounds_used
+            except (LLMUnreachableError, json.JSONDecodeError, ValidationError) as retry_exc:
+                logger.warning("mentor intake retry failed: %s", retry_exc)
+                return _abstention_response(
+                    category="could_not_ground",
+                    notice=notice,
+                    tool_calls=tool_calls,
+                    rounds_used=rounds_used,
+                )
+        elif agent_result.degraded:
             return _abstention_response(
                 category="could_not_ground",
                 notice=notice,
                 tool_calls=tool_calls,
                 rounds_used=rounds_used,
             )
-        logger.warning("mentor intake parse failed: %s", exc)
-        return _abstention_response(
-            category="could_not_ground",
-            notice=notice,
-            tool_calls=tool_calls,
-            rounds_used=rounds_used,
-        )
+        else:
+            logger.warning("mentor intake parse failed: %s", exc)
+            return _abstention_response(
+                category="could_not_ground",
+                notice=notice,
+                tool_calls=tool_calls,
+                rounds_used=rounds_used,
+            )
 
     has_proposal = (
         parsed.proposed_path is not None

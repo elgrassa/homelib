@@ -466,3 +466,20 @@ def test_scene_hits_unique_by_block_id() -> None:
     unique = _dedupe_hits_by_block_id(hits, k=5)
     assert [h.block_id for h in unique] == ["blk-1", "blk-2"]
     assert unique[0].chunk_id == "c1"
+
+
+def test_context_window_snaps_to_word_boundaries() -> None:
+    """Scene previews must not start mid-word (retest P2)."""
+    from homelib_rag.scene_search import _context_window
+
+    text = "abcdefghij living deliberately in the woods and more words here"
+    start = text.index("deliberately")
+    end = start + len("deliberately")
+    quote, prev, nxt = _context_window(text, start, end)
+    assert quote == "deliberately"
+    if prev:
+        prev_at = text.index(prev)
+        assert prev_at == 0 or text[prev_at - 1].isspace()
+    if nxt:
+        assert nxt.startswith(" ") or nxt[0].isalnum()
+

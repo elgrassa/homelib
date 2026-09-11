@@ -674,12 +674,15 @@ def render_projection_tab(client: Client) -> None:
 
     source = normalize_projection_source(str(st.session_state.get("projection_source", "")))
     st.session_state["projection_source"] = source
+    # Drive the radio solely via session_state (Open handlers / query params
+    # set the same key). Passing both ``index=`` and a session value triggers
+    # Streamlit's competing-default warning.
+    st.session_state["projection_source_radio"] = source
 
     source_label = st.radio(
         "Projector source",
         options=("official", "shelf"),
         format_func=lambda v: "Official preview" if v == "official" else "This shelf",
-        index=0 if source == "official" else 1,
         horizontal=True,
         key="projection_source_radio",
     )
