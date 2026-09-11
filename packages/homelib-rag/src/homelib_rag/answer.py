@@ -153,6 +153,9 @@ class LLMResponse(BaseModel):
     content: str | None
     tool_calls: list[dict[str, Any]] | None = None
     usage: LLMUsage
+    #: Provider completion reason (`stop`, `length`, …). Optional so scripted
+    #: test doubles stay valid; Mentor uses ``length`` to detect truncation.
+    finish_reason: str | None = None
 
 
 class OpenAICompatibleClient(Protocol):
@@ -282,6 +285,7 @@ class OpenAIClient:
                 prompt_tokens=usage.prompt_tokens if usage else 0,
                 completion_tokens=usage.completion_tokens if usage else 0,
             ),
+            finish_reason=getattr(response.choices[0], "finish_reason", None),
         )
 
 
@@ -469,56 +473,107 @@ def _collapse_whitespace(text: str) -> str:
     line break a typesetter chose a century ago. Measured live before this
     change: 3 of 3 sampled questions degraded on exactly that.
 
-    This is the smallest loosening that admits real quotes, and deliberately
-    the only one. Word order, wording and punctuation still have to match
-    exactly, so a paraphrase is rejected as firmly as before — which is the
-    whole point of the check.
+    This is the smallest loosening that admits real quotes for *whitespace*.
+    Typography folding lives in `_fold_for_locate`; wording still has to match.
     """
     return " ".join(text.split())
 
 
-def _resolve_quote(raw_citation: _RawCitation, context_hits: list[Hit]) -> Hit | None:
-    """The passage a quote actually came from, or `None` if it came from none.
+# Locate-only: map common model/OCR typography onto ASCII so an NB hyphen or
+# curly quote can find the same span. The citation we store is always the
+# exact source substring — never the model's folded variant.
+_TYPOGRAPHY_FOLD = str.maketrans(
+    {
+        "\u2010": "-",  # hyphen
+        "\u2011": "-",  # non-breaking hyphen
+        "\u2012": "-",  # figure dash
+        "\u2013": "-",  # en dash
+        "\u2014": "-",  # em dash
+        "\u2212": "-",  # minus sign
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+    }
+)
+
+
+def _fold_for_locate(text: str) -> str:
+    """Whitespace + typography fold used only to *find* a quote in a passage."""
+    return _collapse_whitespace(text.translate(_TYPOGRAPHY_FOLD))
+
+
+def _source_span_for_quote(quote: str, passage: str) -> str | None:
+    """Exact source substring that matches ``quote`` under locate folding.
+
+    Prefer a byte-identical substring. Otherwise slide over ``passage`` and
+    return the shortest slice whose folded form equals the folded quote.
+    Returns ``None`` when no slice matches — paraphrases stay rejected.
+    """
+    if not quote or not passage:
+        return None
+    if quote in passage:
+        return quote
+
+    needle = _fold_for_locate(quote)
+    if not needle:
+        return None
+
+    n = len(passage)
+    for start in range(n):
+        for end in range(start + 1, n + 1):
+            folded = _fold_for_locate(passage[start:end])
+            if folded == needle:
+                # Shrink leading/trailing whitespace that collapse away so the
+                # stored citation is the readable source span, not padding.
+                while start < end - 1 and _fold_for_locate(passage[start + 1 : end]) == needle:
+                    start += 1
+                while end > start + 1 and _fold_for_locate(passage[start : end - 1]) == needle:
+                    end -= 1
+                return passage[start:end]
+            if len(folded) > len(needle):
+                break
+            if folded and not needle.startswith(folded):
+                break
+    return None
+
+
+def _resolve_quote(
+    raw_citation: _RawCitation, context_hits: list[Hit]
+) -> tuple[Hit, str] | None:
+    """The passage a quote came from and the exact source span, or ``None``.
 
     The model's `passage` number is treated as a hint, not as truth. It is
     checked first — it is usually right, and preferring it keeps attribution
     stable when the same sentence appears twice — but if the quote is not in
     that passage, every other shown passage is searched before giving up.
 
-    This is not leniency. Observed live: asked what makes writing clear, the
-    model returned a real, verbatim sentence of Taylor on scientific
-    management while citing the number of a completely different extract. The
-    words were genuine; only the label was wrong. Binding the citation to the
-    passage the text demonstrably occupies is *stronger* attribution than
-    trusting a number the model typed — the same reason `book_title` and
-    `chunk_id` are never taken from its output either. The model is reliable
-    at copying text and unreliable at bookkeeping, so it does the copying and
-    this function does the bookkeeping.
-
-    A quote present in no shown passage still returns `None`, and the caller
-    degrades: there is nothing to bind it to, and the answer is not grounded.
+    Matching folds whitespace and a narrow typography set (NB hyphen, dashes,
+    curly quotes) only to locate the span; the returned quote is always the
+    verbatim source slice. A paraphrase still returns ``None``.
     """
-    needle = _collapse_whitespace(raw_citation.quote)
-    if not needle:
+    if not raw_citation.quote.strip():
         return None
 
     hinted = raw_citation.passage - 1
     if 0 <= hinted < len(context_hits):
         candidate = context_hits[hinted]
-        if needle in _collapse_whitespace(candidate.text):
-            return candidate
+        span = _source_span_for_quote(raw_citation.quote, candidate.text)
+        if span is not None:
+            return candidate, span
 
     for index, candidate in enumerate(context_hits):
         if index == hinted:
             continue
-        if needle in _collapse_whitespace(candidate.text):
+        span = _source_span_for_quote(raw_citation.quote, candidate.text)
+        if span is not None:
             logger.info(
                 "citation named passage %d but its quote is in passage %d; "
                 "reattributing to where the text actually is",
                 raw_citation.passage,
                 index + 1,
             )
-            return candidate
+            return candidate, span
     return None
 
 
@@ -583,7 +638,12 @@ def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
             raise CitationValidationError(
                 f"citation cites chunk_id {citation.chunk_id!r}, which is not in the retrieved hits"
             )
-        if _collapse_whitespace(citation.quote) not in _collapse_whitespace(hit.text):
+        # Prefer exact bytes; allow whitespace/typography locate only when the
+        # stored quote still maps to a source span (post-recovery citations
+        # are exact slices and pass the first check).
+        if citation.quote not in hit.text and _source_span_for_quote(
+            citation.quote, hit.text
+        ) is None:
             raise CitationValidationError(
                 f"citation quote for chunk_id {citation.chunk_id!r} is not a verbatim "
                 "substring of that chunk's text"
@@ -763,9 +823,12 @@ def answer(
     context_hits = hits[:_MAX_CONTEXT_HITS]
     citations: list[Citation] = []
     for raw_citation in parsed.citations:
-        source = _resolve_quote(raw_citation, context_hits)
+        resolved = _resolve_quote(raw_citation, context_hits)
+        source: Hit | None = None
         citation_quote = raw_citation.quote
-        if source is None:
+        if resolved is not None:
+            source, citation_quote = resolved
+        else:
             recovered = _resolve_author_header_quote(
                 raw_citation,
                 parsed.answer,

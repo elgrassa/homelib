@@ -738,7 +738,8 @@ def test_quote_matching_ignores_only_whitespace_differences() -> None:
     a substring, but nothing was invented — the difference is a line break
     the typesetter chose. Failing this rejected essentially every real quote.
     """
-    hits = [_hit(text="The division of labour\nin this factory system\nis very marked.")]
+    source = "The division of labour\nin this factory system\nis very marked."
+    hits = [_hit(text=source)]
     client = _ScriptedClient(
         [_llm_json("Marked.", [{"passage": 1, "quote": "division of labour in this factory"}])]
     )
@@ -747,6 +748,10 @@ def test_quote_matching_ignores_only_whitespace_differences() -> None:
 
     assert response.degraded is False
     assert len(response.citations) == 1
+    # Stored quote is the exact source slice (with the original newline), not
+    # the model's reflowed string.
+    assert response.citations[0].quote == "division of labour\nin this factory"
+    assert response.citations[0].quote in source
 
 
 def test_a_paraphrase_is_still_rejected_after_whitespace_normalisation() -> None:
@@ -763,6 +768,58 @@ def test_a_paraphrase_is_still_rejected_after_whitespace_normalisation() -> None
     response = answer("q", hits, client=client, arm_used="hybrid")
 
     assert response.degraded is True
+
+
+def test_typography_only_quote_recovers_exact_source_span() -> None:
+    """Smith live failure: model emits a non-breaking hyphen the chunk lacks.
+
+    Locate folds NB hyphen → ASCII hyphen, but the citation quote must be the
+    exact bytes from the passage — never the model's typography variant.
+    """
+    source = (
+        "The pin-factory division of labour makes each worker "
+        "complete one small operation."
+    )
+    model_quote = (
+        "The pin\u2011factory division of labour makes each worker "
+        "complete one small operation."
+    )
+    assert "\u2011" in model_quote
+    assert model_quote not in source
+    hits = [_hit(text=source)]
+    client = _ScriptedClient(
+        [_llm_json("Pin factory.", [{"passage": 1, "quote": model_quote}])]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is False
+    assert len(response.citations) == 1
+    assert response.citations[0].quote == source
+    assert "\u2011" not in response.citations[0].quote
+
+
+def test_word_change_still_rejected_after_typography_fold() -> None:
+    """Folding dashes must not admit a rewritten quote."""
+    hits = [_hit(text="The pin-factory division of labour is marked.")]
+    client = _ScriptedClient(
+        [
+            _llm_json(
+                "Marked.",
+                [
+                    {
+                        "passage": 1,
+                        "quote": "The pin\u2011factory splitting of labour is marked.",
+                    }
+                ],
+            )
+        ]
+    )
+
+    response = answer("q", hits, client=client, arm_used="hybrid")
+
+    assert response.degraded is True
+    assert response.citations == []
 
 
 def test_passage_ordinal_is_not_accepted_as_a_chunk_id() -> None:
