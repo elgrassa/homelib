@@ -82,8 +82,8 @@ capture shows the first inventory rows; the demo contains 18 books.
 
 [![Shelf — current corpus counts and first inventory rows](docs/screenshots/reviewer-03-shelf.jpg)](docs/screenshots/reviewer-03-shelf.jpg)
 
-**Discover:** search the committed Open Library catalog snapshot. Results link
-to Open Library and explicitly identify records that are metadata only.
+**Discover:** live Open Library + Gutendex metadata search (under Shelf), with
+snapshot fallback. Results link out and label metadata-only records.
 
 [![Discover — economics results with Open Library links and metadata labels](docs/screenshots/reviewer-06-discover.jpg)](docs/screenshots/reviewer-06-discover.jpg)
 
