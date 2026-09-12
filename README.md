@@ -215,20 +215,20 @@ Maintainer maps (optional): [`docs/course-map.md`](docs/course-map.md),
 Status vocabulary in [`CHECKLIST.md`](CHECKLIST.md): `done` means verified in
 [`docs/evidence.md`](docs/evidence.md), not merely “code exists.”
 
-| Criterion | Points | Status |
-|---|---:|---|
-| Problem description | 2 | done |
-| Retrieval flow (KB + LLM) | 2 | done |
-| Retrieval evaluation | 2 | done |
-| LLM evaluation | 2 | done |
-| Interface (UI + API) | 2 | done |
-| Ingestion (dlt) | 2 | done |
-| Monitoring (≥5 charts + feedback) | 2 | done |
-| Containerization | 2 | done |
-| Reproducibility | 2 | done |
-| Hybrid + rerank + rewrite (measured) | 3 | done |
-| Cloud (bonus) | 2 | done — https://homelib.streamlit.app/ |
-| Extras (bonus) | — | partial — Mentor, eval gate, Coffee Table, rotunda |
+| Criterion | Points | Status | Code evidence |
+|---|---:|---|---|
+| Problem description | 2 | done | [`README.md`](README.md) (problem + architecture) |
+| Retrieval flow (KB + LLM) | 2 | done | [`answer.py`](packages/homelib-rag/src/homelib_rag/answer.py), [`hybrid.py`](packages/homelib-rag/src/homelib_rag/hybrid.py), [`apps/api/main.py`](apps/api/main.py) |
+| Retrieval evaluation | 2 | done | [`retrieval_eval.py`](evals/retrieval_eval.py), [`ADR-001`](docs/adrs/ADR-001-retrieval-arm.md), [`retrieval-2026-09-11-remapped.md`](evals/results/retrieval-2026-09-11-remapped.md) |
+| LLM evaluation | 2 | done | [`llm_eval.py`](evals/llm_eval.py), [`ADR-003`](docs/adrs/ADR-003-answer-prompt.md), [`llm_eval.md`](evals/results/llm_eval.md) |
+| Interface (UI + API) | 2 | done | [`apps/ui/app.py`](apps/ui/app.py), [`apps/api/main.py`](apps/api/main.py), [`openapi.snapshot.json`](specs/openapi.snapshot.json) |
+| Ingestion (dlt) | 2 | done | [`sqlite_pipeline.py`](apps/ingest/sqlite_pipeline.py), [`pipeline.py`](apps/ingest/pipeline.py) |
+| Monitoring (≥5 charts + feedback) | 2 | done | [`observatory.py`](apps/store/observatory.py), [`apps/api/main.py`](apps/api/main.py) (`POST /v1/feedback`) |
+| Containerization | 2 | done | [`docker/docker-compose.yml`](docker/docker-compose.yml) |
+| Reproducibility | 2 | done | [`justfile`](justfile) (`just drill`), [`.env.example`](.env.example), [`uv.lock`](uv.lock) |
+| Hybrid + rerank + rewrite (measured) | 3 | done | [`hybrid.py`](packages/homelib-rag/src/homelib_rag/hybrid.py), [`rerank.py`](packages/homelib-rag/src/homelib_rag/rerank.py), [`rewrite.py`](packages/homelib-rag/src/homelib_rag/rewrite.py), [`ADR-001`](docs/adrs/ADR-001-retrieval-arm.md) |
+| Cloud (bonus) | 2 | done — https://homelib.streamlit.app/ | [`streamlit_app.py`](streamlit_app.py) |
+| Extras (bonus) | — | partial — Mentor, eval gate, Coffee Table, rotunda | [`mentor.py`](packages/homelib-rag/src/homelib_rag/mentor.py), [`gate.py`](evals/gate.py), [`coffee_table.py`](apps/store/coffee_table.py), [`rotunda.py`](apps/ui/rotunda.py) |
 
 ## License
 
