@@ -61,19 +61,14 @@ questions can use the answer cache; the example reports zero new tokens.
 
 [![Ask — Walden answer with expanded source quotation](docs/screenshots/reviewer-02-ask-cited.jpg)](docs/screenshots/reviewer-02-ask-cited.jpg)
 
-**Mentor:** a beginner path for “Learn how Adam Smith explains division of
-labour in The Wealth of Nations”, with interests “economics, division of labour”.
+**Mentor:** a beginner path for “Learn how Adam Smith explains division of labour in The Wealth of Nations”, with interests “economics, division of labour”.
 The complete two-step proposal and an expanded Smith citation are shown below.
-Path acceptance depends
-on whether its steps resolve to full-text shelf books.
+Path acceptance depends on whether its steps resolve to full-text shelf books.
 
 [![Mentor — complete Smith study path and supporting citation](docs/screenshots/reviewer-07-mentor.jpg)](docs/screenshots/reviewer-07-mentor.jpg)
 
 **Roadmap:** an ordered book list with authors, rationale, prerequisites and
-source provenance. For “Understand Adam Smith and the division of labour”, this
-run combines a catalog book
-with the full-text *Wealth of Nations*; accepting it adds the shelf book to
-Coffee Table.
+source provenance. For “Understand Adam Smith and the division of labour”, this run combines a catalog book with the full-text *Wealth of Nations*; accepting it adds the shelf book to Coffee Table.
 
 [![Roadmap — two books with catalog and shelf provenance](docs/screenshots/reviewer-09-roadmap.jpg)](docs/screenshots/reviewer-09-roadmap.jpg)
 
@@ -93,8 +88,7 @@ to Open Library and explicitly identify records that are metadata only.
 [![Discover — economics results with Open Library links and metadata labels](docs/screenshots/reviewer-06-discover.jpg)](docs/screenshots/reviewer-06-discover.jpg)
 
 **Scene search:** choose a shelf book and describe a passage. Smart retrieval
-can return related excerpts rather than an exact phrase match; use **Open this
-passage** to inspect the full source, then continue in Projection.
+can return related excerpts rather than an exact phrase match; use **Open this passage** to inspect the full source, then continue in Projection.
 
 [![Scene search — Walden query, related excerpt and source-opening control](docs/screenshots/reviewer-10-scene-search.jpg)](docs/screenshots/reviewer-10-scene-search.jpg)
 
