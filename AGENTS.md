@@ -49,7 +49,11 @@ local / Groq for the public demo behind the existing `OpenAIClient`.
 
 ## Standing rules
 
-- Stacked PRs into `main` (oldest-first, rebase-merge); agents do not merge.
+- Stacked PRs into `main` (oldest-first, rebase-merge). Owner merges; agents
+  never merge to `main`.
+- PR titles/bodies read like a person wrote them: what changed, why, how to
+  check. No agent-ops boilerplate (“agents do not merge”, stack liturgy,
+  skill names) — those rules live in this file only.
 - One `just ci` per push; targeted pytest per fix; no OpenAPI regen unless asked.
 - Demo LLM stays behind existing `OpenAIClient`/`LLM_*` — no ProviderChain,
   no `LLM_PROVIDERS`, no new SDK.

@@ -170,13 +170,15 @@ Problem description; KB+LLM flow; multiple retrieval evals; multiple LLM evals; 
 
 ---
 
-## I. Stacked review protocol (v2, binding 2026-09-01)
+## I. Stacked review protocol (binding; `v2` history kept below)
 
-Pavlo merges **oldest → newest** (~10 PRs into `v2`). Agents do **not** merge to
-`v2` or `main`.
+Merge stacked PRs **oldest → newest** into `main` with rebase-merge. Restack
+downstream branches after each land. Draft dependents until their base lands.
 
-- **Merge style:** rebase-merge only (Forgejo UI or an equivalent CLI).
-  Restack downstream feature branches after each merge.
+Agent merge/publish limits live in [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md),
+not in PR descriptions.
+
+- **Merge style:** rebase-merge only (Forgejo UI or equivalent CLI).
 - **Draft newer PRs** until their base PR lands; avoid parallel review of
   dependent stacks.
 - **`v2` → `main`:** DONE 2026-09-06 — `main` = `v2` = `eb4a4ff` (fast-forward, no merge commit); re-synced after #32 (MagicLib design-sync inputs, `5881157` + bot graph `96b3967`) — `main` follows every `v2` bot commit. Protocol from now on: push to `v2` first, wait for the `graph-refresh` bot commit (its push does not trigger a run), then fast-forward `main` to that tip. `main` never refreshes its own graph (a rebuild is not byte-stable — community ids, manifest mtimes, cache paths — so a main-side refresh forked `main` from `v2` on every fast-forward until `ci/graph-refresh-v2-only` landed 2026-09-06).
