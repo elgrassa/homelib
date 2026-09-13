@@ -201,7 +201,10 @@ jobs:
   graph-guard:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: [macos-arm64, quick]
-    timeout-minutes: 10
+    # Run 14137: checkout fetch alone chewed most of a 10m budget under host
+    # contention and cancelled before the guard script ran. 15m matches
+    # graph-refresh and leaves room for a slow fetch without hiding real reds.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:

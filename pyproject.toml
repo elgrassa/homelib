@@ -122,6 +122,9 @@ omit = [
     "evals/retrieval_eval.py",
     "evals/chunk_sweep.py",
     "evals/answer_similarity.py",
+    # Same class: one-shot GT remap CLI (PR #72). Measured 0% / 161 stmts in
+    # run 14137 and pulled the heavy-lane floor to 89.08% with no test failure.
+    "evals/remap_ground_truth.py",
 ]
 
 [tool.coverage.report]

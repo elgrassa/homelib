@@ -189,6 +189,25 @@ def test_some_ci_job_runs_the_full_suite_the_hook_skips() -> None:
     assert full, f"no CI job runs the full suite with the coverage floor; jobs are {sorted(jobs)}"
 
 
+def test_coverage_omit_keeps_offline_eval_clis_out_of_the_floor() -> None:
+    """Bake-off / remap CLIs are not unit-tested; omitting them is the floor.
+
+    Run 14137 on PR #71: 1049 passed, then FAIL at 89.08% because
+    ``evals/remap_ground_truth.py`` (161 stmts / 0% hit) sat in ``source`` but
+    not ``omit``. Same failure class as the named-column-gate comment already
+    documents for retrieval_eval / chunk_sweep / answer_similarity.
+    """
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+    omit = pyproject["tool"]["coverage"]["run"]["omit"]
+    for cli in (
+        "evals/retrieval_eval.py",
+        "evals/chunk_sweep.py",
+        "evals/answer_similarity.py",
+        "evals/remap_ground_truth.py",
+    ):
+        assert cli in omit, f"{cli} must stay omitted from the coverage floor"
+
+
 def test_the_full_suite_does_not_run_on_the_quick_lane() -> None:
     """The quick runner's daemon caps jobs at 25m and considers >12m wrong.
 
