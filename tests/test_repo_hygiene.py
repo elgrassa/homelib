@@ -250,7 +250,8 @@ def test_full_suite_waits_for_gate_so_they_do_not_starve_each_other() -> None:
 
     Run 297: parallel gate+full-suite starved the quick job (6% at deadline).
     Run 299: serialized, but quick's 25m daemon still killed pytest at 97%.
-    Keep full-suite behind gate, and run gate on heavy with a 45m budget.
+    Keep full-suite behind gate, and run gate on heavy with a ≥60m budget
+    (45m was still tight under host load 200+).
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     gate = workflow["jobs"]["gate"]
@@ -258,7 +259,7 @@ def test_full_suite_waits_for_gate_so_they_do_not_starve_each_other() -> None:
     assert full.get("needs") == ["gate"], full.get("needs")
     assert "heavy" in gate["runs-on"]
     assert "quick" not in gate["runs-on"]
-    assert int(gate["timeout-minutes"]) >= 45
+    assert int(gate["timeout-minutes"]) >= 60
     assert int(gate["timeout-minutes"]) < 120
 
 

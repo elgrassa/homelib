@@ -36,9 +36,11 @@ jobs:
     name: ruff + mypy + pytest
     # Quick lane daemon caps at 25m. Under shared-host load the fast subset
     # reached 97% then died at the deadline (PR #71 run 299). Heavy daemon
-    # cap is 2h — keep gate there with room for cold uv sync + starved pytest.
+    # cap is 2h — keep gate there with room for cold uv sync + starved pytest
+    # (45m was still tight under load 200+; 60m leaves headroom without
+    # parallelising gate pytest against full-suite on the one Mac).
     runs-on: [macos-arm64, heavy]
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
