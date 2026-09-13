@@ -1163,6 +1163,57 @@ def test_roadmap_llm_unreachable_maps_to_503(monkeypatch: pytest.MonkeyPatch) ->
     assert resp.status_code == 503
 
 
+def test_roadmap_blank_goal_with_interests_does_not_500() -> None:
+    """Cloud UI leaves Goal blank; catalog('') used to escape as HTTP 500."""
+    import json
+
+    from homelib_rag.answer import LLMResponse, LLMUsage
+
+    class _RoadmapLlm:
+        model = "fake-model"
+
+        def chat(self, messages: Any, **kwargs: Any) -> LLMResponse:
+            return LLMResponse(
+                content=json.dumps({"steps": [], "rationale": "ok"}),
+                usage=LLMUsage(prompt_tokens=1, completion_tokens=1),
+            )
+
+    seen: list[str] = []
+
+    def _catalog(query: str, subjects: list[str] | None = None) -> list[Any]:
+        if not query.strip():
+            raise ValueError("query must not be empty")
+        seen.append(query)
+        return []
+
+    app.dependency_overrides[get_deps] = lambda: _make_deps(
+        llm_client=_RoadmapLlm(),
+        catalog_search=_catalog,
+    )
+
+    resp = client.post(
+        "/v1/roadmap",
+        json={"interests": ["AI engineering"], "level": "beginner", "goal": "", "max_steps": 8},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["rationale"] == "ok"
+    assert seen == ["AI engineering"]
+
+
+def test_roadmap_empty_catalog_needle_maps_to_400(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise(*args: Any, **kwargs: Any) -> RoadmapResponse:
+        raise ValueError("query must not be empty")
+
+    monkeypatch.setattr(main.roadmap_module, "build_roadmap", _raise)
+    app.dependency_overrides[get_deps] = lambda: _base_deps()
+
+    resp = client.post("/v1/roadmap", json={"interests": [], "level": "beginner", "goal": ""})
+
+    assert resp.status_code == 400
+    assert "empty" in resp.json()["detail"]
+
+
 # ── /v1/ingest ───────────────────────────────────────────────────────────
 
 

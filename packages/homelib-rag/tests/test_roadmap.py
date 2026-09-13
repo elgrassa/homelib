@@ -57,9 +57,44 @@ def _entry(ol_key: str, title: str = "Some Book", authors: list[str] | None = No
 
 def _catalog_returning(entries: list[CatalogEntry]) -> Any:
     def _search(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]:
+        # Mirror agent/sqlite_index: empty needle is ValueError → Cloud 500
+        # when Roadmap left Goal blank (live demo: interests only).
+        if not query.strip():
+            raise ValueError("query must not be empty")
         return entries
 
     return _search
+
+
+def test_roadmap_blank_goal_uses_interests_as_catalog_needle() -> None:
+    """Cloud Roadmap form allows empty Goal; catalog(goal="") used to 500.
+
+    Interests alone must still retrieve candidates — Goal stays blank in the
+    LLM prompt, but the catalog needle falls back to joined interests.
+    """
+    seen: list[tuple[str, list[str] | None]] = []
+    entry = _entry("/works/OL42W", title="Hands-On Machine Learning")
+
+    def catalog(query: str, subjects: list[str] | None = None) -> list[CatalogEntry]:
+        if not query.strip():
+            raise ValueError("query must not be empty")
+        seen.append((query, subjects))
+        return [entry]
+
+    client = _ScriptedClient([_llm_response([_step(0, "/works/OL42W")])])
+    result = build_roadmap(
+        ["AI engineering"],
+        "beginner",
+        "",
+        client=client,
+        catalog=catalog,
+    )
+
+    # Blank Goal: catalog needle is joined interests; Goal stays empty in the prompt.
+    assert seen == [("AI engineering", ["AI engineering"])]
+    assert result.steps[0].ol_key == "/works/OL42W"
+    prompt = client.calls[0]["messages"][1].content
+    assert "Goal: ''" in prompt or 'Goal: ""' in prompt
 
 
 def _step(order: int, ol_key: str | None) -> dict[str, Any]:

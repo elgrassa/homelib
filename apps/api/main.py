@@ -1032,6 +1032,9 @@ def post_roadmap(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except LLMUnreachableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        # Empty catalog needle (blank goal and interests) — client error, not 500.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v1/ingest", response_model=IngestResponse)

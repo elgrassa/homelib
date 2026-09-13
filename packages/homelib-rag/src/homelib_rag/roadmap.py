@@ -197,7 +197,13 @@ def build_roadmap(
     (specs/roadmap.md). A `RoadmapParseError` is raised only after the first
     call AND the one repair call both fail to parse/validate.
     """
-    candidates = catalog(goal, interests or None)
+    # Catalog search rejects empty needles (agent/sqlite_index). The Cloud
+    # Roadmap form lets Goal stay blank while Interests are filled — using
+    # goal as the only needle then raised ValueError → uncaught HTTP 500.
+    catalog_query = (goal or "").strip() or " ".join(
+        part.strip() for part in interests if part and part.strip()
+    )
+    candidates = catalog(catalog_query, interests or None) if catalog_query else []
 
     prompt = _build_prompt(interests, level, goal, max_steps, candidates)
     messages = [
