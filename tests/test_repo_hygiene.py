@@ -2,8 +2,8 @@
 
 A config file that looks like a guarantee but is wired into nothing is worse
 than no config at all, because it gets believed. `.gitleaks.toml` sat in this
-repository for a day enforced by nothing — no CI step, no hook, no just
-recipe — while CHECKLIST.md listed secret scanning as done. When it was finally
+repository for a day enforced by nothing - no CI step, no hook, no just
+recipe - while CHECKLIST.md listed secret scanning as done. When it was finally
 run it reported four findings.
 
 These tests assert the wiring, not the scan: the scan itself runs in `just
@@ -35,8 +35,8 @@ def test_gitleaks_allowlists_never_exempt_whole_files() -> None:
     """No allowlist may use `paths`.
 
     A `paths` entry exempts every finding in that file. The entries here exist
-    to cover specific known-safe strings — a placeholder in .env.example, a
-    metric name in the eval baseline — and scoping them by file instead would
+    to cover specific known-safe strings - a placeholder in .env.example, a
+    metric name in the eval baseline - and scoping them by file instead would
     also allow a real credential pasted into the same file later. This was
     verified rather than assumed: a path-scoped version of this config
     suppressed a planted GitHub PAT and AWS key id that gitleaks otherwise
@@ -130,7 +130,7 @@ def test_ci_declares_no_permissions_block() -> None:
 
     It is GitHub Actions syntax. On this instance capabilities come from
     Authorized Integrations, so a `permissions: contents: read` block grants
-    and restricts nothing while reading like a security control — the
+    and restricts nothing while reading like a security control - the
     dangerous kind of no-op, because it invites the reader to believe the job
     is sandboxed.
     """
@@ -149,7 +149,7 @@ def test_pre_push_hook_stays_fast_by_excluding_the_slow_markers() -> None:
     Quality gates live on the PR; this hook exists only to catch what is cheap
     to check and embarrassing to push. The moment it starts running the
     integration tests, the embedding-model loads or the coverage floor, it
-    stops being a fast gate and people start reaching for --no-verify — at
+    stops being a fast gate and people start reaching for --no-verify - at
     which point it protects nothing at all.
     """
     hook = REPO_ROOT / ".githooks/pre-push"
@@ -234,7 +234,7 @@ def test_ci_cancels_outdated_runs_on_the_same_pr_ref() -> None:
     """A newer push on the same PR must cancel the in-flight run.
 
     Without cancel-in-progress, tip fixes pile behind dead work on the shared
-    Mac (PR #71 runs 297–299). Group by workflow+ref; never cancel main.
+    Mac (PR #71 runs 297-299). Group by workflow+ref; never cancel main.
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     concurrency = workflow["concurrency"]
@@ -272,7 +272,7 @@ def test_compose_pins_the_ollama_context_window() -> None:
     tokens; the image default is far smaller.
 
     This was invisible during development because the dev machine has
-    OLLAMA_CONTEXT_LENGTH set globally to 32768 — a local setting no reviewer
+    OLLAMA_CONTEXT_LENGTH set globally to 32768 - a local setting no reviewer
     inherits. Exactly the class of defect this repo keeps finding: something
     that works only because of state on one machine.
     """
@@ -289,7 +289,7 @@ def test_ui_dockerfile_pins_pythonpath_so_apps_imports_resolve() -> None:
     """Streamlit runs `apps/ui/app.py` as a script, not as `python -m`.
 
     Without PYTHONPATH=/app, `from apps.ui.api_client import …` raises
-    ModuleNotFoundError while `_stcore/health` still returns 200 — a
+    ModuleNotFoundError while `_stcore/health` still returns 200 - a
     false-healthy container that looks up but cannot render Crossroads.
     Pytest hides this via pyproject.toml `pythonpath = ["."]`; the image
     must pin the same root explicitly.
@@ -306,7 +306,7 @@ def test_streamlit_theme_pins_parchment_gold_from_mockups() -> None:
     """Peer-facing shell: parchment/ink/gold tokens from magic-library mockup.
 
     Without a committed `.streamlit/config.toml`, Compose and Community Cloud
-    fall back to default white Streamlit chrome. Theme only — not the HTML
+    fall back to default white Streamlit chrome. Theme only - not the HTML
     rotunda (cut order: static door grid before rotating-room).
     """
     config = (REPO_ROOT / ".streamlit/config.toml").read_text()
@@ -323,7 +323,7 @@ def test_ui_dockerfile_copies_streamlit_theme_into_image() -> None:
 
     Streamlit loads `$CWD/.streamlit/config.toml` from WORKDIR /app. Omitting
     this COPY leaves Compose on default white chrome while Cloud (full checkout)
-    looks themed — a peer/local skew.
+    looks themed - a peer/local skew.
     """
     dockerfile = (REPO_ROOT / "docker/ui.Dockerfile").read_text()
 
@@ -346,7 +346,7 @@ def test_compose_api_wires_homelib_sqlite_path_for_v2_doors() -> None:
     volumes = api.get("volumes") or []
 
     assert "HOMELIB_SQLITE_PATH" in env, (
-        "api service omits HOMELIB_SQLITE_PATH — Coffee Table and other v2 "
+        "api service omits HOMELIB_SQLITE_PATH - Coffee Table and other v2 "
         "doors return 503 even when Postgres health is green"
     )
     assert any("data" in str(v) for v in volumes), (
@@ -392,7 +392,7 @@ def test_compose_ui_healthcheck_probes_read_server() -> None:
 
 def test_compose_ui_forwards_read_port_and_viewer_flag() -> None:
     """The UI process renders READ_PORT into link text and gates the Official
-    viewer behind HOMELIB_OFFICIAL_VIEWER — both must reach the container, and
+    viewer behind HOMELIB_OFFICIAL_VIEWER - both must reach the container, and
     the viewer flag must default off rather than being silently enabled.
     """
     text = (REPO_ROOT / "docker/docker-compose.yml").read_text()
@@ -417,7 +417,7 @@ def test_ui_entrypoint_pins_read_server_to_container_port() -> None:
 
 def test_streamlit_page_title_is_magiclib() -> None:
     app_src = (REPO_ROOT / "apps/ui/app.py").read_text()
-    assert 'page_title="MagicLib — HomeLib"' in app_src
+    assert 'page_title="MagicLib - HomeLib"' in app_src
     assert 'st.title("MagicLib")' in app_src
     config = (REPO_ROOT / ".streamlit/config.toml").read_text()
     assert 'toolbarMode = "minimal"' in config
@@ -445,7 +445,7 @@ def test_ci_pytest_forces_workspace_basetemp() -> None:
 def test_run_agent_is_only_on_the_mentor_path() -> None:
     """`homelib_rag.agent.run_agent`'s own default tool table binds
     `get_block` to Postgres directly, so calling it with no store-safe
-    `tools=` override is only safe for the Mentor path — the one caller
+    `tools=` override is only safe for the Mentor path - the one caller
     (`homelib_rag.mentor.mentor_intake`) that injects `Deps.get_block`
     et al. (specs/agent-tools.md: "on the Mentor request path since
     2026-09-06; Ask stays single-shot"). `/v1/ask`'s handler
@@ -454,7 +454,7 @@ def test_run_agent_is_only_on_the_mentor_path() -> None:
     """
     main_py_text = (REPO_ROOT / "apps" / "api" / "main.py").read_text()
     assert "run_agent" not in main_py_text, (
-        "run_agent referenced in apps/api/main.py (/v1/ask's module) — Ask must stay single-shot"
+        "run_agent referenced in apps/api/main.py (/v1/ask's module) - Ask must stay single-shot"
     )
 
     ui_offenders = [
@@ -475,7 +475,7 @@ def test_compose_api_pins_selfhosted_like_ui() -> None:
     """`.env.example` ships `APP_MODE=demo` for the Community Cloud path. The
     api service used to read `${APP_MODE:-selfhosted}`, so a reviewer who
     copied `.env.example` got a demo-mode API that minted a fresh anonymous
-    principal for every header-less request — an always-empty Coffee Table
+    principal for every header-less request - an always-empty Coffee Table
     on the reviewer stack. Both containers pin selfhosted; the env var is for
     the Streamlit-only demo process."""
     services = _compose()["services"]
@@ -508,7 +508,7 @@ def test_compose_ingest_can_write_sqlite_seed() -> None:
     """Hygiene (string/structure match, not behavioural). The api service reads
     `/data/homelib.sqlite`; the ingest one-shot must be able to write it: the
     env var is set and the data mount is not read-only. The image CMD stays
-    the Postgres pipeline — the SQLite seed is `just seed-sqlite`, a second
+    the Postgres pipeline - the SQLite seed is `just seed-sqlite`, a second
     one-shot, so a cold clone never embeds the corpus twice in one process."""
     services = _compose()["services"]
     assert isinstance(services, dict)
@@ -523,7 +523,7 @@ def test_compose_ingest_can_write_sqlite_seed() -> None:
 
 
 def test_drill_asserts_seed_counts_via_health() -> None:
-    """The drill used to seed Postgres, then ask the API — which reads SQLite —
+    """The drill used to seed Postgres, then ask the API - which reads SQLite -
     and never checked the counts. It must seed SQLite through the compose
     one-shot (not a host `uv run`) and assert 18 books / 9119 chunks."""
     drill = (REPO_ROOT / "scripts/cold_clone_drill.sh").read_text()
@@ -559,13 +559,13 @@ def test_drill_verifies_monitoring_via_observatory_not_grafana_panel_count() -> 
     assert "/v1/observatory" in drill
     assert "queries_over_time" in drill
     assert '["dashboard"]["panels"]' not in drill, (
-        "drill still asserts on Grafana panel count — vacuous on the SQLite path"
+        "drill still asserts on Grafana panel count - vacuous on the SQLite path"
     )
 
 
 def test_specs_ui_door_list_matches_crossroads_doors() -> None:
     """`specs/ui.md` describes the doors; the code defines them. The spec's door
-    table must list exactly `CROSSROADS_DOORS`, in order — a door added or
+    table must list exactly `CROSSROADS_DOORS`, in order - a door added or
     renamed in one place and not the other fails here, not in a review."""
     from apps.ui.view_model import CROSSROADS_DOORS
 
@@ -627,7 +627,7 @@ def test_ci_graph_guard_job_exists() -> None:
 
 
 def test_ci_graph_refresh_pushes_to_current_protected_branch() -> None:
-    """Homelib refreshes on the pushed protected ref — main, and only main.
+    """Homelib refreshes on the pushed protected ref - main, and only main.
 
     The refresh stays keyed on GITHUB_REF_NAME (a future integration branch
     is a one-line case addition), but since `v2` was collapsed into main on
@@ -722,7 +722,7 @@ def test_ci_graph_refresh_commits_on_main(tmp_path: Path) -> None:
 
     Until 2026-09-06 main was a pure fast-forward of the `v2` integration
     branch and deliberately never refreshed (rebuilds are not byte-stable, so
-    refreshing on both forked them — runs 13318/13319). With `v2` collapsed
+    refreshing on both forked them - runs 13318/13319). With `v2` collapsed
     into main, main is the one branch that owns the committed graph.
     """
     code, out, called, tip = _run_graph_refresh(tmp_path, "main")
@@ -736,7 +736,7 @@ def test_ci_graph_refresh_relativises_source_paths(tmp_path: Path) -> None:
 
     graphify writes absolute ``source_file`` paths and cache keys; on the
     runner that is a private host path, and it leaked into main's
-    ``graphify-out/`` (859 hits in graph.json on 2026-09-06) — straight into
+    ``graphify-out/`` (859 hits in graph.json on 2026-09-06) - straight into
     the public snapshot. The step must strip the workdir prefix before the
     freshness check and the commit.
     """
@@ -790,14 +790,14 @@ def test_ci_graph_refresh_commits_the_bootstrap_graph() -> None:
 
 
 def test_graphifyignore_excludes_generated_and_data_paths() -> None:
-    """Indexer excludes: do not confuse with .gitignore — graphify-out/ is committed."""
+    """Indexer excludes: do not confuse with .gitignore - graphify-out/ is committed."""
     ignore = (REPO_ROOT / ".graphifyignore").read_text()
     for path in (".venv/", "graphify-out/", "data/", ".pytest-tmp/"):
         assert path in ignore, f".graphifyignore missing {path!r}"
 
 
 def test_claude_md_routes_named_symbols_through_graphify_explain() -> None:
-    """Without 1bis, a committed graph is dead weight — sessions still crawl."""
+    """Without 1bis, a committed graph is dead weight - sessions still crawl."""
     text = (REPO_ROOT / "CLAUDE.md").read_text()
     assert "graphify explain" in text
     assert "graphify-out/graph.json" in text  # the ban target
