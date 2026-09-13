@@ -231,18 +231,20 @@ def test_mypy_and_full_suite_live_on_heavy_with_room_for_cold_sync() -> None:
 
 
 def test_full_suite_waits_for_gate_so_they_do_not_starve_each_other() -> None:
-    """PR #71 run 297: parallel gate+full-suite on one Mac killed the quick job.
+    """PR #71: gate must finish before full-suite, with room under load.
 
-    Both jobs uv-sync and pytest at once; the gate's fast subset reached only
-    6% before the 20m quick deadline. Serialize full-suite behind gate, and
-    keep the gate timeout under the daemon's 25m cap with a little headroom.
+    Run 297: parallel gate+full-suite starved the quick job (6% at deadline).
+    Run 299: serialized, but quick's 25m daemon still killed pytest at 97%.
+    Keep full-suite behind gate, and run gate on heavy with a 45m budget.
     """
     workflow = yaml.safe_load(CI_WORKFLOW.read_text())
     gate = workflow["jobs"]["gate"]
     full = workflow["jobs"]["full-suite"]
     assert full.get("needs") == ["gate"], full.get("needs")
-    assert int(gate["timeout-minutes"]) >= 24
-    assert int(gate["timeout-minutes"]) < 25
+    assert "heavy" in gate["runs-on"]
+    assert "quick" not in gate["runs-on"]
+    assert int(gate["timeout-minutes"]) >= 45
+    assert int(gate["timeout-minutes"]) < 120
 
 
 def test_compose_pins_the_ollama_context_window() -> None:

@@ -34,20 +34,11 @@ concurrency:
 jobs:
   gate:
     name: ruff + mypy + pytest
-    runs-on: [macos-arm64, quick]
-    # The quick lane's daemon enforces `timeout: 25m`. A `timeout-minutes:`
-    # ABOVE that is not honoured — the daemon kills the job and reports it
-    # CANCELLED rather than failed, which reads as a hang (run 12292). 24 keeps
-    # this under the daemon's cap so a real overrun still reports as a failure.
-    #
-    # 12 was too tight, and not because of the tests. Measured on run 12298:
-    # checkout took 2 seconds and `uv sync --frozen --all-extras` took 11.5
-    # minutes. The runner wipes its workdir every job, so the venv — torch,
-    # sentence-transformers, the lot — is rebuilt from scratch each time. The
-    # fast test suite itself is about 8 seconds when the host is quiet.
-    # 20 was still too tight when gate and full-suite raced on the same Mac
-    # (PR #71 run 297: pytest at 6% when the 20m job deadline fired).
-    timeout-minutes: 24
+    # Quick lane daemon caps at 25m. Under shared-host load the fast subset
+    # reached 97% then died at the deadline (PR #71 run 299). Heavy daemon
+    # cap is 2h — keep gate there with room for cold uv sync + starved pytest.
+    runs-on: [macos-arm64, heavy]
+    timeout-minutes: 45
     env:
       RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
       AGENT_TOOLSDIRECTORY: /tmp/hostedtoolcache
