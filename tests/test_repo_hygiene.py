@@ -417,7 +417,7 @@ def test_ui_entrypoint_pins_read_server_to_container_port() -> None:
 
 def test_streamlit_page_title_is_magiclib() -> None:
     app_src = (REPO_ROOT / "apps/ui/app.py").read_text()
-    assert 'page_title="MagicLib - HomeLib"' in app_src
+    assert 'page_title="MagicLib — HomeLib"' in app_src
     assert 'st.title("MagicLib")' in app_src
     config = (REPO_ROOT / ".streamlit/config.toml").read_text()
     assert 'toolbarMode = "minimal"' in config
