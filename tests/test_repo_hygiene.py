@@ -230,6 +230,21 @@ def test_mypy_and_full_suite_live_on_heavy_with_room_for_cold_sync() -> None:
     assert "uv run mypy" not in gate_cmds
 
 
+def test_ci_cancels_outdated_runs_on_the_same_pr_ref() -> None:
+    """A newer push on the same PR must cancel the in-flight run.
+
+    Without cancel-in-progress, tip fixes pile behind dead work on the shared
+    Mac (PR #71 runs 297–299). Group by workflow+ref; never cancel main.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    concurrency = workflow["concurrency"]
+    assert "github.ref" in str(concurrency["group"])
+    assert "github.workflow" in str(concurrency["group"])
+    cancel = str(concurrency["cancel-in-progress"])
+    assert "refs/heads/main" in cancel
+    assert "!=" in cancel or "ne" in cancel
+
+
 def test_full_suite_waits_for_gate_so_they_do_not_starve_each_other() -> None:
     """PR #71: gate must finish before full-suite, with room under load.
 
