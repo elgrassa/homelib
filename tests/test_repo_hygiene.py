@@ -230,6 +230,21 @@ def test_mypy_and_full_suite_live_on_heavy_with_room_for_cold_sync() -> None:
     assert "uv run mypy" not in gate_cmds
 
 
+def test_full_suite_waits_for_gate_so_they_do_not_starve_each_other() -> None:
+    """PR #71 run 297: parallel gate+full-suite on one Mac killed the quick job.
+
+    Both jobs uv-sync and pytest at once; the gate's fast subset reached only
+    6% before the 20m quick deadline. Serialize full-suite behind gate, and
+    keep the gate timeout under the daemon's 25m cap with a little headroom.
+    """
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text())
+    gate = workflow["jobs"]["gate"]
+    full = workflow["jobs"]["full-suite"]
+    assert full.get("needs") == ["gate"], full.get("needs")
+    assert int(gate["timeout-minutes"]) >= 24
+    assert int(gate["timeout-minutes"]) < 25
+
+
 def test_compose_pins_the_ollama_context_window() -> None:
     """An unpinned context window fails silently, which is the worst kind.
 
