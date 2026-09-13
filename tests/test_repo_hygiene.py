@@ -707,15 +707,21 @@ def test_ci_graph_refresh_relativises_source_paths(tmp_path: Path) -> None:
     the public snapshot. The step must strip the workdir prefix before the
     freshness check and the commit.
     """
+    import os
     import subprocess
 
     code, out, _called, tip = _run_graph_refresh(tmp_path, "main")
     assert code == 0, out
     assert tip == "chore(graph): refresh main post-merge", out
+    # Inherit PATH so Homebrew git is used. A hardcoded `/usr/bin:/bin` hits the
+    # macOS Xcode stub, which returns exit 69 when the license is unsigned
+    # (seen on runners 2026-09-13) and false-fails this check.
+    show_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    show_env["GIT_CONFIG_GLOBAL"] = str(tmp_path / "gitconfig-empty")
     committed = subprocess.run(
         ["git", "show", "main:graphify-out/graph.json"],
         cwd=tmp_path / "remote.git",
-        env={"GIT_CONFIG_GLOBAL": str(tmp_path / "gitconfig-empty"), "PATH": "/usr/bin:/bin"},
+        env=show_env,
         capture_output=True,
         text=True,
         check=True,
