@@ -11,11 +11,13 @@ the PR; ONNX swap is out of scope unless tests require it).
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import functools
 import gzip
 import os
 import shutil
 import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +59,12 @@ def inflate_seed_if_missing(target: Path, seed_gz: Path = SEED_GZ) -> bool:
     file wherever the environment says" is not a behaviour to have on a public
     host. Writes to a sibling temp file and renames, so a killed cold start
     never leaves a half-inflated store that SQLite would happily open.
+
+    Community Cloud reclones on reboot and often runs two script sessions at
+    once; both used to race on the same ``*.inflating`` path and one raised
+    ``FileNotFoundError`` on ``replace``. A process-unique temp name plus an
+    exclusive lock makes the loser wait, then no-op when the winner's file
+    is already present.
     """
     if not _inside_data_dir(target):
         raise RuntimeError(f"refusing to inflate the seed outside data/: {target}")
@@ -66,11 +74,24 @@ def inflate_seed_if_missing(target: Path, seed_gz: Path = SEED_GZ) -> bool:
     if not seed_gz.is_file():
         return False
     resolved.parent.mkdir(parents=True, exist_ok=True)
-    tmp = resolved.with_name(resolved.name + ".inflating")
-    with gzip.open(seed_gz, "rb") as src, tmp.open("wb") as dst:
-        shutil.copyfileobj(src, dst)
-    tmp.replace(resolved)
-    return True
+    lock_path = resolved.with_name(resolved.name + ".inflate.lock")
+    with lock_path.open("a+") as lock_f:
+        fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
+        try:
+            if resolved.is_file():
+                return False
+            tmp = resolved.with_name(
+                f"{resolved.name}.inflating.{os.getpid()}.{uuid.uuid4().hex}"
+            )
+            try:
+                with gzip.open(seed_gz, "rb") as src, tmp.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                os.replace(tmp, resolved)
+            finally:
+                tmp.unlink(missing_ok=True)
+            return True
+        finally:
+            fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
 
 def require_sqlite_path() -> Path:

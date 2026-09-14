@@ -72,6 +72,20 @@ def test_clicking_a_door_button_opens_that_door() -> None:
     assert "Roadmap" in [h.value for h in at.header]
 
 
+def test_ask_query_shows_shelf_hint_placeholder() -> None:
+    """Empty Ask box should grey-hint a shelf question, not look blank."""
+    from apps.ui.app import _ASK_QUERY_PLACEHOLDER
+
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Ask"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    ask = next(w for w in at.text_input if w.label == "Ask your library a question")
+    assert ask.placeholder == _ASK_QUERY_PLACEHOLDER
+    assert "Walden" in ask.placeholder
+    assert "shelf" in ask.placeholder.lower()
+
+
 def test_switching_doors_does_not_render_the_previous_door_body() -> None:
     """LIVE: Projection briefly kept Observatory/Ask controls until another rerun."""
     at = AppTest.from_file(str(APP_PATH), default_timeout=30)

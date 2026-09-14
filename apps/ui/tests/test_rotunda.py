@@ -164,3 +164,12 @@ def test_collapsed_rotunda_hides_enter_for_open_door() -> None:
     assert 'data-door="Ask" hidden' in doc or 'data-door="Ask"' in doc
     # Active Enter must stay hidden while collapsed (door body is already open).
     assert 'class="hl-enter-link" href="?door=Ask" data-door="Ask" hidden>' in doc
+
+
+def test_collapsed_rotunda_room_tall_enough_to_show_door_faces() -> None:
+    """Cloud/body-first layout shrinks the room, but 160px clipped arches mid-face."""
+    doc = build_rotunda_html(CROSSROADS_DOORS, "Ask", collapsed=True)
+    collapsed = doc.split("#hl-rotunda.hl-collapsed .hl-room")[1].split("}")[0]
+    assert "height: 280px" in collapsed
+    full = doc.split("#hl-rotunda .hl-room {")[1].split("}")[0]
+    assert "height: 380px" in full

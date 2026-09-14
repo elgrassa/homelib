@@ -82,6 +82,9 @@ _ASK_EXAMPLE_QUESTIONS: tuple[str, ...] = (
     "What does Machiavelli say about being feared versus loved?",
     'Where does Thoreau say he went to the woods "to live deliberately"?',
 )
+_ASK_QUERY_PLACEHOLDER = (
+    "e.g. Who wrote Walden? — answers cite passages from books on the shelf"
+)
 
 
 def render_ask_tab(client: Client) -> None:
@@ -91,7 +94,11 @@ def render_ask_tab(client: Client) -> None:
     for col, example in zip(example_cols, _ASK_EXAMPLE_QUESTIONS, strict=True):
         if col.button(example, key=f"ask_example_{example[:24]}"):
             st.session_state["ask_query"] = example
-    query = st.text_input("Ask your library a question", key="ask_query")
+    query = st.text_input(
+        "Ask your library a question",
+        key="ask_query",
+        placeholder=_ASK_QUERY_PLACEHOLDER,
+    )
     k = st.slider("Number of results", min_value=1, max_value=10, value=5, key="ask_k")
     if st.button("Ask", key="ask_submit", type="primary"):
         if not query.strip():
