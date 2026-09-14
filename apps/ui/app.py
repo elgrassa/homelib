@@ -82,12 +82,18 @@ _ASK_EXAMPLE_QUESTIONS: tuple[str, ...] = (
     "What does Machiavelli say about being feared versus loved?",
     'Where does Thoreau say he went to the woods "to live deliberately"?',
 )
-_ASK_QUERY_PLACEHOLDER = "e.g. Who wrote Walden? — answers cite passages from books on the shelf"
+# ASCII hyphen: Cloud's React Aria text input has dropped the em-dash form.
+_ASK_QUERY_PLACEHOLDER = (
+    "e.g. Who wrote Walden? - answers cite passages from books on the shelf"
+)
 
 
 def render_ask_tab(client: Client) -> None:
     st.header("Ask")
     st.caption("Try a known-good starter, or write your own question.")
+    # Visible hint: Streamlit Cloud 1.62 has rendered placeholder="" despite the
+    # widget kwarg (AppTest still sees it). Caption survives when the grey text does not.
+    st.caption(_ASK_QUERY_PLACEHOLDER)
     example_cols = st.columns(len(_ASK_EXAMPLE_QUESTIONS))
     for col, example in zip(example_cols, _ASK_EXAMPLE_QUESTIONS, strict=True):
         if col.button(example, key=f"ask_example_{example[:24]}"):
@@ -96,6 +102,7 @@ def render_ask_tab(client: Client) -> None:
         "Ask your library a question",
         key="ask_query",
         placeholder=_ASK_QUERY_PLACEHOLDER,
+        help=_ASK_QUERY_PLACEHOLDER,
     )
     k = st.slider("Number of results", min_value=1, max_value=10, value=5, key="ask_k")
     if st.button("Ask", key="ask_submit", type="primary"):
@@ -1043,7 +1050,8 @@ def main() -> None:
         )
         st.title("MagicLib")
         st.caption(
-            "HomeLib — a private academic shelf you can ask, with citations that open the page. "
+            "HomeLib — a private academic shelf you can ask, with citations you can expand "
+            "to the source passage. "
             f"{len(CROSSROADS_DOORS)} Crossroads doors. · build {resolve_build_sha()}"
         )
         st.markdown(
@@ -1067,23 +1075,10 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
-        # Door body first so Ask / Mentor stay above the fold; rotunda collapses
-        # to a nav band underneath (live-demo audit P2-1).
+        # Rotunda nav band first so the door faces stay in the first viewport
+        # (body-first + 380px room put the arches under the fold on Cloud).
         # Clear + remount the body slot when the door changes so previous-door
         # widgets cannot linger under the new heading (LIVE #48).
-        body_slot = st.empty()
-        with body_slot.container(key=f"door_body_{door}"):
-            try:
-                DOOR_RENDERERS[door](client)
-            finally:
-                persist_demo_session(client, st.session_state)
-        st.divider()
-        with st.container(key="door_navigation"):
-            cols = st.columns(len(CROSSROADS_DOORS))
-            for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
-                if col.button(door_label, key=f"door_{door_label}", width="stretch"):
-                    st.session_state["door"] = normalize_door(door_label)
-                    st.rerun()
         # unsafe_allow_javascript is safe: the HTML is built from CROSSROADS_DOORS
         # and DOOR_COPY only — never from user input.
         st.html(
@@ -1094,6 +1089,19 @@ def main() -> None:
             ),
             unsafe_allow_javascript=True,
         )
+        with st.container(key="door_navigation"):
+            cols = st.columns(len(CROSSROADS_DOORS))
+            for col, door_label in zip(cols, CROSSROADS_DOORS, strict=True):
+                if col.button(door_label, key=f"door_{door_label}", width="stretch"):
+                    st.session_state["door"] = normalize_door(door_label)
+                    st.rerun()
+        st.divider()
+        body_slot = st.empty()
+        with body_slot.container(key=f"door_body_{door}"):
+            try:
+                DOOR_RENDERERS[door](client)
+            finally:
+                persist_demo_session(client, st.session_state)
     else:
         st.markdown(
             "<style>"

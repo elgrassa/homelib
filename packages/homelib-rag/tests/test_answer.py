@@ -113,15 +113,45 @@ def test_answer_rejects_quote_not_in_chunk() -> None:
     """A fabricated quote not present in the cited chunk's text causes a
     degraded fallback instead of being passed through unchecked."""
     hits = [_hit(text="The fox jumps high.")]
+    # First attempt + citation-repair attempt both invent a non-verbatim quote.
     client = _ScriptedClient(
-        [_llm_json("It flies.", [{"passage": 1, "quote": "the fox flies away"}])]
+        [
+            _llm_json("It flies.", [{"passage": 1, "quote": "the fox flies away"}]),
+            _llm_json("It flies.", [{"passage": 1, "quote": "the fox flies away"}]),
+        ]
     )
 
     result = answer("does it fly?", hits, client=client, arm_used="hybrid")
 
     assert result.degraded is True
     assert result.citations == []
+    assert len(client.calls) == 2
+    assert "verbatim" in client.calls[1]["messages"][-1].content.lower() or (
+        "exact substring" in client.calls[1]["messages"][-1].content.lower()
+    )
 
+
+def test_answer_repairs_non_verbatim_quote_on_second_attempt() -> None:
+    """LIVE: uncached Ask hit citation_mismatch once; one repair with a real span recovers."""
+    hits = [_hit(text="The fox jumps high over the fence.")]
+    client = _ScriptedClient(
+        [
+            _llm_json("It jumps.", [{"passage": 1, "quote": "the fox leaps high"}]),
+            _llm_json("It jumps.", [{"passage": 1, "quote": "fox jumps high"}]),
+        ]
+    )
+
+    result = answer("does it jump?", hits, client=client, arm_used="hybrid_rerank")
+
+    assert result.degraded is False
+    assert result.answer == "It jumps."
+    assert len(result.citations) == 1
+    assert "fox jumps high" in result.citations[0].quote
+    assert len(client.calls) == 2
+    repair_user = client.calls[1]["messages"][-1].content
+    assert "rejected" in repair_user.lower()
+    assert result.tokens.prompt == 84  # 42 + 42
+    assert result.tokens.completion == 14
 
 def test_citation_quote_present_verbatim_in_chunk() -> None:
     """For each citation in a non-degraded response, `quote` is a substring

@@ -630,6 +630,80 @@ def _resolve_author_header_quote(
     return None
 
 
+def _citation_repair_prompt(reason: str) -> str:
+    """One-shot repair: keep the answer, replace quotes with verbatim spans."""
+    return (
+        "Your previous JSON was rejected because a citation quote was not an "
+        f"exact substring of any provided passage ({reason}). "
+        "Reply again with ONLY a JSON object of the same shape. Keep the same "
+        "factual answer if it is still supported. Every `quote` MUST be copied "
+        "character-for-character from a passage body below the metadata line "
+        "(not from `authors=...` headers, not a paraphrase). If you cannot, "
+        "return an empty citations list and say the passages do not answer."
+    )
+
+
+def _materialize_citations(
+    parsed: _RawAnswer,
+    context_hits: list[Hit],
+    book_meta: dict[str, tuple[str, list[str]]],
+    *,
+    validate_against: list[Hit],
+) -> tuple[list[Citation] | None, str | None]:
+    """Build validated citations, or ``(None, reason)`` when a quote is ungrounded."""
+    citations: list[Citation] = []
+    for raw_citation in parsed.citations:
+        resolved = _resolve_quote(raw_citation, context_hits)
+        source: Hit | None = None
+        citation_quote = raw_citation.quote
+        if resolved is not None:
+            source, citation_quote = resolved
+        else:
+            recovered = _resolve_author_header_quote(
+                raw_citation,
+                parsed.answer,
+                context_hits,
+                book_meta,
+            )
+            if recovered is not None:
+                source, citation_quote = recovered
+
+        if source is None:
+            return None, (
+                f"citation quote {raw_citation.quote[:60]!r} does not appear in any "
+                "of the passages provided"
+            )
+        title, _authors = book_meta.get(source.book_id, ("(unknown title)", []))
+        citations.append(
+            Citation(
+                chunk_id=source.chunk_id,
+                block_id=source.block_ids[0] if source.block_ids else "",
+                book_id=source.book_id,
+                book_title=title,
+                section_path=source.section_path,
+                page=source.page,
+                quote=citation_quote,
+            )
+        )
+    try:
+        _validate_citations(citations, validate_against)
+    except CitationValidationError as exc:
+        return None, str(exc)
+    return citations, None
+
+
+def _parse_raw_answer(raw_content: str) -> _RawAnswer:
+    text = (raw_content or "").strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return _RawAnswer.model_validate_json(text)
+
+
 def _validate_citations(citations: list[Citation], hits: list[Hit]) -> None:
     """Raise `CitationValidationError` unless every citation is genuine.
 
@@ -793,17 +867,9 @@ def answer(
         prompt=response.usage.prompt_tokens,
         completion=response.usage.completion_tokens,
     )
-    raw_content = (response.content or "").strip()
-    if raw_content.startswith("```"):
-        # Retry-without-format path sometimes wraps JSON in a fence.
-        lines = raw_content.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        raw_content = "\n".join(lines).strip()
+    raw_content = response.content or ""
     try:
-        parsed = _RawAnswer.model_validate_json(raw_content)
+        parsed = _parse_raw_answer(raw_content)
     except ValidationError as exc:
         # After a JSON-mode truncate/validate failure the free-form retry often
         # still isn't `_RawAnswer`-shaped; empty body keeps #A1 refuse+shelf.
@@ -825,47 +891,55 @@ def answer(
     # Only the passages actually shown to the model are citable. Slicing the
     # same way `_build_context_prompt` does keeps the two in step.
     context_hits = hits[:_MAX_CONTEXT_HITS]
-    citations: list[Citation] = []
-    for raw_citation in parsed.citations:
-        resolved = _resolve_quote(raw_citation, context_hits)
-        source: Hit | None = None
-        citation_quote = raw_citation.quote
-        if resolved is not None:
-            source, citation_quote = resolved
-        else:
-            recovered = _resolve_author_header_quote(
-                raw_citation,
-                parsed.answer,
-                context_hits,
-                book_meta,
+    citations, cite_err = _materialize_citations(
+        parsed, context_hits, book_meta, validate_against=hits
+    )
+    if cite_err is not None:
+        # One bounded repair (roadmap-style): fail closed still, but give the
+        # model a chance to copy a real span after a near-miss paraphrase.
+        logger.warning("answer(): citation grounding failed (%s); one repair attempt", cite_err)
+        repair_messages = [
+            *messages,
+            ChatMessage(role="assistant", content=raw_content.strip()),
+            ChatMessage(role="user", content=_citation_repair_prompt(cite_err)),
+        ]
+        try:
+            repair = client.chat(
+                repair_messages,
+                response_format={"type": "json_object"},
+                max_tokens=_ANSWER_MAX_TOKENS,
             )
-            if recovered is not None:
-                source, citation_quote = recovered
-
-        if source is None:
+        except LLMUnreachableError as exc:
+            return _fail(f"LLM unreachable during citation repair: {exc}", tokens=usage)
+        except Exception as exc:
+            logger.exception("answer(): unexpected error on citation repair")
+            return _fail(f"unexpected LLM error during citation repair: {exc}", tokens=usage)
+        usage = TokenUsage(
+            prompt=usage.prompt + repair.usage.prompt_tokens,
+            completion=usage.completion + repair.usage.completion_tokens,
+        )
+        try:
+            parsed = _parse_raw_answer(repair.content or "")
+        except ValidationError as exc:
+            return _fail(f"malformed LLM output after citation repair: {exc}", tokens=usage)
+        if not parsed.answer.strip():
+            return _fail("uncited empty LLM answer rejected", tokens=usage)
+        if (
+            parsed.answer.strip()
+            and not parsed.citations
+            and not is_passage_abstention(parsed.answer)
+        ):
             return _fail(
-                f"citation quote {raw_citation.quote[:60]!r} does not appear in any "
-                "of the passages provided",
+                "uncited factual answer rejected; empty citations with a claim",
                 tokens=usage,
             )
-        title, _authors = book_meta.get(source.book_id, ("(unknown title)", []))
-        citations.append(
-            Citation(
-                chunk_id=source.chunk_id,
-                block_id=source.block_ids[0] if source.block_ids else "",
-                book_id=source.book_id,
-                book_title=title,
-                section_path=source.section_path,
-                page=source.page,
-                quote=citation_quote,
-            )
+        citations, cite_err = _materialize_citations(
+            parsed, context_hits, book_meta, validate_against=hits
         )
+        if cite_err is not None:
+            return _fail(cite_err, tokens=usage)
 
-    try:
-        _validate_citations(citations, hits)
-    except CitationValidationError as exc:
-        return _fail(str(exc), tokens=usage)
-
+    assert citations is not None
     latency_ms = int((time.monotonic() - start) * 1000)
     return AskResponse(
         request_id=str(uuid.uuid4()),

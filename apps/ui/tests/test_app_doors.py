@@ -65,11 +65,36 @@ def test_clicking_a_door_button_opens_that_door() -> None:
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["door"] == target
     assert f"Open door: {target}" not in [c.value for c in at.caption]
-    # Door body renders above the rotunda band; room still faces the target.
+    # Rotunda nav band faces the target; door body follows underneath.
     (rotunda,) = at.get("html")
     assert f"Facing: {target}" in rotunda.body
     assert "hl-collapsed" in rotunda.body
     assert "Roadmap" in [h.value for h in at.header]
+
+
+def test_rotunda_nav_band_renders_above_ask_door_body() -> None:
+    """LIVE: body-first + 380px room put door faces under the fold on Cloud."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Ask"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    children = at.main.children
+    rotunda_i = next(
+        i
+        for i, child in children.items()
+        if "hl-rotunda" in getattr(child, "body", "")
+        or (type(child).__name__ == "UnknownElement" and "hl-rotunda" in repr(child))
+    )
+    ask_body_i = next(
+        i
+        for i, child in children.items()
+        if type(child).__name__ == "Block"
+        and any(
+            type(grandchild).__name__ == "Header" and getattr(grandchild, "value", None) == "Ask"
+            for grandchild in (getattr(child, "children", {}) or {}).values()
+        )
+    )
+    assert rotunda_i < ask_body_i
 
 
 def test_ask_query_shows_shelf_hint_placeholder() -> None:
@@ -84,6 +109,19 @@ def test_ask_query_shows_shelf_hint_placeholder() -> None:
     assert ask.placeholder == _ASK_QUERY_PLACEHOLDER
     assert "Walden" in ask.placeholder
     assert "shelf" in ask.placeholder.lower()
+    # Cloud has dropped the placeholder attribute; caption must still show the hint.
+    assert any(c.value == _ASK_QUERY_PLACEHOLDER for c in at.caption)
+
+
+def test_magiclib_caption_promises_expandable_source_not_page_open() -> None:
+    """LIVE: tagline said 'open the page' while UI only expands a source block."""
+    at = AppTest.from_file(str(APP_PATH), default_timeout=30)
+    at.session_state["door"] = "Ask"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    captions = [c.value for c in at.caption]
+    assert any("source passage" in c for c in captions)
+    assert not any("open the page" in c for c in captions)
 
 
 def test_switching_doors_does_not_render_the_previous_door_body() -> None:
