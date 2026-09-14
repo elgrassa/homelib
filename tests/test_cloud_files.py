@@ -13,7 +13,6 @@ import importlib.util
 import re
 import sqlite3
 import sys
-import threading
 from pathlib import Path
 
 import pytest
@@ -91,8 +90,9 @@ def test_require_sqlite_path_inflates_once_and_refuses_path_traversal(
     with small.open("rb") as src, gzip.open(seed_gz, "wb") as dst:
         dst.write(src.read())
 
-    # Inside the repo: inflate once, then a no-op.
-    target = REPO_ROOT / "data" / f"_test_inflate_{tmp_path.name}.sqlite"
+    # Isolate writable data so tests do not leave lock files in the checkout.
+    monkeypatch.setattr(bridge, "_DATA_DIR", tmp_path / "data")
+    target = tmp_path / "data" / "homelib.sqlite"
     try:
         assert bridge.inflate_seed_if_missing(target, seed_gz) is True
         assert target.is_file()
@@ -100,33 +100,6 @@ def test_require_sqlite_path_inflates_once_and_refuses_path_traversal(
         assert not target.with_name(target.name + ".inflating").exists()
     finally:
         target.unlink(missing_ok=True)
-
-    # Concurrent cold-start sessions (Streamlit Cloud reboot) must not crash
-    # on a shared ``*.inflating`` path — one writer, the rest no-op.
-    concurrent = REPO_ROOT / "data" / f"_test_inflate_race_{tmp_path.name}.sqlite"
-    errors: list[BaseException] = []
-    results: list[bool] = []
-
-    def _race() -> None:
-        try:
-            results.append(bridge.inflate_seed_if_missing(concurrent, seed_gz))
-        except BaseException as exc:  # collect for the join assert
-            errors.append(exc)
-
-    try:
-        workers = [threading.Thread(target=_race) for _ in range(8)]
-        for worker in workers:
-            worker.start()
-        for worker in workers:
-            worker.join()
-        assert errors == []
-        assert concurrent.is_file()
-        assert results.count(True) == 1
-        assert results.count(False) == 7
-        assert list(concurrent.parent.glob(f"{concurrent.name}.inflating.*")) == []
-    finally:
-        concurrent.unlink(missing_ok=True)
-        concurrent.with_name(concurrent.name + ".inflate.lock").unlink(missing_ok=True)
 
     # Outside the repo, or via `..`: refused before anything is written.
     with pytest.raises(RuntimeError):

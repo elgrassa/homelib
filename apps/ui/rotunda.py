@@ -88,7 +88,7 @@ def build_rotunda_html(
     `active` must be one of `doors`; it is the door facing the viewer on load.
     `reduced_motion=True` disables the rotation transition from the Python
     side (the CSS media query does the same for users who asked their OS).
-    `collapsed=True` shrinks the room to a navigation band and hides the
+    `collapsed=True` keeps the full door height in a navigation band and hides the
     duplicate Enter card once a door's content is already on screen.
     The markup lives in `rotunda_template.html` next to this module — CSS and
     JS are not Python, and a 100-column linter should not shape a gradient.

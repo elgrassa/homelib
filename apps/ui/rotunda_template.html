@@ -25,9 +25,10 @@
     margin-top: 1.25rem;
     padding-bottom: 4.5rem; /* Streamlit status badges sit bottom-right on Cloud */
   }
-  /* Nav band: still show door faces + floor seal (160px clipped them mid-arch). */
+  /* Perspective enlarges a 244px door at z=300px to 352px. Keep the
+     whole arch and label inside the room, including the mobile door. */
   #hl-rotunda.hl-collapsed .hl-room {
-    height: 280px;
+    height: 380px;
   }
   #hl-rotunda.hl-collapsed .hl-result {
     display: none;

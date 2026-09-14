@@ -166,10 +166,31 @@ def test_collapsed_rotunda_hides_enter_for_open_door() -> None:
     assert 'class="hl-enter-link" href="?door=Ask" data-door="Ask" hidden>' in doc
 
 
-def test_collapsed_rotunda_room_tall_enough_to_show_door_faces() -> None:
-    """Cloud/body-first layout shrinks the room, but 160px clipped arches mid-face."""
+def test_collapsed_rotunda_contains_perspective_enlarged_door() -> None:
+    """Cloud screenshot: the 244px door projects to 352px at z=300px."""
+    import re
+
     doc = build_rotunda_html(CROSSROADS_DOORS, "Ask", collapsed=True)
-    collapsed = doc.split("#hl-rotunda.hl-collapsed .hl-room")[1].split("}")[0]
-    assert "height: 280px" in collapsed
-    full = doc.split("#hl-rotunda .hl-room {")[1].split("}")[0]
-    assert "height: 380px" in full
+
+    def rule(selector: str) -> str:
+        return doc.split(selector + " {")[1].split("}")[0]
+
+    def pixels(css: str, property_name: str) -> float:
+        match = re.search(rf"(?:^|[;\s]){property_name}:\s*(-?[0-9]+)px", css)
+        assert match is not None
+        return float(match.group(1))
+
+    room_height = pixels(rule("#hl-rotunda.hl-collapsed .hl-room"), "height")
+    perspective = pixels(rule("#hl-rotunda .hl-room"), "perspective")
+    depth = re.search(r"translateZ\(([0-9]+)px\)", doc)
+    assert depth is not None
+    scale = perspective / (perspective - float(depth.group(1)))
+    # Desktop and the narrower mobile door must both stay inside the room.
+    desktop = rule("#hl-rotunda .hl-door")
+    mobile = doc.split("@media (max-width: 720px)")[1]
+    mobile_door = mobile.split("#hl-rotunda .hl-door {")[1].split("}")[0]
+    for door_height in (pixels(desktop, "height"), pixels(mobile_door, "height")):
+        top = room_height / 2 + pixels(desktop, "top") * scale
+        bottom = top + door_height * scale
+        assert top >= 8, "door arch is clipped by the room"
+        assert bottom <= room_height - 8, "door label or foot is clipped by the room"
