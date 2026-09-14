@@ -153,6 +153,7 @@ def test_answer_repairs_non_verbatim_quote_on_second_attempt() -> None:
     assert result.tokens.prompt == 84  # 42 + 42
     assert result.tokens.completion == 14
 
+
 def test_citation_quote_present_verbatim_in_chunk() -> None:
     """For each citation in a non-degraded response, `quote` is a substring
     of the matching hit's text."""

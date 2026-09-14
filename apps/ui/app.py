@@ -83,9 +83,7 @@ _ASK_EXAMPLE_QUESTIONS: tuple[str, ...] = (
     'Where does Thoreau say he went to the woods "to live deliberately"?',
 )
 # ASCII hyphen: Cloud's React Aria text input has dropped the em-dash form.
-_ASK_QUERY_PLACEHOLDER = (
-    "e.g. Who wrote Walden? - answers cite passages from books on the shelf"
-)
+_ASK_QUERY_PLACEHOLDER = "e.g. Who wrote Walden? - answers cite passages from books on the shelf"
 
 
 def render_ask_tab(client: Client) -> None:
