@@ -243,10 +243,10 @@
   "241": "MonkeyPatch",
   "242": "Path",
   "243": "pre-push",
+  "244": "load_indexed_chunk_ids",
   "245": "BookDoc",
+  "246": "_is_self_referential",
   "247": "Any",
-  "248": "Path",
-  "249": "Response",
   "252": "spec: progress — reading and listening positions",
   "257": "4. Plan 2.1 / Zoomcamp checklist matrix",
   "258": "datetime",
@@ -294,7 +294,5 @@
   "366": "MonkeyPatch",
   "367": "MonkeyPatch",
   "376": "Namespace",
-  "377": "Namespace",
-  "378": "MonkeyPatch",
-  "379": "Path"
+  "377": "Namespace"
 }
