@@ -80,13 +80,11 @@ def inflate_seed_if_missing(target: Path, seed_gz: Path = SEED_GZ) -> bool:
         try:
             if resolved.is_file():
                 return False
-            tmp = resolved.with_name(
-                f"{resolved.name}.inflating.{os.getpid()}.{uuid.uuid4().hex}"
-            )
+            tmp = resolved.with_name(f"{resolved.name}.inflating.{os.getpid()}.{uuid.uuid4().hex}")
             try:
                 with gzip.open(seed_gz, "rb") as src, tmp.open("wb") as dst:
                     shutil.copyfileobj(src, dst)
-                os.replace(tmp, resolved)
+                tmp.replace(resolved)
             finally:
                 tmp.unlink(missing_ok=True)
             return True

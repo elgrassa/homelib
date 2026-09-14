@@ -110,7 +110,7 @@ def test_require_sqlite_path_inflates_once_and_refuses_path_traversal(
     def _race() -> None:
         try:
             results.append(bridge.inflate_seed_if_missing(concurrent, seed_gz))
-        except BaseException as exc:  # noqa: BLE001 — collect for the join assert
+        except BaseException as exc:  # collect for the join assert
             errors.append(exc)
 
     try:

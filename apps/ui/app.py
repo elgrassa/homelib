@@ -82,9 +82,7 @@ _ASK_EXAMPLE_QUESTIONS: tuple[str, ...] = (
     "What does Machiavelli say about being feared versus loved?",
     'Where does Thoreau say he went to the woods "to live deliberately"?',
 )
-_ASK_QUERY_PLACEHOLDER = (
-    "e.g. Who wrote Walden? — answers cite passages from books on the shelf"
-)
+_ASK_QUERY_PLACEHOLDER = "e.g. Who wrote Walden? — answers cite passages from books on the shelf"
 
 
 def render_ask_tab(client: Client) -> None:
